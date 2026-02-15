@@ -1,0 +1,55 @@
+[package]
+name = "xplorertui"
+version = "0.1.0"
+description = "event-driven async tui for X"
+authors = ["Jesse Armand <jesse@jessearmand.com>"]
+license = "MIT"
+edition = "2024"
+
+[dependencies]
+# TUI
+ratatui = "0.30.0"
+crossterm = { version = "0.28.1", features = ["event-stream"] }
+
+# Async runtime
+tokio = { version = "1.40.0", features = ["full"] }
+futures = "0.3.31"
+
+# HTTP & API
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Auth
+oauth2 = { version = "5", features = ["reqwest"] }
+hex = "0.4"
+hmac = "0.12"
+sha1 = "0.10"
+base64 = "0.22"
+rand = "0.9"
+
+# Config & storage
+dotenvy = "0.15"
+dirs = "6"
+toml = "0.8"
+
+# Error handling
+color-eyre = "0.6.3"
+thiserror = "2"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+url = "2"
+open = "5"
+tokio-util = "0.7"
+unicode-width = "0.2"
+percent-encoding = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Read the optimization guideline for more details: https://ratatui.rs/recipes/apps/release-your-app/#optimizations
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
