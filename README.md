@@ -14,7 +14,13 @@ Browse your home timeline, mentions, bookmarks, search tweets, view threads, and
 - Rust (2024 edition) — install via [rustup](https://rustup.rs)
 - An [X Developer account](https://developer.x.com) with API credentials
 
-### Build & Run
+### Install
+
+```bash
+cargo install --path .
+```
+
+Or build and run without installing:
 
 ```bash
 cargo build --release
@@ -47,20 +53,28 @@ xplorertui supports three auth methods, auto-detected from environment variables
 
 ### OAuth 2.0 PKCE (recommended)
 
-Enables full user-context access (home timeline, mentions, bookmarks). On first run, a browser window opens for authorization. Tokens are persisted at `~/.config/xplorertui/tokens.json`.
+Enables full user-context access (home timeline, mentions, bookmarks). Tokens are persisted at `~/.config/xplorertui/tokens.json` and automatically refreshed when they expire.
 
 ```env
 X_CLIENT_ID=your_client_id
 X_CLIENT_SECRET=your_client_secret  # optional for public clients
 ```
 
+After setting up your `.env` file, authenticate before launching the TUI:
+
+```bash
+xplorertui auth
+```
+
+This opens your browser for authorization and saves the tokens. You can also authenticate from within the TUI by typing `:auth` in command mode.
+
 ### OAuth 1.0a
 
 Full user-context access using HMAC-SHA1 signed requests.
 
 ```env
-X_API_KEY=your_api_key
-X_API_SECRET=your_api_secret
+X_CONSUMER_KEY=your_consumer_key
+X_CONSUMER_KEY_SECRET=your_consumer_key_secret
 X_ACCESS_TOKEN=your_access_token
 X_ACCESS_TOKEN_SECRET=your_access_token_secret
 X_BEARER_TOKEN=your_bearer_token  # optional, used for read-only endpoints
@@ -117,6 +131,7 @@ Type `:` to enter command mode, then:
 | `:home` | Switch to home timeline |
 | `:mentions` / `:m` | Switch to mentions |
 | `:bookmarks` / `:b` | Switch to bookmarks |
+| `:auth` / `:login` | Authenticate with OAuth 2.0 PKCE |
 | `:help` / `:h` | Show help |
 | `:quit` / `:q` | Quit |
 

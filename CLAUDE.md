@@ -66,7 +66,7 @@ Credentials loaded from environment variables via `.env` files in priority order
 
 | Variable | Auth Method |
 |---|---|
-| `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` | OAuth 1.0a |
+| `X_CONSUMER_KEY`, `X_CONSUMER_KEY_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` | OAuth 1.0a |
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` (optional) | OAuth 2.0 PKCE |
 | `X_BEARER_TOKEN` | App-only bearer |
 
