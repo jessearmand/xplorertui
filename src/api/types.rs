@@ -166,8 +166,8 @@ pub struct Entities {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UrlEntity {
-    pub start: u32,
-    pub end: u32,
+    pub start: i32,
+    pub end: i32,
     pub url: String,
     #[serde(default)]
     pub expanded_url: Option<String>,
@@ -181,15 +181,15 @@ pub struct UrlEntity {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct HashtagEntity {
-    pub start: u32,
-    pub end: u32,
+    pub start: i32,
+    pub end: i32,
     pub tag: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct MentionEntity {
-    pub start: u32,
-    pub end: u32,
+    pub start: i32,
+    pub end: i32,
     pub username: String,
     #[serde(default)]
     pub id: Option<String>,
@@ -197,15 +197,15 @@ pub struct MentionEntity {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CashtagEntity {
-    pub start: u32,
-    pub end: u32,
+    pub start: i32,
+    pub end: i32,
     pub tag: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Annotation {
-    pub start: u32,
-    pub end: u32,
+    pub start: i32,
+    pub end: i32,
     pub probability: f64,
     #[serde(rename = "type")]
     pub type_: String,
