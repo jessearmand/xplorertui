@@ -6,8 +6,10 @@ use serde::Deserialize;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(bound(deserialize = "T: serde::de::DeserializeOwned"))]
 pub struct ApiResponse<T> {
-    pub data: T,
+    #[serde(default)]
+    pub data: Option<T>,
     #[serde(default)]
     pub includes: Option<Includes>,
     #[serde(default)]

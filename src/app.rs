@@ -566,7 +566,7 @@ impl App {
                         self.home_timeline.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.home_timeline.includes = resp.includes;
-                        self.home_timeline.tweets.extend(resp.data);
+                        self.home_timeline.tweets.extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading timeline: {e}"));
@@ -582,7 +582,7 @@ impl App {
                         self.viewed_user_timeline.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.viewed_user_timeline.includes = resp.includes;
-                        self.viewed_user_timeline.tweets.extend(resp.data);
+                        self.viewed_user_timeline.tweets.extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading user timeline: {e}"));
@@ -594,17 +594,20 @@ impl App {
                 match *result {
                     Ok(resp) => {
                         self.cache_users_from_includes(&resp.includes);
-                        let tweet = resp.data;
-                        let conv_id = tweet
-                            .conversation_id
-                            .clone()
-                            .unwrap_or_else(|| tweet.id.clone());
-                        self.thread_root = Some(tweet);
-                        self.events.send(AppEvent::FetchThread {
-                            conversation_id: conv_id.clone(),
-                            pagination_token: None,
-                        });
-                        self.push_view(ViewKind::Thread(conv_id));
+                        if let Some(tweet) = resp.data {
+                            let conv_id = tweet
+                                .conversation_id
+                                .clone()
+                                .unwrap_or_else(|| tweet.id.clone());
+                            self.thread_root = Some(tweet);
+                            self.events.send(AppEvent::FetchThread {
+                                conversation_id: conv_id.clone(),
+                                pagination_token: None,
+                            });
+                            self.push_view(ViewKind::Thread(conv_id));
+                        } else {
+                            self.status_message = Some("Tweet not found".to_string());
+                        }
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading tweet: {e}"));
@@ -619,7 +622,7 @@ impl App {
                 match result {
                     Ok(resp) => {
                         self.cache_users_from_includes(&resp.includes);
-                        self.thread_tweets = resp.data;
+                        self.thread_tweets = resp.data.unwrap_or_default();
                         // Push the thread view if not already on it.
                         if self.current_view() != Some(&ViewKind::Thread(conversation_id.clone())) {
                             self.push_view(ViewKind::Thread(conversation_id));
@@ -634,11 +637,14 @@ impl App {
                 self.loading = false;
                 match result {
                     Ok(resp) => {
-                        let user = resp.data;
-                        let username = user.username.clone();
-                        self.viewed_user = Some(user);
-                        self.viewed_user_timeline = TimelineState::default();
-                        self.push_view(ViewKind::UserProfile(username));
+                        if let Some(user) = resp.data {
+                            let username = user.username.clone();
+                            self.viewed_user = Some(user);
+                            self.viewed_user_timeline = TimelineState::default();
+                            self.push_view(ViewKind::UserProfile(username));
+                        } else {
+                            self.status_message = Some("User not found".to_string());
+                        }
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading user: {e}"));
@@ -654,7 +660,7 @@ impl App {
                         self.search_results.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.search_results.includes = resp.includes;
-                        self.search_results.tweets = resp.data;
+                        self.search_results.tweets = resp.data.unwrap_or_default();
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error searching: {e}"));
@@ -670,7 +676,7 @@ impl App {
                         self.mentions.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.mentions.includes = resp.includes;
-                        self.mentions.tweets.extend(resp.data);
+                        self.mentions.tweets.extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading mentions: {e}"));
@@ -686,7 +692,7 @@ impl App {
                         self.bookmarks.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.bookmarks.includes = resp.includes;
-                        self.bookmarks.tweets.extend(resp.data);
+                        self.bookmarks.tweets.extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading bookmarks: {e}"));
@@ -697,7 +703,7 @@ impl App {
                 self.loading = false;
                 match result {
                     Ok(resp) => {
-                        self.followers = resp.data;
+                        self.followers = resp.data.unwrap_or_default();
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading followers: {e}"));
@@ -708,7 +714,7 @@ impl App {
                 self.loading = false;
                 match result {
                     Ok(resp) => {
-                        self.following = resp.data;
+                        self.following = resp.data.unwrap_or_default();
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading following: {e}"));
