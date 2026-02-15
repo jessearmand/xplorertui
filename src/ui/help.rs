@@ -65,6 +65,7 @@ impl Widget for HelpView {
             binding_line(":", "Command mode", key_style, desc_style),
             binding_line("/", "Search tweets", key_style, desc_style),
             binding_line("@", "Look up user", key_style, desc_style),
+            binding_line(":auth", "Authenticate (OAuth2 PKCE)", key_style, desc_style),
             binding_line("Ctrl-C", "Quit", key_style, desc_style),
         ];
 

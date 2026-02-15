@@ -95,6 +95,7 @@ pub enum AppEvent {
     },
 
     // -- Auth --
+    StartAuth,
     AuthCompleted(Result<String, String>),
 }
 

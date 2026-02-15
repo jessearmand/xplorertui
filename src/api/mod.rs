@@ -99,19 +99,40 @@ impl XApiClient {
         Ok(id)
     }
 
+    /// Load an OAuth 2.0 bearer token, auto-refreshing if expired.
+    async fn get_oauth2_bearer(&self) -> Result<String, ApiClientError> {
+        let oauth2_creds = self
+            .auth
+            .credentials
+            .oauth2
+            .as_ref()
+            .ok_or(ApiClientError::Auth(AuthError::NoAuthMethod))?;
+
+        let Some(tokens) = oauth2_pkce::load_tokens().map_err(AuthError::OAuth2)? else {
+            return Err(ApiClientError::Auth(AuthError::NoAuthMethod));
+        };
+
+        // Refresh if within 60 seconds of expiry.
+        if let Some(expires_at) = tokens.expires_at
+            && chrono::Utc::now() + chrono::Duration::seconds(60) >= expires_at
+            && let Some(ref refresh) = tokens.refresh_token
+        {
+            let refreshed = oauth2_pkce::refresh_token(oauth2_creds, refresh)
+                .await
+                .map_err(AuthError::OAuth2)?;
+            return Ok(format!("Bearer {}", refreshed.access_token));
+        }
+
+        Ok(format!("Bearer {}", tokens.access_token))
+    }
+
     /// Issue a GET request with bearer-token authorization.
     pub(crate) async fn bearer_get<T: DeserializeOwned>(
         &self,
         url: &str,
     ) -> Result<T, ApiClientError> {
         let auth_header = match self.auth.method {
-            AuthMethod::OAuth2Pkce => {
-                if let Some(tokens) = oauth2_pkce::load_tokens().map_err(AuthError::OAuth2)? {
-                    format!("Bearer {}", tokens.access_token)
-                } else {
-                    return Err(ApiClientError::Auth(AuthError::NoAuthMethod));
-                }
-            }
+            AuthMethod::OAuth2Pkce => self.get_oauth2_bearer().await?,
             _ => self.auth.get_bearer_header()?,
         };
 
@@ -127,7 +148,7 @@ impl XApiClient {
 
     /// Issue a GET request with user-context authorization.
     ///
-    /// OAuth2 PKCE  -> stored access token
+    /// OAuth2 PKCE  -> stored access token (auto-refreshed)
     /// OAuth 1.0a   -> signed OAuth header
     /// Bearer-only  -> fall back to bearer token
     pub(crate) async fn oauth_get<T: DeserializeOwned>(
@@ -135,13 +156,7 @@ impl XApiClient {
         url: &str,
     ) -> Result<T, ApiClientError> {
         let auth_header = match self.auth.method {
-            AuthMethod::OAuth2Pkce => {
-                if let Some(tokens) = oauth2_pkce::load_tokens().map_err(AuthError::OAuth2)? {
-                    format!("Bearer {}", tokens.access_token)
-                } else {
-                    return Err(ApiClientError::Auth(AuthError::NoAuthMethod));
-                }
-            }
+            AuthMethod::OAuth2Pkce => self.get_oauth2_bearer().await?,
             AuthMethod::OAuth1 => self.auth.get_oauth_header("GET", url, None)?,
             AuthMethod::BearerOnly => self.auth.get_bearer_header()?,
         };

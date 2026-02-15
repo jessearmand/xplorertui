@@ -59,6 +59,11 @@ pub fn detect_auth_method(creds: &CredentialSet) -> Result<AuthMethod, AuthError
     }
 }
 
+/// Check whether persisted OAuth 2.0 tokens exist on disk.
+pub fn has_stored_tokens() -> bool {
+    oauth2_pkce::load_tokens().ok().flatten().is_some()
+}
+
 impl AuthProvider {
     /// Create a new provider by loading credentials and detecting the best method.
     pub fn new(credentials: CredentialSet) -> Result<Self, AuthError> {

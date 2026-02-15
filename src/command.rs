@@ -9,6 +9,7 @@ pub enum Command {
     Mentions,
     Bookmarks,
     Help,
+    Auth,
     Quit,
 }
 
@@ -32,6 +33,7 @@ pub fn parse_command(input: &str) -> Option<Command> {
         "mentions" | "m" => Some(Command::Mentions),
         "bookmarks" | "b" => Some(Command::Bookmarks),
         "help" | "h" => Some(Command::Help),
+        "auth" | "login" => Some(Command::Auth),
         "quit" | "q" => Some(Command::Quit),
         _ => None,
     }
@@ -97,6 +99,8 @@ mod tests {
         assert_eq!(parse_command(":h"), Some(Command::Help));
         assert_eq!(parse_command(":b"), Some(Command::Bookmarks));
         assert_eq!(parse_command(":m"), Some(Command::Mentions));
+        assert_eq!(parse_command(":auth"), Some(Command::Auth));
+        assert_eq!(parse_command(":login"), Some(Command::Auth));
     }
 
     #[test]

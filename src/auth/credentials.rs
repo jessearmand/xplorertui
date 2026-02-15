@@ -6,7 +6,7 @@ use thiserror::Error;
 pub enum CredentialError {
     #[error("failed to load .env file: {0}")]
     EnvFile(#[from] dotenvy::Error),
-    #[error("no credentials found; set X_API_KEY/X_CLIENT_ID/X_BEARER_TOKEN in env or .env")]
+    #[error("no credentials found; set X_CONSUMER_KEY/X_CLIENT_ID/X_BEARER_TOKEN in env or .env")]
     NoCredentials,
 }
 
@@ -41,6 +41,18 @@ pub struct CredentialSet {
     pub bearer: Option<BearerCredentials>,
 }
 
+/// Load .env files into the process environment (best effort).
+///
+/// Call this before reading env vars when you want .env values available
+/// but don't need a full credential validation pass.
+pub fn load_env_files() {
+    for path in env_file_paths() {
+        if path.exists() {
+            let _ = dotenvy::from_path(&path);
+        }
+    }
+}
+
 /// Return candidate .env paths in priority order.
 fn env_file_paths() -> Vec<PathBuf> {
     let mut paths = Vec::new();
@@ -57,19 +69,13 @@ fn env_file_paths() -> Vec<PathBuf> {
 /// Priority: ~/.config/xplorertui/.env > ~/.config/x-cli/.env > cwd .env
 /// Variables already set in the environment take precedence.
 pub fn load_credentials() -> Result<CredentialSet, CredentialError> {
-    // Load .env files (earlier files have higher priority because dotenvy
-    // does NOT overwrite existing env vars).
-    for path in env_file_paths() {
-        if path.exists() {
-            let _ = dotenvy::from_path(&path);
-        }
-    }
+    load_env_files();
 
     let get = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
 
     let oauth1 = match (
-        get("X_API_KEY"),
-        get("X_API_SECRET"),
+        get("X_CONSUMER_KEY"),
+        get("X_CONSUMER_KEY_SECRET"),
         get("X_ACCESS_TOKEN"),
         get("X_ACCESS_TOKEN_SECRET"),
     ) {

@@ -7,6 +7,8 @@ use ratatui::DefaultTerminal;
 
 use crate::api::XApiClient;
 use crate::api::types::{Includes, Tweet, User};
+use crate::auth::AuthProvider;
+use crate::auth::credentials::CredentialSet;
 use crate::command::{self, Command};
 use crate::config::AppConfig;
 use crate::event::{ApiResult, AppEvent, Event, EventHandler, ViewKind};
@@ -78,6 +80,9 @@ pub struct App {
     pub command_input: String,
     pub search_input: String,
 
+    // Credentials (needed for runtime auth flows)
+    pub credentials: CredentialSet,
+
     // API client (wrapped for sharing with spawned tasks)
     pub api_client: Option<Arc<Mutex<XApiClient>>>,
 
@@ -90,7 +95,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(config: AppConfig, api_client: Option<XApiClient>) -> Self {
+    pub fn new(
+        config: AppConfig,
+        api_client: Option<XApiClient>,
+        credentials: CredentialSet,
+    ) -> Self {
         let default_view = match config.default_view {
             crate::config::DefaultView::Home => ViewKind::Home,
             crate::config::DefaultView::Mentions => ViewKind::Mentions,
@@ -124,6 +133,7 @@ impl App {
             following: Vec::new(),
             command_input: String::new(),
             search_input: String::new(),
+            credentials,
             api_client: api_client.map(|c| Arc::new(Mutex::new(c))),
             users_cache: HashMap::new(),
             status_message: None,
@@ -165,7 +175,13 @@ impl App {
                         self.handle_key_event(key);
                     }
                 }
-                Event::App(app_event) => self.handle_app_event(*app_event),
+                Event::App(app_event) => {
+                    if matches!(*app_event, AppEvent::StartAuth) {
+                        self.run_auth_flow(&mut terminal).await;
+                    } else {
+                        self.handle_app_event(*app_event);
+                    }
+                }
             }
         }
         Ok(())
@@ -350,6 +366,9 @@ impl App {
             Some(Command::Help) => {
                 self.events.send(AppEvent::PushView(ViewKind::Help));
             }
+            Some(Command::Auth) => {
+                self.events.send(AppEvent::StartAuth);
+            }
             Some(Command::Quit) => {
                 self.events.send(AppEvent::Quit);
             }
@@ -512,6 +531,59 @@ impl App {
                 });
             }
             _ => {}
+        }
+    }
+
+    // -- Auth flow (suspends TUI) ------------------------------------------
+
+    async fn run_auth_flow(&mut self, terminal: &mut DefaultTerminal) {
+        let Some(ref oauth2_creds) = self.credentials.oauth2 else {
+            self.status_message =
+                Some("OAuth 2.0 not configured. Set X_CLIENT_ID in your .env file.".into());
+            return;
+        };
+        let oauth2_creds = oauth2_creds.clone();
+
+        // Suspend the TUI so the user can interact with their browser.
+        ratatui::restore();
+        println!("Starting OAuth 2.0 PKCE authorization flow...");
+        println!("Your browser should open. If not, check the URL printed above.");
+        println!();
+
+        let result = crate::auth::oauth2_pkce::start_pkce_flow(&oauth2_creds).await;
+
+        match &result {
+            Ok(_) => {
+                println!();
+                println!("Authentication successful! Tokens saved.");
+            }
+            Err(e) => {
+                println!();
+                println!("Authentication failed: {e}");
+            }
+        }
+
+        println!();
+        println!("Press Enter to return to the TUI...");
+        let _ = std::io::stdin().read_line(&mut String::new());
+
+        // Re-initialize the terminal and event handler.
+        *terminal = ratatui::init();
+        self.events = EventHandler::new();
+
+        // On success, rebuild the API client with the new tokens.
+        if result.is_ok() {
+            match AuthProvider::new(self.credentials.clone()) {
+                Ok(auth) => {
+                    self.api_client = Some(Arc::new(Mutex::new(XApiClient::new(auth))));
+                    self.status_message = Some("Authenticated successfully!".into());
+                }
+                Err(e) => {
+                    self.status_message = Some(format!("Auth provider error: {e}"));
+                }
+            }
+        } else if let Err(e) = result {
+            self.status_message = Some(format!("Auth failed: {e}"));
         }
     }
 
@@ -722,7 +794,8 @@ impl App {
                 }
             }
 
-            // Auth
+            // Auth (StartAuth is handled in run() before reaching here)
+            AppEvent::StartAuth => unreachable!("StartAuth intercepted in run()"),
             AppEvent::AuthCompleted(result) => match result {
                 Ok(user_id) => {
                     self.status_message = Some(format!("Authenticated as {user_id}"));
