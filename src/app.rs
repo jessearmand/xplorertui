@@ -546,9 +546,6 @@ impl App {
 
         // Suspend the TUI so the user can interact with their browser.
         ratatui::restore();
-        println!("Starting OAuth 2.0 PKCE authorization flow...");
-        println!("Your browser should open. If not, check the URL printed above.");
-        println!();
 
         let result = crate::auth::oauth2_pkce::start_pkce_flow(
             &oauth2_creds,

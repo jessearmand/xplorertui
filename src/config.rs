@@ -49,7 +49,7 @@ impl Default for AppConfig {
 }
 
 fn config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("xplorertui").join("config.toml"))
+    dirs::home_dir().map(|home| home.join(".config/xplorertui/config.toml"))
 }
 
 pub fn load_config() -> AppConfig {

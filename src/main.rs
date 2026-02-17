@@ -100,10 +100,6 @@ async fn run_auth_command() -> color_eyre::Result<()> {
         }
     }
 
-    println!("Starting OAuth 2.0 PKCE authorization flow...");
-    println!("Your browser should open for authorization.");
-    println!();
-
     match auth::oauth2_pkce::start_pkce_flow(&oauth2_creds, config.oauth_callback_port).await {
         Ok(_) => {
             println!("Authentication successful! Tokens saved to ~/.config/xplorertui/tokens.json");

@@ -121,6 +121,11 @@ pub async fn start_pkce_flow(
                 OAuth2Error::Io(e)
             }
         })?;
+
+    println!("Starting OAuth 2.0 PKCE authorization flow...");
+    println!("Your browser should open for authorization.");
+    println!();
+
     let redirect_url = redirect_url(port);
 
     let mut client = BasicClient::new(ClientId::new(creds.client_id.clone()))
