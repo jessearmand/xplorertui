@@ -1,5 +1,6 @@
 pub mod bookmarks;
 pub mod command_bar;
+pub mod error_popup;
 pub mod help;
 pub mod input;
 pub mod search;
@@ -17,6 +18,7 @@ use crate::event::ViewKind;
 
 use bookmarks::BookmarksView;
 use command_bar::CommandBar;
+use error_popup::ErrorPopup;
 use help::HelpView;
 use search::SearchView;
 use status_bar::StatusBar;
@@ -98,6 +100,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
         None => {
             frame.render_widget(TimelineView::new("xplorertui", &[], app), main_area);
         }
+    }
+
+    // Error detail popup overlay (renders on top of everything)
+    if let Some(ref detail) = app.error_detail {
+        frame.render_widget(ErrorPopup::new(detail), frame.area());
     }
 }
 
