@@ -1,8 +1,8 @@
 # xplorertui
 
-A terminal UI for browsing X, built with [Ratatui] and the X API v2.
+A terminal UI and CLI for browsing X, built with [Ratatui] and the X API v2.
 
-Browse your home timeline, mentions, bookmarks, search tweets, view threads, and look up user profiles — all from your terminal. Based on the Ratatui [event driven async template]. Several implementations — including the X API v2 client, authentication strategies, and credential handling — were adapted from [x-cli], a command-line client for X.
+Browse your home timeline, mentions, bookmarks, search tweets, view threads, and look up user profiles — all from your terminal. Includes a non-interactive CLI mode that outputs JSONL to stdout for piping into tools like `jq`, `grep`, and `wc`. Based on the Ratatui [event driven async template]. Several implementations — including the X API v2 client, authentication strategies, and credential handling — were adapted from [x-cli], a command-line client for X.
 
 [Ratatui]: https://ratatui.rs
 [event driven async template]: https://github.com/ratatui/templates/tree/main/event-driven-async
@@ -87,6 +87,38 @@ Read-only access. User-context endpoints (home timeline, mentions, bookmarks) wi
 
 ```env
 X_BEARER_TOKEN=your_bearer_token
+```
+
+## CLI Mode
+
+When a subcommand is provided, xplorertui bypasses the TUI and outputs JSONL (one JSON object per line) to stdout. This makes it easy to pipe X API data into other tools.
+
+```bash
+xplorertui                          # Launch TUI (default)
+xplorertui tui                      # Launch TUI (explicit)
+xplorertui auth                     # OAuth 2.0 PKCE flow
+xplorertui home                     # Home timeline → JSONL
+xplorertui mentions                 # Mentions → JSONL
+xplorertui bookmarks                # Bookmarks → JSONL
+xplorertui search <query>           # Search tweets → JSONL
+xplorertui user <username>          # User profile → JSONL
+xplorertui open <tweet_id_or_url>   # Single tweet + thread → JSONL
+```
+
+Each tweet line is a denormalized JSON object with the tweet, its author, and any attached media embedded:
+
+```bash
+# Pretty-print your home timeline
+xplorertui home | jq .
+
+# Count mentions
+xplorertui mentions | wc -l
+
+# Search and filter with jq
+xplorertui search "rust lang" | jq '.tweet.text'
+
+# Open a tweet by URL
+xplorertui open https://x.com/user/status/1234567890
 ```
 
 ## Keybindings
