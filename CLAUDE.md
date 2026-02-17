@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**xplorertui** is an event-driven async terminal UI for browsing the X (Twitter) platform. Built with Ratatui + Crossterm + Tokio, targeting the X API v2. Rust 2024 edition.
+**xplorertui** is an event-driven async terminal UI for browsing the X platform. Built with Ratatui + Crossterm + Tokio, targeting the X API v2. Rust 2024 edition.
 
 ## Build & Development Commands
 

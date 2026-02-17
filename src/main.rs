@@ -42,7 +42,7 @@ async fn main() -> color_eyre::Result<()> {
                         );
                     }
                     tracing::info!(method = ?auth.method, "auth initialized");
-                    Some(api::XApiClient::new(auth))
+                    Some(api::XApiClient::new(auth, config.oauth_callback_port))
                 }
                 Err(e) => {
                     tracing::warn!("auth setup failed: {e}");
@@ -67,6 +67,9 @@ async fn main() -> color_eyre::Result<()> {
 
 /// Standalone `xplorertui auth` command — runs the PKCE flow outside the TUI.
 async fn run_auth_command() -> color_eyre::Result<()> {
+    // Load config for the callback port setting.
+    let config = load_config();
+
     // Load .env files so X_CLIENT_ID is available, but don't require a full
     // credential set — the user may only have OAuth2 vars configured.
     auth::credentials::load_env_files();
@@ -97,11 +100,7 @@ async fn run_auth_command() -> color_eyre::Result<()> {
         }
     }
 
-    println!("Starting OAuth 2.0 PKCE authorization flow...");
-    println!("Your browser should open for authorization.");
-    println!();
-
-    match auth::oauth2_pkce::start_pkce_flow(&oauth2_creds).await {
+    match auth::oauth2_pkce::start_pkce_flow(&oauth2_creds, config.oauth_callback_port).await {
         Ok(_) => {
             println!("Authentication successful! Tokens saved to ~/.config/xplorertui/tokens.json");
             Ok(())

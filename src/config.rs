@@ -11,6 +11,8 @@ pub struct AppConfig {
     pub default_max_results: u32,
     #[serde(default)]
     pub default_view: DefaultView,
+    #[serde(default = "default_oauth_callback_port")]
+    pub oauth_callback_port: u16,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -31,18 +33,23 @@ fn default_max_results() -> u32 {
     20
 }
 
+fn default_oauth_callback_port() -> u16 {
+    8477
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             tick_rate_fps: default_tick_rate(),
             default_max_results: default_max_results(),
             default_view: DefaultView::default(),
+            oauth_callback_port: default_oauth_callback_port(),
         }
     }
 }
 
 fn config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("xplorertui").join("config.toml"))
+    dirs::home_dir().map(|home| home.join(".config/xplorertui/config.toml"))
 }
 
 pub fn load_config() -> AppConfig {

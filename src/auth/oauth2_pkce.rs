@@ -15,7 +15,7 @@ use tokio::net::TcpListener;
 
 use crate::auth::credentials::OAuth2Credentials;
 
-const AUTH_URL: &str = "https://twitter.com/i/oauth2/authorize";
+const AUTH_URL: &str = "https://x.com/i/oauth2/authorize";
 const TOKEN_URL: &str = "https://api.x.com/2/oauth2/token";
 
 const DEFAULT_SCOPES: &[&str] = &["tweet.read", "users.read", "offline.access"];
@@ -34,6 +34,10 @@ pub enum OAuth2Error {
     Json(#[from] serde_json::Error),
     #[error("no refresh token available")]
     NoRefreshToken,
+    #[error(
+        "port {0} is already in use — check for conflicts or set oauth_callback_port in config.toml"
+    )]
+    PortInUse(u16),
 }
 
 /// Persisted token data.
@@ -90,18 +94,39 @@ fn token_response_to_data<T: TokenResponse>(
     }
 }
 
+/// Build the redirect URL for OAuth callbacks.
+///
+/// Must match the callback URL registered in the X Developer Portal.
+fn redirect_url(port: u16) -> String {
+    format!("http://127.0.0.1:{port}")
+}
+
 /// Run the full OAuth 2.0 PKCE authorization flow.
 ///
-/// 1. Bind a local TCP listener on a random port.
+/// 1. Bind a local TCP listener on the configured callback port.
 /// 2. Open the user's browser to the X authorization page.
 /// 3. Wait for the redirect callback.
 /// 4. Exchange the authorization code for tokens.
 /// 5. Persist tokens to disk.
-pub async fn start_pkce_flow(creds: &OAuth2Credentials) -> Result<TokenData, OAuth2Error> {
-    // Bind listener on random port.
-    let listener = TcpListener::bind("127.0.0.1:0").await?;
-    let local_addr = listener.local_addr()?;
-    let redirect_url = format!("http://127.0.0.1:{}", local_addr.port());
+pub async fn start_pkce_flow(
+    creds: &OAuth2Credentials,
+    port: u16,
+) -> Result<TokenData, OAuth2Error> {
+    let listener = TcpListener::bind(format!("127.0.0.1:{port}"))
+        .await
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::AddrInUse {
+                OAuth2Error::PortInUse(port)
+            } else {
+                OAuth2Error::Io(e)
+            }
+        })?;
+
+    println!("Starting OAuth 2.0 PKCE authorization flow...");
+    println!("Your browser should open for authorization.");
+    println!();
+
+    let redirect_url = redirect_url(port);
 
     let mut client = BasicClient::new(ClientId::new(creds.client_id.clone()))
         .set_auth_uri(AuthUrl::new(AUTH_URL.to_string()).expect("valid auth URL"))
@@ -186,13 +211,12 @@ pub async fn start_pkce_flow(creds: &OAuth2Credentials) -> Result<TokenData, OAu
 pub async fn refresh_token(
     creds: &OAuth2Credentials,
     refresh: &str,
+    port: u16,
 ) -> Result<TokenData, OAuth2Error> {
     let mut client = BasicClient::new(ClientId::new(creds.client_id.clone()))
         .set_auth_uri(AuthUrl::new(AUTH_URL.to_string()).expect("valid auth URL"))
         .set_token_uri(TokenUrl::new(TOKEN_URL.to_string()).expect("valid token URL"))
-        .set_redirect_uri(
-            RedirectUrl::new("http://127.0.0.1".to_string()).expect("valid redirect URL"),
-        );
+        .set_redirect_uri(RedirectUrl::new(redirect_url(port)).expect("valid redirect URL"));
 
     if let Some(ref secret) = creds.client_secret {
         client = client.set_client_secret(ClientSecret::new(secret.clone()));
