@@ -33,6 +33,9 @@ dotenvy = "0.15"
 dirs = "6"
 toml = "1"
 
+# CLI
+clap = { version = "4", features = ["derive"] }
+
 # Error handling
 color-eyre = "0.6.3"
 thiserror = "2"

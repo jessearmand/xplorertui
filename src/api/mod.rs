@@ -88,6 +88,11 @@ impl XApiClient {
         }
     }
 
+    /// Return the auth method in use (for diagnostics).
+    pub fn auth_method(&self) -> AuthMethod {
+        self.auth.method
+    }
+
     /// Return the authenticated user's ID, caching after first call.
     pub async fn get_my_user_id(&mut self) -> Result<String, ApiClientError> {
         if let Some(ref id) = self.user_id {

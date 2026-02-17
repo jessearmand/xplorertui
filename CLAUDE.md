@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**xplorertui** is an event-driven async terminal UI for browsing the X platform. Built with Ratatui + Crossterm + Tokio, targeting the X API v2. Rust 2024 edition.
+**xplorertui** is an event-driven async terminal UI and non-interactive CLI for browsing the X platform. Built with Ratatui + Crossterm + Tokio, targeting the X API v2. Rust 2024 edition. CLI mode uses `clap` for argument parsing and outputs JSONL to stdout.
 
 ## Build & Development Commands
 
@@ -47,14 +47,22 @@ The app follows a **single-threaded event loop** with async API dispatch:
 
 `App.view_stack: Vec<ViewState>` acts as a navigation stack. `ViewKind` identifies the current view (Home, Mentions, Bookmarks, Search, UserProfile, UserTimeline, Thread, Help). Push/pop for drill-down and back navigation; `SwitchView` replaces the root.
 
+### Non-Interactive CLI Mode
+
+`src/cli.rs` defines the `clap`-based CLI. When a subcommand is given (e.g. `home`, `search`, `user`), `main.rs` routes to `cli::run_command()` which calls the API directly and writes JSONL to stdout — no event loop or TUI involved. The `build_api_client()` helper in `cli.rs` is shared by both the CLI and TUI paths for constructing an authenticated `XApiClient`.
+
+Tweet output uses `denormalize_tweet()` to join each tweet with its author (from `includes.users`) and media (from `includes.media`) into a self-contained JSON object per line.
+
 ### Module Layout
 
+- **`src/main.rs`** — Entry point. Uses `clap` to route: no subcommand/`tui` → TUI, `auth` → PKCE flow, other → `cli::run_command()`
+- **`src/cli.rs`** — CLI definition (`Cli`, `CliCommand`), `build_api_client()`, `run_command()`, JSONL denormalization/output, `parse_tweet_id()` URL-or-ID parser
 - **`src/app.rs`** — `App` struct (all state), key handling, event loop, API dispatch
 - **`src/event.rs`** — `Event`, `AppEvent`, `ViewKind`, `EventHandler`
 - **`src/command.rs`** — `:command` parser (vim-style commands like `:user`, `:search`, `:quit`)
 - **`src/config.rs`** — TOML config from `~/.config/xplorertui/config.toml`
 - **`src/ui/`** — Ratatui widget modules. `ui::draw()` in `mod.rs` dispatches to per-view widgets. Each view (timeline, tweet, thread, user, search, bookmarks, help, status_bar, command_bar) is a separate widget module.
-- **`src/api/`** — X API v2 client. `mod.rs` has `XApiClient` with `bearer_get`/`oauth_get` methods. Endpoint methods split across `tweets.rs`, `users.rs`, `engagement.rs`. `types.rs` defines all API response types.
+- **`src/api/`** — X API v2 client. `mod.rs` has `XApiClient` with `bearer_get`/`oauth_get` methods. Endpoint methods split across `tweets.rs`, `users.rs`, `engagement.rs`. `types.rs` defines all API response types (all types derive both `Serialize` and `Deserialize`).
 - **`src/auth/`** — Auth strategies: OAuth 2.0 PKCE (`oauth2_pkce.rs`), OAuth 1.0a HMAC-SHA1 (`oauth1.rs`), bearer-only. `credentials.rs` loads from `.env` files. Auth method auto-detected by priority: OAuth2 PKCE > OAuth1 > Bearer.
 
 ### Authentication & Credentials

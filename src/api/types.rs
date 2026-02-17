@@ -1,12 +1,13 @@
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
 // Generic API response wrapper
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(deserialize = "T: serde::de::DeserializeOwned"))]
+#[serde(bound(serialize = "T: serde::Serialize"))]
 pub struct ApiResponse<T> {
     #[serde(default)]
     pub data: Option<T>,
@@ -28,7 +29,7 @@ pub type ListResponse<T> = ApiResponse<Vec<T>>;
 // Tweet
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tweet {
     pub id: String,
     pub text: String,
@@ -56,7 +57,7 @@ pub struct Tweet {
     pub note_tweet: Option<NoteTweet>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublicMetrics {
     pub like_count: u64,
     pub retweet_count: u64,
@@ -68,14 +69,14 @@ pub struct PublicMetrics {
     pub impression_count: Option<u64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReferencedTweet {
     #[serde(rename = "type")]
     pub type_: String,
     pub id: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Attachments {
     #[serde(default)]
     pub media_keys: Option<Vec<String>>,
@@ -83,7 +84,7 @@ pub struct Attachments {
     pub poll_ids: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoteTweet {
     pub text: String,
     #[serde(default)]
@@ -94,7 +95,7 @@ pub struct NoteTweet {
 // User
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
     pub username: String,
@@ -117,7 +118,7 @@ pub struct User {
     pub public_metrics: Option<UserPublicMetrics>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserPublicMetrics {
     pub followers_count: u64,
     pub following_count: u64,
@@ -129,7 +130,7 @@ pub struct UserPublicMetrics {
 // Media
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Media {
     pub media_key: String,
     #[serde(rename = "type")]
@@ -150,7 +151,7 @@ pub struct Media {
 // Entities
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entities {
     #[serde(default)]
     pub urls: Option<Vec<UrlEntity>>,
@@ -164,7 +165,7 @@ pub struct Entities {
     pub annotations: Option<Vec<Annotation>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UrlEntity {
     pub start: i32,
     pub end: i32,
@@ -179,14 +180,14 @@ pub struct UrlEntity {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HashtagEntity {
     pub start: i32,
     pub end: i32,
     pub tag: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MentionEntity {
     pub start: i32,
     pub end: i32,
@@ -195,14 +196,14 @@ pub struct MentionEntity {
     pub id: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CashtagEntity {
     pub start: i32,
     pub end: i32,
     pub tag: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Annotation {
     pub start: i32,
     pub end: i32,
@@ -216,7 +217,7 @@ pub struct Annotation {
 // Response metadata
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Includes {
     #[serde(default)]
     pub users: Option<Vec<User>>,
@@ -226,7 +227,7 @@ pub struct Includes {
     pub media: Option<Vec<Media>>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Meta {
     #[serde(default)]
     pub result_count: Option<u32>,
@@ -240,7 +241,7 @@ pub struct Meta {
     pub oldest_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiError {
     #[serde(default)]
     pub detail: Option<String>,

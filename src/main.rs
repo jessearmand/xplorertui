@@ -1,14 +1,16 @@
 pub mod api;
 pub mod app;
 pub mod auth;
+pub mod cli;
 pub mod command;
 pub mod config;
 pub mod event;
 pub mod ui;
 
 use app::App;
-use auth::credentials::{CredentialSet, load_credentials};
-use auth::{AuthMethod, AuthProvider};
+use auth::credentials::CredentialSet;
+use clap::Parser;
+use cli::{Cli, CliCommand};
 use config::load_config;
 
 #[tokio::main]
@@ -21,40 +23,31 @@ async fn main() -> color_eyre::Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    // Handle `xplorertui auth` subcommand before launching TUI.
-    let args: Vec<String> = std::env::args().collect();
-    if args.get(1).map(|s| s.as_str()) == Some("auth") {
-        return run_auth_command().await;
-    }
+    let cli = Cli::parse();
 
+    match cli.command {
+        // No subcommand or explicit `tui` → launch the interactive TUI.
+        None | Some(CliCommand::Tui) => run_tui().await,
+        // `auth` → standalone PKCE flow.
+        Some(CliCommand::Auth) => run_auth_command().await,
+        // All other subcommands → non-interactive JSONL output.
+        Some(cmd) => cli::run_command(cmd).await,
+    }
+}
+
+/// Launch the interactive TUI.
+async fn run_tui() -> color_eyre::Result<()> {
     let config = load_config();
 
-    // Load credentials and build API client.
-    let (creds, api_client) = match load_credentials() {
-        Ok(creds) => {
-            let client = match AuthProvider::new(creds.clone()) {
-                Ok(auth) => {
-                    // Hint if OAuth2 PKCE is detected but no tokens exist.
-                    if auth.method == AuthMethod::OAuth2Pkce && !auth::has_stored_tokens() {
-                        eprintln!(
-                            "Hint: Run `xplorertui auth` to authenticate with OAuth 2.0 PKCE, \
-                             or use `:auth` inside the TUI."
-                        );
-                    }
-                    tracing::info!(method = ?auth.method, "auth initialized");
-                    Some(api::XApiClient::new(auth, config.oauth_callback_port))
-                }
-                Err(e) => {
-                    tracing::warn!("auth setup failed: {e}");
-                    eprintln!("Warning: auth setup failed ({e}). Running without API access.");
-                    None
-                }
-            };
-            (creds, client)
+    // Load credentials, tolerating missing creds (TUI can still show help etc.).
+    let (creds, api_client) = match cli::build_api_client() {
+        Ok((client, creds)) => {
+            tracing::info!(method = ?client.auth_method(), "auth initialized");
+            (creds, Some(client))
         }
         Err(e) => {
-            tracing::warn!("no credentials found: {e}");
-            eprintln!("Warning: no credentials found ({e}). Running without API access.");
+            tracing::warn!("no credentials / auth setup failed: {e}");
+            eprintln!("Warning: {e}. Running without API access.");
             (CredentialSet::default(), None)
         }
     };
@@ -67,7 +60,6 @@ async fn main() -> color_eyre::Result<()> {
 
 /// Standalone `xplorertui auth` command — runs the PKCE flow outside the TUI.
 async fn run_auth_command() -> color_eyre::Result<()> {
-    // Load config for the callback port setting.
     let config = load_config();
 
     // Load .env files so X_CLIENT_ID is available, but don't require a full
