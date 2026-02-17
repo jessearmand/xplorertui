@@ -91,6 +91,7 @@ pub struct App {
 
     // Status
     pub status_message: Option<String>,
+    pub error_detail: Option<String>,
     pub loading: bool,
 }
 
@@ -137,6 +138,7 @@ impl App {
             api_client: api_client.map(|c| Arc::new(Mutex::new(c))),
             users_cache: HashMap::new(),
             status_message: None,
+            error_detail: None,
             loading: false,
         }
     }
@@ -213,6 +215,11 @@ impl App {
         }
     }
 
+    fn set_error(&mut self, msg: String) {
+        self.status_message = Some(msg.clone());
+        self.error_detail = Some(msg);
+    }
+
     // -- Key event routing --------------------------------------------------
 
     fn handle_key_event(&mut self, key: KeyEvent) {
@@ -221,6 +228,17 @@ impl App {
             && matches!(key.code, KeyCode::Char('c' | 'C'))
         {
             self.events.send(AppEvent::Quit);
+            return;
+        }
+
+        // Dismiss error popup if open (swallow all other keys).
+        if self.error_detail.is_some() {
+            match key.code {
+                KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+                    self.error_detail = None;
+                }
+                _ => {}
+            }
             return;
         }
 
@@ -647,7 +665,7 @@ impl App {
                             .extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading timeline: {e}"));
+                        self.set_error(format!("Error loading timeline: {e}"));
                     }
                 }
             }
@@ -665,7 +683,7 @@ impl App {
                             .extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading user timeline: {e}"));
+                        self.set_error(format!("Error loading user timeline: {e}"));
                     }
                 }
             }
@@ -690,7 +708,7 @@ impl App {
                         }
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading tweet: {e}"));
+                        self.set_error(format!("Error loading tweet: {e}"));
                     }
                 }
             }
@@ -709,7 +727,7 @@ impl App {
                         }
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading thread: {e}"));
+                        self.set_error(format!("Error loading thread: {e}"));
                     }
                 }
             }
@@ -727,7 +745,7 @@ impl App {
                         }
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading user: {e}"));
+                        self.set_error(format!("Error loading user: {e}"));
                     }
                 }
             }
@@ -743,7 +761,7 @@ impl App {
                         self.search_results.tweets = resp.data.unwrap_or_default();
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error searching: {e}"));
+                        self.set_error(format!("Error searching: {e}"));
                     }
                 }
             }
@@ -759,7 +777,7 @@ impl App {
                         self.mentions.tweets.extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading mentions: {e}"));
+                        self.set_error(format!("Error loading mentions: {e}"));
                     }
                 }
             }
@@ -775,7 +793,7 @@ impl App {
                         self.bookmarks.tweets.extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading bookmarks: {e}"));
+                        self.set_error(format!("Error loading bookmarks: {e}"));
                     }
                 }
             }
@@ -786,7 +804,7 @@ impl App {
                         self.followers = resp.data.unwrap_or_default();
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading followers: {e}"));
+                        self.set_error(format!("Error loading followers: {e}"));
                     }
                 }
             }
@@ -797,7 +815,7 @@ impl App {
                         self.following = resp.data.unwrap_or_default();
                     }
                     Err(e) => {
-                        self.status_message = Some(format!("Error loading following: {e}"));
+                        self.set_error(format!("Error loading following: {e}"));
                     }
                 }
             }
@@ -809,7 +827,7 @@ impl App {
                     self.status_message = Some(format!("Authenticated as {user_id}"));
                 }
                 Err(e) => {
-                    self.status_message = Some(format!("Auth failed: {e}"));
+                    self.set_error(format!("Auth failed: {e}"));
                 }
             },
         }
