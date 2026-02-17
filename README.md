@@ -2,10 +2,11 @@
 
 A terminal UI for browsing X (Twitter), built with [Ratatui] and the X API v2.
 
-Browse your home timeline, mentions, bookmarks, search tweets, view threads, and look up user profiles — all from your terminal. Based on the Ratatui [event driven async template].
+Browse your home timeline, mentions, bookmarks, search tweets, view threads, and look up user profiles — all from your terminal. Based on the Ratatui [event driven async template]. Several implementations — including the X API v2 client, authentication strategies, and credential handling — were adapted from [x-cli], a command-line client for X.
 
 [Ratatui]: https://ratatui.rs
 [event driven async template]: https://github.com/ratatui/templates/tree/main/event-driven-async
+[x-cli]: https://github.com/Infatoshi/x-cli
 
 ## Getting Started
 
