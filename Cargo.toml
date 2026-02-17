@@ -31,7 +31,7 @@ rand = "0.9"
 # Config & storage
 dotenvy = "0.15"
 dirs = "6"
-toml = "0.8"
+toml = "1.0"
 
 # Error handling
 color-eyre = "0.6.3"
