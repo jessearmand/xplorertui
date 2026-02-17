@@ -18,7 +18,12 @@ use crate::auth::credentials::OAuth2Credentials;
 const AUTH_URL: &str = "https://x.com/i/oauth2/authorize";
 const TOKEN_URL: &str = "https://api.x.com/2/oauth2/token";
 
-const DEFAULT_SCOPES: &[&str] = &["tweet.read", "users.read", "offline.access"];
+const DEFAULT_SCOPES: &[&str] = &[
+    "tweet.read",
+    "users.read",
+    "bookmark.read",
+    "offline.access",
+];
 
 #[derive(Debug, Error)]
 pub enum OAuth2Error {
