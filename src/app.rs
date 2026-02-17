@@ -638,7 +638,9 @@ impl App {
                         self.home_timeline.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.home_timeline.includes = resp.includes;
-                        self.home_timeline.tweets.extend(resp.data.unwrap_or_default());
+                        self.home_timeline
+                            .tweets
+                            .extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading timeline: {e}"));
@@ -654,7 +656,9 @@ impl App {
                         self.viewed_user_timeline.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.viewed_user_timeline.includes = resp.includes;
-                        self.viewed_user_timeline.tweets.extend(resp.data.unwrap_or_default());
+                        self.viewed_user_timeline
+                            .tweets
+                            .extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
                         self.status_message = Some(format!("Error loading user timeline: {e}"));
