@@ -550,7 +550,11 @@ impl App {
         println!("Your browser should open. If not, check the URL printed above.");
         println!();
 
-        let result = crate::auth::oauth2_pkce::start_pkce_flow(&oauth2_creds).await;
+        let result = crate::auth::oauth2_pkce::start_pkce_flow(
+            &oauth2_creds,
+            self.config.oauth_callback_port,
+        )
+        .await;
 
         match &result {
             Ok(_) => {
@@ -575,7 +579,10 @@ impl App {
         if result.is_ok() {
             match AuthProvider::new(self.credentials.clone()) {
                 Ok(auth) => {
-                    self.api_client = Some(Arc::new(Mutex::new(XApiClient::new(auth))));
+                    self.api_client = Some(Arc::new(Mutex::new(XApiClient::new(
+                        auth,
+                        self.config.oauth_callback_port,
+                    ))));
                     self.status_message = Some("Authenticated successfully!".into());
                 }
                 Err(e) => {

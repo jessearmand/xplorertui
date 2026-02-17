@@ -72,16 +72,18 @@ pub struct XApiClient {
     http_client: reqwest::Client,
     auth: AuthProvider,
     user_id: Option<String>,
+    callback_port: u16,
     #[allow(dead_code)]
     rate_limit: RateLimitInfo,
 }
 
 impl XApiClient {
-    pub fn new(auth: AuthProvider) -> Self {
+    pub fn new(auth: AuthProvider, callback_port: u16) -> Self {
         Self {
             http_client: reqwest::Client::new(),
             auth,
             user_id: None,
+            callback_port,
             rate_limit: RateLimitInfo::default(),
         }
     }
@@ -117,7 +119,7 @@ impl XApiClient {
             && chrono::Utc::now() + chrono::Duration::seconds(60) >= expires_at
             && let Some(ref refresh) = tokens.refresh_token
         {
-            let refreshed = oauth2_pkce::refresh_token(oauth2_creds, refresh)
+            let refreshed = oauth2_pkce::refresh_token(oauth2_creds, refresh, self.callback_port)
                 .await
                 .map_err(AuthError::OAuth2)?;
             return Ok(format!("Bearer {}", refreshed.access_token));

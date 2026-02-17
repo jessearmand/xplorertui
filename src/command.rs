@@ -50,8 +50,7 @@ pub fn parse_tweet_url(input: &str) -> Option<String> {
     let url = Url::parse(trimmed).ok()?;
 
     let host = url.host_str()?;
-    if host != "x.com" && host != "twitter.com" && host != "www.x.com" && host != "www.twitter.com"
-    {
+    if host != "x.com" && host != "www.x.com" {
         return None;
     }
 
@@ -118,9 +117,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_tweet_url_twitter() {
+    fn test_parse_tweet_url_www_x() {
         assert_eq!(
-            parse_tweet_url("https://twitter.com/user/status/789"),
+            parse_tweet_url("https://www.x.com/user/status/789"),
             Some("789".into())
         );
     }
