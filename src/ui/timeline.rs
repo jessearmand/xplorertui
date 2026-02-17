@@ -125,31 +125,53 @@ fn compute_scroll_start(heights: &[u16], selected: usize, available: u16) -> usi
     }
 
     let selected = selected.min(heights.len() - 1);
+    if available == 0 {
+        return selected;
+    }
 
-    // Start from 0 and accumulate. If the selected item would overflow,
-    // advance the start.
-    let mut start = 0;
-    loop {
-        let mut used: u16 = 0;
-        let mut fits = false;
-        for (i, &h) in heights.iter().enumerate().skip(start) {
-            let next = used.saturating_add(h);
-            if next > available && i <= selected {
-                start += 1;
-                break;
-            }
-            used = next;
-            if i == selected {
-                fits = true;
-                break;
-            }
-            if used >= available {
-                break;
-            }
-        }
-        if fits || start > selected {
+    // Build a viewport that always includes the selected tweet and packs as
+    // many previous items as can fit above it.
+    let mut start = selected;
+    let mut used = heights[selected];
+
+    while start > 0 {
+        let next = used.saturating_add(heights[start - 1]);
+        if next > available {
             break;
         }
+        start -= 1;
+        used = next;
     }
+
     start
+}
+
+#[cfg(test)]
+mod tests {
+    use super::compute_scroll_start;
+
+    #[test]
+    fn handles_empty_timeline() {
+        assert_eq!(compute_scroll_start(&[], 0, 10), 0);
+    }
+
+    #[test]
+    fn advances_when_selected_is_below_exactly_full_window() {
+        // First two items exactly fill the viewport; selecting index 2 should
+        // move the viewport start to 1 instead of looping.
+        let heights = [5, 5, 5];
+        assert_eq!(compute_scroll_start(&heights, 2, 10), 1);
+    }
+
+    #[test]
+    fn keeps_selected_item_visible_when_it_is_taller_than_viewport() {
+        let heights = [3, 12, 4];
+        assert_eq!(compute_scroll_start(&heights, 1, 8), 1);
+    }
+
+    #[test]
+    fn clamps_selected_index_to_last_item() {
+        let heights = [2, 2, 2];
+        assert_eq!(compute_scroll_start(&heights, 99, 4), 1);
+    }
 }

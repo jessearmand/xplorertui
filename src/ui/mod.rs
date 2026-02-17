@@ -130,3 +130,80 @@ fn render_previous_view(frame: &mut Frame, app: &App, area: ratatui::layout::Rec
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    use super::draw;
+    use crate::api::types::Tweet;
+    use crate::app::App;
+    use crate::auth::credentials::CredentialSet;
+    use crate::config::AppConfig;
+
+    fn make_tweet(id: &str) -> Tweet {
+        Tweet {
+            id: id.to_string(),
+            text: format!("tweet {id}"),
+            author_id: None,
+            created_at: None,
+            conversation_id: None,
+            in_reply_to_user_id: None,
+            lang: None,
+            edit_history_tweet_ids: None,
+            public_metrics: None,
+            entities: None,
+            referenced_tweets: None,
+            attachments: None,
+            note_tweet: None,
+        }
+    }
+
+    fn buffer_lines(terminal: &Terminal<TestBackend>) -> Vec<String> {
+        let buffer = terminal.backend().buffer();
+        let area = *buffer.area();
+        let mut lines = Vec::with_capacity(area.height as usize);
+
+        for y in 0..area.height {
+            let mut line = String::with_capacity(area.width as usize);
+            for x in 0..area.width {
+                if let Some(cell) = buffer.cell((x, y)) {
+                    line.push_str(cell.symbol());
+                }
+            }
+            lines.push(line);
+        }
+
+        lines
+    }
+
+    #[tokio::test]
+    async fn draw_home_timeline_keeps_bottom_selection_visible_without_hanging() {
+        let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
+        app.home_timeline.tweets = vec![make_tweet("0"), make_tweet("1"), make_tweet("2")];
+
+        // Height 11 -> main area 10 -> timeline inner height 8 after borders.
+        // With 1-line tweet text, each card+separator is height 4, so items 0+1
+        // exactly fill the viewport and selecting item 2 exercises the edge case.
+        let backend = TestBackend::new(80, 11);
+        let mut terminal = Terminal::new(backend).expect("terminal should initialize");
+
+        for selected in 0..app.home_timeline.tweets.len() {
+            let root_view = app
+                .view_stack
+                .last_mut()
+                .expect("app always has at least one view");
+            root_view.selected_index = selected;
+            terminal
+                .draw(|frame| draw(frame, &app))
+                .expect("draw should complete");
+        }
+
+        let lines = buffer_lines(&terminal).join("\n");
+        assert!(
+            lines.contains("tweet 2"),
+            "expected bottom-selected tweet text in rendered buffer, got:\n{lines}"
+        );
+    }
+}
