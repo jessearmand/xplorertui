@@ -25,7 +25,7 @@ fn percent_encode(s: &str) -> String {
 }
 
 fn generate_nonce() -> String {
-    use rand::Rng;
+    use rand::RngExt;
     let mut bytes = [0u8; 16];
     rand::rng().fill(&mut bytes);
     bytes.iter().map(|b| format!("{b:02x}")).collect()
