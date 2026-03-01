@@ -103,7 +103,7 @@ fn token_response_to_data<T: TokenResponse>(
 ///
 /// Must match the callback URL registered in the X Developer Portal.
 fn redirect_url(port: u16) -> String {
-    format!("http://127.0.0.1:{port}")
+    format!("http://127.0.0.1:{port}/callback")
 }
 
 /// Run the full OAuth 2.0 PKCE authorization flow.
@@ -161,34 +161,47 @@ pub async fn start_pkce_flow(
         eprintln!("Open this URL in your browser:\n{auth_url_str}");
     }
 
-    // Wait for callback.
-    let (mut stream, _addr) = listener.accept().await?;
+    // Wait for the /callback request, ignoring unrelated requests (e.g., /favicon.ico).
+    let (code, state) = loop {
+        let (mut stream, _addr) = listener.accept().await?;
 
-    let mut buf = vec![0u8; 4096];
-    let n = tokio::io::AsyncReadExt::read(&mut stream, &mut buf).await?;
-    let request_str = String::from_utf8_lossy(&buf[..n]);
+        let mut buf = vec![0u8; 4096];
+        let n = tokio::io::AsyncReadExt::read(&mut stream, &mut buf).await?;
+        let request_str = String::from_utf8_lossy(&buf[..n]);
 
-    // Parse the GET request line for code and state.
-    let request_line = request_str.lines().next().unwrap_or("");
-    let path = request_line.split_whitespace().nth(1).unwrap_or("");
-    let query = path.split('?').nth(1).unwrap_or("");
+        // Parse the GET request line.
+        let request_line = request_str.lines().next().unwrap_or("");
+        let path = request_line.split_whitespace().nth(1).unwrap_or("");
+        let path_prefix = path.split('?').next().unwrap_or("");
 
-    let mut code: Option<String> = None;
-    let mut state: Option<String> = None;
-    for pair in query.split('&') {
-        let mut kv = pair.splitn(2, '=');
-        match (kv.next(), kv.next()) {
-            (Some("code"), Some(v)) => code = Some(v.to_string()),
-            (Some("state"), Some(v)) => state = Some(v.to_string()),
-            _ => {}
+        if path_prefix != "/callback" {
+            // Not our callback — send 404 and keep listening.
+            let response = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
+            stream.write_all(response.as_bytes()).await?;
+            continue;
         }
-    }
 
-    // Send response to browser.
-    let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
-        <html><body><h2>Authorization successful!</h2>\
-        <p>You can close this tab.</p></body></html>";
-    stream.write_all(response.as_bytes()).await?;
+        let query = path.split('?').nth(1).unwrap_or("");
+
+        let mut code: Option<String> = None;
+        let mut state: Option<String> = None;
+        for pair in query.split('&') {
+            let mut kv = pair.splitn(2, '=');
+            match (kv.next(), kv.next()) {
+                (Some("code"), Some(v)) => code = Some(v.to_string()),
+                (Some("state"), Some(v)) => state = Some(v.to_string()),
+                _ => {}
+            }
+        }
+
+        // Send success response to browser.
+        let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+            <html><body><h2>Authorization successful!</h2>\
+            <p>You can close this tab.</p></body></html>";
+        stream.write_all(response.as_bytes()).await?;
+
+        break (code, state);
+    };
 
     // Validate state.
     let state = state.ok_or(OAuth2Error::CsrfMismatch)?;
