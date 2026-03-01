@@ -13,6 +13,8 @@ pub struct AppConfig {
     pub default_view: DefaultView,
     #[serde(default = "default_oauth_callback_port")]
     pub oauth_callback_port: u16,
+    #[serde(default = "default_openrouter_callback_port")]
+    pub openrouter_callback_port: u16,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -37,6 +39,10 @@ fn default_oauth_callback_port() -> u16 {
     8477
 }
 
+fn default_openrouter_callback_port() -> u16 {
+    3000
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -44,6 +50,7 @@ impl Default for AppConfig {
             default_max_results: default_max_results(),
             default_view: DefaultView::default(),
             oauth_callback_port: default_oauth_callback_port(),
+            openrouter_callback_port: default_openrouter_callback_port(),
         }
     }
 }
