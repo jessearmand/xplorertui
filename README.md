@@ -42,6 +42,7 @@ Optional configuration file at `~/.config/xplorertui/config.toml`:
 tick_rate_fps = 30       # UI refresh rate
 default_max_results = 20 # Tweets per API request (10–100)
 default_view = "home"    # One of: home, mentions, bookmarks, search
+openrouter_callback_port = 3000 # OpenRouter OAuth localhost callback port
 ```
 
 ## Authentication

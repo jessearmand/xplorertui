@@ -5,6 +5,7 @@ pub mod cli;
 pub mod command;
 pub mod config;
 pub mod event;
+pub mod openrouter;
 pub mod ui;
 
 use app::App;
@@ -30,6 +31,8 @@ async fn main() -> color_eyre::Result<()> {
         None | Some(CliCommand::Tui) => run_tui().await,
         // `auth` → standalone PKCE flow.
         Some(CliCommand::Auth) => run_auth_command().await,
+        // `openrouter-auth` → OpenRouter PKCE flow.
+        Some(CliCommand::OpenRouterAuth) => run_openrouter_auth_command().await,
         // All other subcommands → non-interactive JSONL output.
         Some(cmd) => cli::run_command(cmd).await,
     }
@@ -56,6 +59,46 @@ async fn run_tui() -> color_eyre::Result<()> {
     let result = App::new(config, api_client, creds).run(terminal).await;
     ratatui::restore();
     result
+}
+
+/// Standalone `xplorertui openrouter-auth` command — runs the OpenRouter PKCE flow.
+async fn run_openrouter_auth_command() -> color_eyre::Result<()> {
+    let config = load_config();
+
+    // Load .env files so OPENROUTER_API_KEY can be checked.
+    auth::credentials::load_env_files();
+
+    if openrouter::auth::has_stored_key() {
+        eprint!("OpenRouter API key already exists. Re-authenticate? [y/N] ");
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+        if !answer.trim().eq_ignore_ascii_case("y") {
+            println!("Aborted.");
+            return Ok(());
+        }
+    }
+
+    // OpenRouter localhost auth is more reliable on 3000. If a legacy config
+    // still points to 8478, upgrade transparently for this flow.
+    let port = if config.openrouter_callback_port == 8478 {
+        eprintln!("Using OpenRouter callback port 3000 (legacy 8478 value detected in config).");
+        3000
+    } else {
+        config.openrouter_callback_port
+    };
+
+    match openrouter::auth::start_openrouter_auth(port).await {
+        Ok(_) => {
+            println!(
+                "Authentication successful! API key saved to \
+                 ~/.config/xplorertui/openrouter_tokens.json"
+            );
+            Ok(())
+        }
+        Err(e) => Err(color_eyre::eyre::eyre!(
+            "OpenRouter authentication failed: {e}"
+        )),
+    }
 }
 
 /// Standalone `xplorertui auth` command — runs the PKCE flow outside the TUI.

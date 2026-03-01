@@ -6,6 +6,7 @@ use crate::api::types::{Includes, Tweet};
 use crate::auth::credentials::load_credentials;
 use crate::auth::{AuthMethod, AuthProvider};
 use crate::config::load_config;
+use crate::openrouter::client::OpenRouterClient;
 
 // ---------------------------------------------------------------------------
 // CLI definition
@@ -45,6 +46,12 @@ pub enum CliCommand {
         /// Tweet ID or URL
         id_or_url: String,
     },
+    /// Run the OpenRouter OAuth authorization flow
+    #[command(name = "openrouter-auth")]
+    OpenRouterAuth,
+    /// List OpenRouter embedding models (JSONL)
+    #[command(name = "openrouter-models")]
+    OpenRouterModels,
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +112,13 @@ fn print_tweets(tweets: &[Tweet], includes: &Option<Includes>) -> eyre::Result<(
 // Client construction (shared with main.rs TUI path)
 // ---------------------------------------------------------------------------
 
+/// Build an `OpenRouterClient` from env var or stored API key.
+pub fn build_openrouter_client() -> eyre::Result<OpenRouterClient> {
+    crate::auth::credentials::load_env_files();
+    let api_key = crate::openrouter::auth::load_api_key().map_err(|e| eyre!("{e}"))?;
+    Ok(OpenRouterClient::new(api_key))
+}
+
 /// Build an authenticated `XApiClient` from env credentials + config.
 /// Returns an error if no credentials are found or auth setup fails.
 pub fn build_api_client() -> eyre::Result<(XApiClient, crate::auth::credentials::CredentialSet)> {
@@ -148,8 +162,8 @@ pub async fn run_command(cmd: CliCommand) -> eyre::Result<()> {
     let max = config.default_max_results;
 
     match cmd {
-        CliCommand::Tui | CliCommand::Auth => {
-            unreachable!("tui and auth are handled in main")
+        CliCommand::Tui | CliCommand::Auth | CliCommand::OpenRouterAuth => {
+            unreachable!("tui, auth, and openrouter-auth are handled in main")
         }
 
         CliCommand::Home => {
@@ -235,6 +249,19 @@ pub async fn run_command(cmd: CliCommand) -> eyre::Result<()> {
                         println!("{line}");
                     }
                 }
+            }
+        }
+
+        CliCommand::OpenRouterModels => {
+            let or_client = build_openrouter_client()?;
+            let resp: crate::openrouter::types::ModelsResponse = or_client
+                .get("/embeddings/models")
+                .await
+                .map_err(|e| eyre!("{e}"))?;
+
+            for model in &resp.data {
+                let line = serde_json::to_string(&model)?;
+                println!("{line}");
             }
         }
     }
