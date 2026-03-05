@@ -51,6 +51,16 @@ percent-encoding = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# ML / embeddings
+ndarray = "0.15"
+linfa = "0.7"
+linfa-clustering = "0.7"
+linfa-reduction = "0.7"
+
+# Plotting
+kuva = "0.1"
+ansi-to-tui = "8"
+
 # Read the optimization guideline for more details: https://ratatui.rs/recipes/apps/release-your-app/#optimizations
 [profile.release]
 codegen-units = 1

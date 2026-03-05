@@ -6,6 +6,8 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use crate::api::types::{ListResponse, SingleResponse, Tweet, User};
+use crate::embeddings::cluster::ClusterResult;
+use crate::openrouter::types::Model;
 
 /// The frequency at which tick events are emitted.
 const TICK_FPS: f64 = 30.0;
@@ -97,6 +99,26 @@ pub enum AppEvent {
     // -- Auth --
     StartAuth,
     AuthCompleted(Result<String, String>),
+
+    // -- OpenRouter --
+    StartOpenRouterAuth,
+    FetchOpenRouterModels,
+    OpenRouterModelsLoaded(ApiResult<Vec<Model>>),
+    SelectEmbeddingModel {
+        model_id: String,
+    },
+
+    // -- Embeddings --
+    EmbedAndRankSearch {
+        query: String,
+        tweets: Vec<Tweet>,
+    },
+    SearchRanked {
+        query: String,
+        result: ApiResult<Vec<(Tweet, f64)>>,
+    },
+    ClusterTimeline,
+    ClusteringComplete(ApiResult<ClusterResult>),
 }
 
 /// API result type using `Arc<String>` so errors are `Clone`.
@@ -112,6 +134,8 @@ pub enum ViewKind {
     Search,
     Mentions,
     Bookmarks,
+    OpenRouterModels,
+    Cluster,
     Help,
 }
 

@@ -61,3 +61,37 @@ pub struct ModelArchitecture {
 pub struct ModelsResponse {
     pub data: Vec<Model>,
 }
+
+// ---------------------------------------------------------------------------
+// Embedding types
+// ---------------------------------------------------------------------------
+
+/// Request body for `POST /api/v1/embeddings`.
+#[derive(Debug, Serialize)]
+pub struct EmbeddingRequest {
+    pub model: String,
+    pub input: Vec<String>,
+}
+
+/// Response from `POST /api/v1/embeddings`.
+#[derive(Debug, Deserialize)]
+pub struct EmbeddingResponse {
+    pub data: Vec<EmbeddingData>,
+    pub model: String,
+    #[serde(default)]
+    pub usage: Option<EmbeddingUsage>,
+}
+
+/// A single embedding vector in the response.
+#[derive(Debug, Deserialize)]
+pub struct EmbeddingData {
+    pub embedding: Vec<f64>,
+    pub index: usize,
+}
+
+/// Token usage information for an embeddings request.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EmbeddingUsage {
+    pub prompt_tokens: u64,
+    pub total_tokens: u64,
+}

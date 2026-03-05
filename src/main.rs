@@ -4,6 +4,7 @@ pub mod auth;
 pub mod cli;
 pub mod command;
 pub mod config;
+pub mod embeddings;
 pub mod event;
 pub mod openrouter;
 pub mod ui;

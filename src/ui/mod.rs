@@ -1,8 +1,10 @@
 pub mod bookmarks;
+pub mod cluster;
 pub mod command_bar;
 pub mod error_popup;
 pub mod help;
 pub mod input;
+pub mod models;
 pub mod search;
 pub mod status_bar;
 pub mod thread;
@@ -17,9 +19,11 @@ use crate::app::{App, AppMode};
 use crate::event::ViewKind;
 
 use bookmarks::BookmarksView;
+use cluster::ClusterView;
 use command_bar::CommandBar;
 use error_popup::ErrorPopup;
 use help::HelpView;
+use models::ModelsView;
 use search::SearchView;
 use status_bar::StatusBar;
 use thread::ThreadView;
@@ -91,6 +95,12 @@ pub fn draw(frame: &mut Frame, app: &App) {
                     main_area,
                 );
             }
+        }
+        Some(ViewKind::OpenRouterModels) => {
+            frame.render_widget(ModelsView::new(app), main_area);
+        }
+        Some(ViewKind::Cluster) => {
+            frame.render_widget(ClusterView::new(app), main_area);
         }
         Some(ViewKind::Help) => {
             // Render the view underneath first, then overlay help.
