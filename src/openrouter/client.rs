@@ -59,6 +59,19 @@ impl OpenRouterClient {
         self.handle_response(resp).await
     }
 
+    /// Generate embeddings for a batch of texts.
+    pub async fn embed(
+        &self,
+        model: &str,
+        texts: &[String],
+    ) -> Result<super::types::EmbeddingResponse, OpenRouterError> {
+        let request = super::types::EmbeddingRequest {
+            model: model.to_string(),
+            input: texts.to_vec(),
+        };
+        self.post("/embeddings", &request).await
+    }
+
     /// Check status and deserialize the response body.
     async fn handle_response<T: DeserializeOwned>(
         &self,

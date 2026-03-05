@@ -10,6 +10,9 @@ pub enum Command {
     Bookmarks,
     Help,
     Auth,
+    OpenRouterAuth,
+    Models,
+    Cluster,
     Quit,
 }
 
@@ -34,6 +37,9 @@ pub fn parse_command(input: &str) -> Option<Command> {
         "bookmarks" | "b" => Some(Command::Bookmarks),
         "help" | "h" => Some(Command::Help),
         "auth" | "login" => Some(Command::Auth),
+        "openrouter-auth" | "or-auth" => Some(Command::OpenRouterAuth),
+        "models" => Some(Command::Models),
+        "cluster" => Some(Command::Cluster),
         "quit" | "q" => Some(Command::Quit),
         _ => None,
     }
