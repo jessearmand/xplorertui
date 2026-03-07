@@ -843,6 +843,7 @@ impl App {
 
             let _ = sender.send(Event::App(Box::new(AppEvent::SearchRanked {
                 query: query_clone,
+                model_id: model,
                 result,
             })));
         });
@@ -1168,8 +1169,20 @@ impl App {
                 self.loading = true;
                 self.dispatch_embed_and_rank(query, tweets);
             }
-            AppEvent::SearchRanked { query: _, result } => {
+            AppEvent::SearchRanked {
+                query,
+                model_id,
+                result,
+            } => {
                 self.loading = false;
+                // Guard: only apply if the query and model still match current state.
+                let query_matches = self.search_query == query;
+                let model_matches = self.selected_embedding_model.as_deref() == Some(&model_id);
+                if !query_matches || !model_matches {
+                    self.status_message =
+                        Some("Stale ranking result discarded (query or model changed)".into());
+                    return;
+                }
                 match result {
                     Ok(ranked) => {
                         let tweets: Vec<Tweet> = ranked.into_iter().map(|(t, _)| t).collect();

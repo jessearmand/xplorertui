@@ -115,6 +115,7 @@ pub enum AppEvent {
     },
     SearchRanked {
         query: String,
+        model_id: String,
         result: ApiResult<Vec<(Tweet, f64)>>,
     },
     ClusterTimeline,
