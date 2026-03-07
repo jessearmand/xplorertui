@@ -11,6 +11,10 @@ pub struct ClusterResult {
     pub labels: Vec<usize>,
     /// Original tweet texts.
     pub tweet_texts: Vec<String>,
+    /// Tweet ID for each entry (parallel to `tweet_texts`).
+    pub tweet_ids: Vec<String>,
+    /// Conversation ID per tweet (for opening threads).
+    pub conversation_ids: Vec<Option<String>>,
     /// Representative label per cluster (tweet closest to centroid).
     pub cluster_topics: Vec<String>,
 }
@@ -29,6 +33,26 @@ impl ClusterResult {
     /// Number of distinct clusters.
     pub fn num_clusters(&self) -> usize {
         self.labels.iter().copied().max().map_or(0, |m| m + 1)
+    }
+
+    /// Returns original indices of tweets belonging to a cluster.
+    pub fn tweet_indices_for_cluster(&self, cluster: usize) -> Vec<usize> {
+        self.labels
+            .iter()
+            .enumerate()
+            .filter(|(_, label)| **label == cluster)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Returns `(original_index, text)` pairs for tweets in a cluster.
+    pub fn texts_for_cluster(&self, cluster: usize) -> Vec<(usize, &str)> {
+        self.labels
+            .iter()
+            .enumerate()
+            .filter(|(_, label)| **label == cluster)
+            .map(|(i, _)| (i, self.tweet_texts[i].as_str()))
+            .collect()
     }
 }
 
@@ -116,6 +140,8 @@ fn closest_to_centroid(
 pub fn build_cluster_result(
     embeddings: &[Vec<f64>],
     tweet_texts: Vec<String>,
+    tweet_ids: Vec<String>,
+    conversation_ids: Vec<Option<String>>,
     k: usize,
 ) -> ClusterResult {
     let labels = run_kmeans(embeddings, k);
@@ -126,6 +152,8 @@ pub fn build_cluster_result(
         points,
         labels,
         tweet_texts,
+        tweet_ids,
+        conversation_ids,
         cluster_topics,
     }
 }
