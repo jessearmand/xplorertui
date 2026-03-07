@@ -1,9 +1,11 @@
 use ansi_to_tui::IntoText;
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap};
+use ratatui::widgets::{
+    Block, Borders, Clear, List, ListItem, ListState, Paragraph, StatefulWidget, Widget, Wrap,
+};
 
 use crate::app::App;
 use crate::embeddings::cluster::ClusterResult;
@@ -66,41 +68,6 @@ impl<'a> ClusterView<'a> {
         TerminalBackend::new(cols, rows).render_scene(&scene)
     }
 
-    fn render_legend(result: &ClusterResult, area: Rect, buf: &mut Buffer) {
-        let num_clusters = result.num_clusters();
-        let lines: Vec<Line<'_>> = (0..num_clusters)
-            .map(|c| {
-                let (_, color) = CLUSTER_COLORS[c % CLUSTER_COLORS.len()];
-                let topic =
-                    if c < result.cluster_topics.len() && !result.cluster_topics[c].is_empty() {
-                        result.cluster_topics[c].as_str()
-                    } else {
-                        "(no data)"
-                    };
-
-                // Truncate to fit available width (leave room for "█ C0: " prefix).
-                let max_topic_len = area.width.saturating_sub(8) as usize;
-                let display_topic = if topic.len() > max_topic_len && max_topic_len > 3 {
-                    format!("{}...", &topic[..max_topic_len - 3])
-                } else {
-                    topic.to_string()
-                };
-
-                Line::from(vec![
-                    Span::styled("█ ", Style::default().fg(color)),
-                    Span::styled(
-                        format!("C{c}: "),
-                        Style::default().fg(color).add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(display_topic, Style::default().fg(Color::White)),
-                ])
-            })
-            .collect();
-
-        let paragraph = Paragraph::new(lines);
-        paragraph.render(area, buf);
-    }
-
     fn render_loading_popup(area: Rect, buf: &mut Buffer) {
         let width = 40u16.min(area.width.saturating_sub(4));
         let height = 5u16.min(area.height.saturating_sub(2));
@@ -130,30 +97,21 @@ impl<'a> ClusterView<'a> {
         .centered();
         text.render(inner, buf);
     }
-}
 
-impl Widget for ClusterView<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+    /// Render cluster list mode: scatter plot on top, selectable cluster list on bottom.
+    fn render_cluster_list(
+        result: &ClusterResult,
+        selected_index: usize,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
         let block = Block::default()
-            .title(" Topic Clusters (Esc to go back) ")
+            .title(" Topic Clusters (Enter to browse, Esc to go back) ")
             .borders(Borders::ALL);
 
-        if self.app.cluster_loading {
-            block.render(area, buf);
-            Self::render_loading_popup(area, buf);
-            return;
-        }
-
-        let Some(ref result) = self.app.cluster_result else {
-            let empty = Paragraph::new("No cluster data. Use :cluster to compute.").block(block);
-            empty.render(area, buf);
-            return;
-        };
-
         let num_clusters = result.num_clusters();
-        let legend_height = (num_clusters as u16).clamp(1, 10);
+        let legend_height = (num_clusters as u16).clamp(1, 10) + 2; // +2 for list block borders
 
-        // Split area: chart on top, legend at bottom.
         let inner = block.inner(area);
         if inner.width < 10 || inner.height < 5 {
             block.render(area, buf);
@@ -161,12 +119,13 @@ impl Widget for ClusterView<'_> {
         }
         block.render(area, buf);
 
-        let [chart_area, legend_area] = Layout::vertical([
+        let [chart_area, list_area] = ratatui::layout::Layout::vertical([
             Constraint::Min(5),
-            Constraint::Length(legend_height + 1), // +1 for spacing
+            Constraint::Length(legend_height),
         ])
         .areas(inner);
 
+        // Render scatter plot
         let ansi_output = Self::render_scatter(
             result,
             chart_area.width as usize,
@@ -176,13 +135,137 @@ impl Widget for ClusterView<'_> {
         let chart = Paragraph::new(text).wrap(Wrap { trim: false });
         chart.render(chart_area, buf);
 
-        // Render color legend panel.
-        let legend_inner = Rect::new(
-            legend_area.x + 1,
-            legend_area.y,
-            legend_area.width.saturating_sub(2),
-            legend_area.height,
-        );
-        Self::render_legend(result, legend_inner, buf);
+        // Render selectable cluster list
+        let items: Vec<ListItem> = (0..num_clusters)
+            .map(|c| {
+                let (_, color) = CLUSTER_COLORS[c % CLUSTER_COLORS.len()];
+                let topic =
+                    if c < result.cluster_topics.len() && !result.cluster_topics[c].is_empty() {
+                        result.cluster_topics[c].as_str()
+                    } else {
+                        "(no data)"
+                    };
+
+                let count = result.tweet_indices_for_cluster(c).len();
+                let max_topic_len = list_area.width.saturating_sub(18) as usize;
+                let display_topic = if topic.len() > max_topic_len && max_topic_len > 3 {
+                    format!("{}...", &topic[..max_topic_len - 3])
+                } else {
+                    topic.to_string()
+                };
+
+                ListItem::new(Line::from(vec![
+                    Span::styled("█ ", Style::default().fg(color)),
+                    Span::styled(
+                        format!("C{c}"),
+                        Style::default().fg(color).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(format!(" ({count})"), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(": {display_topic}"),
+                        Style::default().fg(Color::White),
+                    ),
+                ]))
+            })
+            .collect();
+
+        let list = List::new(items)
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("▸ ");
+
+        let mut state = ListState::default().with_selected(Some(selected_index));
+        StatefulWidget::render(list, list_area, buf, &mut state);
+    }
+
+    /// Render tweet list mode: scrollable list of tweets within a selected cluster.
+    fn render_tweet_list(
+        result: &ClusterResult,
+        cluster: usize,
+        selected_index: usize,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
+        let (_, color) = CLUSTER_COLORS[cluster % CLUSTER_COLORS.len()];
+        let topic = if cluster < result.cluster_topics.len()
+            && !result.cluster_topics[cluster].is_empty()
+        {
+            result.cluster_topics[cluster].as_str()
+        } else {
+            "(no data)"
+        };
+
+        let max_title_len = area.width.saturating_sub(10) as usize;
+        let display_topic = if topic.len() > max_title_len && max_title_len > 3 {
+            format!("{}...", &topic[..max_title_len - 3])
+        } else {
+            topic.to_string()
+        };
+
+        let block = Block::default()
+            .title(format!(
+                " C{cluster}: {display_topic} (Enter for thread, Esc to go back) "
+            ))
+            .title_style(Style::default().fg(color).add_modifier(Modifier::BOLD))
+            .borders(Borders::ALL);
+
+        let texts = result.texts_for_cluster(cluster);
+        let items: Vec<ListItem> = texts
+            .iter()
+            .map(|(_, text)| {
+                let display = text.replace('\n', " ");
+                ListItem::new(Line::from(Span::styled(
+                    display,
+                    Style::default().fg(Color::White),
+                )))
+            })
+            .collect();
+
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("▸ ");
+
+        let mut state = ListState::default().with_selected(Some(selected_index));
+        StatefulWidget::render(list, area, buf, &mut state);
+    }
+}
+
+impl Widget for ClusterView<'_> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        if self.app.cluster_loading {
+            let block = Block::default()
+                .title(" Topic Clusters ")
+                .borders(Borders::ALL);
+            block.render(area, buf);
+            Self::render_loading_popup(area, buf);
+            return;
+        }
+
+        let Some(ref result) = self.app.cluster_result else {
+            let block = Block::default()
+                .title(" Topic Clusters ")
+                .borders(Borders::ALL);
+            let empty = Paragraph::new("No cluster data. Use :cluster to compute.").block(block);
+            empty.render(area, buf);
+            return;
+        };
+
+        let selected_index = self.app.selected_index();
+
+        if let Some(cluster) = self.app.selected_cluster {
+            Self::render_tweet_list(result, cluster, selected_index, area, buf);
+        } else {
+            Self::render_cluster_list(result, selected_index, area, buf);
+        }
     }
 }

@@ -103,6 +103,8 @@ pub struct App {
     // Clustering state
     pub cluster_result: Option<ClusterResult>,
     pub cluster_loading: bool,
+    /// `None` = cluster list mode, `Some(c)` = viewing tweets in cluster c.
+    pub selected_cluster: Option<usize>,
 
     // Status
     pub status_message: Option<String>,
@@ -158,6 +160,7 @@ impl App {
             models_loading: false,
             cluster_result: None,
             cluster_loading: false,
+            selected_cluster: None,
             status_message: None,
             error_detail: None,
             loading: false,
@@ -278,7 +281,16 @@ impl App {
     fn handle_normal_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => {
-                if self.view_stack.len() > 1 {
+                // In cluster tweet list mode, go back to cluster list first
+                if self.current_view() == Some(&ViewKind::Cluster)
+                    && self.selected_cluster.is_some()
+                {
+                    let cluster_idx = self.selected_cluster.unwrap();
+                    self.selected_cluster = None;
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = cluster_idx;
+                    }
+                } else if self.view_stack.len() > 1 {
                     self.events.send(AppEvent::PopView);
                 } else {
                     self.events.send(AppEvent::Quit);
@@ -461,7 +473,17 @@ impl App {
             Some(ViewKind::Thread(_)) => self.thread_tweets.len(),
             Some(ViewKind::UserProfile(_)) => 0,
             Some(ViewKind::OpenRouterModels) => self.openrouter_models.len(),
-            Some(ViewKind::Cluster) => 0,
+            Some(ViewKind::Cluster) => {
+                if let Some(ref result) = self.cluster_result {
+                    if let Some(c) = self.selected_cluster {
+                        result.tweet_indices_for_cluster(c).len()
+                    } else {
+                        result.num_clusters()
+                    }
+                } else {
+                    0
+                }
+            }
             Some(ViewKind::Help) => 0,
             None => 0,
         }
@@ -539,6 +561,32 @@ impl App {
                     let model_id = model.id.clone();
                     self.events
                         .send(AppEvent::SelectEmbeddingModel { model_id });
+                }
+            }
+            Some(ViewKind::Cluster) => {
+                if let Some(ref result) = self.cluster_result {
+                    if let Some(c) = self.selected_cluster {
+                        // In tweet list mode — open the selected tweet's thread
+                        let indices = result.tweet_indices_for_cluster(c);
+                        if let Some(&orig_idx) = indices.get(idx) {
+                            let conv_id = result.conversation_ids[orig_idx]
+                                .clone()
+                                .unwrap_or_else(|| result.tweet_ids[orig_idx].clone());
+                            self.events.send(AppEvent::FetchThread {
+                                conversation_id: conv_id,
+                                pagination_token: None,
+                            });
+                        }
+                    } else {
+                        // In cluster list mode — enter tweet list for this cluster
+                        let num = result.num_clusters();
+                        if idx < num {
+                            self.selected_cluster = Some(idx);
+                            if let Some(vs) = self.view_stack.last_mut() {
+                                vs.selected_index = 0;
+                            }
+                        }
+                    }
                 }
             }
             _ => {}
@@ -821,6 +869,9 @@ impl App {
         tokio::spawn(async move {
             let result = async {
                 let texts: Vec<String> = tweets.iter().map(|t| t.text.clone()).collect();
+                let ids: Vec<String> = tweets.iter().map(|t| t.id.clone()).collect();
+                let conv_ids: Vec<Option<String>> =
+                    tweets.iter().map(|t| t.conversation_id.clone()).collect();
 
                 let resp = client
                     .embed(&model, &texts)
@@ -833,8 +884,13 @@ impl App {
                     sorted_data.into_iter().map(|d| d.embedding).collect();
 
                 let k = 5.min(tweets.len());
-                let cluster_result =
-                    crate::embeddings::cluster::build_cluster_result(&embeddings, texts, k);
+                let cluster_result = crate::embeddings::cluster::build_cluster_result(
+                    &embeddings,
+                    texts,
+                    ids,
+                    conv_ids,
+                    k,
+                );
 
                 Ok(cluster_result)
             }
@@ -1135,6 +1191,7 @@ impl App {
                     return;
                 }
                 self.cluster_loading = true;
+                self.selected_cluster = None;
                 self.push_view(ViewKind::Cluster);
                 self.dispatch_cluster_timeline();
             }
