@@ -32,6 +32,9 @@ pub enum AppEvent {
     PopView,
     SwitchView(ViewKind),
 
+    // -- Refresh --
+    RefreshView,
+
     // -- API request triggers (sent from key handlers) --
     FetchHomeTimeline {
         pagination_token: Option<String>,

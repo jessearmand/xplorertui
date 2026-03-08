@@ -105,6 +105,8 @@ pub struct App {
     pub cluster_loading: bool,
     /// `None` = cluster list mode, `Some(c)` = viewing tweets in cluster c.
     pub selected_cluster: Option<usize>,
+    /// When true, a cluster operation will be triggered after the home timeline refresh completes.
+    pub refresh_then_cluster: bool,
 
     // Status
     pub status_message: Option<String>,
@@ -161,6 +163,7 @@ impl App {
             cluster_result: None,
             cluster_loading: false,
             selected_cluster: None,
+            refresh_then_cluster: false,
             status_message: None,
             error_detail: None,
             loading: false,
@@ -341,6 +344,9 @@ impl App {
             KeyCode::Char('o') => {
                 self.open_tweet_url();
             }
+            KeyCode::Char('r') => {
+                self.events.send(AppEvent::RefreshView);
+            }
             _ => {}
         }
     }
@@ -441,6 +447,9 @@ impl App {
             }
             Some(Command::Cluster) => {
                 self.events.send(AppEvent::ClusterTimeline);
+            }
+            Some(Command::Refresh) => {
+                self.events.send(AppEvent::RefreshView);
             }
             Some(Command::Quit) => {
                 self.events.send(AppEvent::Quit);
@@ -727,6 +736,67 @@ impl App {
         }
     }
 
+    fn refresh_current_view(&mut self) {
+        match self.current_view().cloned() {
+            Some(ViewKind::Home) => {
+                self.reset_timeline(&mut Self::home_timeline_ref);
+                self.events.send(AppEvent::FetchHomeTimeline {
+                    pagination_token: None,
+                });
+            }
+            Some(ViewKind::Mentions) => {
+                self.reset_timeline(&mut Self::mentions_ref);
+                self.events.send(AppEvent::FetchMentions {
+                    pagination_token: None,
+                });
+            }
+            Some(ViewKind::Bookmarks) => {
+                self.reset_timeline(&mut Self::bookmarks_ref);
+                self.events.send(AppEvent::FetchBookmarks {
+                    pagination_token: None,
+                });
+            }
+            Some(ViewKind::Cluster) => {
+                self.reset_timeline(&mut Self::home_timeline_ref);
+                self.cluster_result = None;
+                self.selected_cluster = None;
+                self.refresh_then_cluster = true;
+                self.events.send(AppEvent::FetchHomeTimeline {
+                    pagination_token: None,
+                });
+            }
+            _ => {
+                self.status_message = Some("Refresh not supported for this view".into());
+            }
+        }
+    }
+
+    /// Clear a timeline and reset the view stack's selection/scroll to the top.
+    fn reset_timeline(&mut self, timeline_fn: &mut dyn FnMut(&mut Self) -> &mut TimelineState) {
+        let tl = timeline_fn(self);
+        tl.tweets.clear();
+        tl.next_token = None;
+        tl.selected_index = 0;
+        tl.scroll_offset = 0;
+        if let Some(vs) = self.view_stack.last_mut() {
+            vs.selected_index = 0;
+            vs.scroll_offset = 0;
+        }
+        self.status_message = Some("Refreshing...".into());
+    }
+
+    fn home_timeline_ref(&mut self) -> &mut TimelineState {
+        &mut self.home_timeline
+    }
+
+    fn mentions_ref(&mut self) -> &mut TimelineState {
+        &mut self.mentions
+    }
+
+    fn bookmarks_ref(&mut self) -> &mut TimelineState {
+        &mut self.bookmarks
+    }
+
     // -- Auth flow (suspends TUI) ------------------------------------------
 
     async fn run_auth_flow(&mut self, terminal: &mut DefaultTerminal) {
@@ -999,6 +1069,10 @@ impl App {
             AppEvent::PopView => {
                 self.pop_view();
             }
+            AppEvent::RefreshView => {
+                self.refresh_current_view();
+            }
+
             AppEvent::SwitchView(kind) => {
                 // Replace the root view or push if stack is deeper.
                 if self.view_stack.len() <= 1 {
@@ -1043,6 +1117,10 @@ impl App {
                     Err(e) => {
                         self.set_error(format!("Error loading timeline: {e}"));
                     }
+                }
+                if self.refresh_then_cluster {
+                    self.refresh_then_cluster = false;
+                    self.events.send(AppEvent::ClusterTimeline);
                 }
             }
             AppEvent::UserTimelineLoaded { user_id: _, result } => {

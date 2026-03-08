@@ -13,6 +13,7 @@ pub enum Command {
     OpenRouterAuth,
     Models,
     Cluster,
+    Refresh,
     Quit,
 }
 
@@ -40,6 +41,7 @@ pub fn parse_command(input: &str) -> Option<Command> {
         "openrouter-auth" | "or-auth" => Some(Command::OpenRouterAuth),
         "models" => Some(Command::Models),
         "cluster" => Some(Command::Cluster),
+        "refresh" | "r" => Some(Command::Refresh),
         "quit" | "q" => Some(Command::Quit),
         _ => None,
     }
@@ -106,6 +108,8 @@ mod tests {
         assert_eq!(parse_command(":m"), Some(Command::Mentions));
         assert_eq!(parse_command(":auth"), Some(Command::Auth));
         assert_eq!(parse_command(":login"), Some(Command::Auth));
+        assert_eq!(parse_command(":refresh"), Some(Command::Refresh));
+        assert_eq!(parse_command(":r"), Some(Command::Refresh));
     }
 
     #[test]
