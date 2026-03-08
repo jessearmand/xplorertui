@@ -53,6 +53,8 @@ impl Widget for HelpView {
             binding_line("Enter", "Open selected item", key_style, desc_style),
             binding_line("Esc/q", "Go back / close", key_style, desc_style),
             binding_line("n", "Load next page", key_style, desc_style),
+            binding_line("y", "Copy tweet URL", key_style, desc_style),
+            binding_line("o", "Open tweet in browser", key_style, desc_style),
             Line::from(""),
             Line::from(Span::styled("Views", section_style)),
             binding_line("1", "Home timeline", key_style, desc_style),
