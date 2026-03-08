@@ -2,6 +2,7 @@ pub mod api;
 pub mod app;
 pub mod auth;
 pub mod cli;
+pub mod clipboard;
 pub mod command;
 pub mod config;
 pub mod embeddings;

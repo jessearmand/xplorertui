@@ -335,6 +335,12 @@ impl App {
             KeyCode::Char('n') => {
                 self.load_next_page();
             }
+            KeyCode::Char('y') => {
+                self.copy_tweet_url();
+            }
+            KeyCode::Char('o') => {
+                self.open_tweet_url();
+            }
             _ => {}
         }
     }
@@ -590,6 +596,81 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Returns a reference to the currently selected tweet, if any.
+    fn selected_tweet(&self) -> Option<&Tweet> {
+        let idx = self.selected_index();
+        match self.current_view() {
+            Some(ViewKind::Home) => self.home_timeline.tweets.get(idx),
+            Some(ViewKind::Mentions) => self.mentions.tweets.get(idx),
+            Some(ViewKind::Bookmarks) => self.bookmarks.tweets.get(idx),
+            Some(ViewKind::Search) => self.search_results.tweets.get(idx),
+            Some(ViewKind::UserTimeline(_)) => self.viewed_user_timeline.tweets.get(idx),
+            Some(ViewKind::Thread(_)) => self.thread_tweets.get(idx),
+            _ => None,
+        }
+    }
+
+    /// Builds the tweet URL for the current selection, handling both regular
+    /// views (via `selected_tweet()`) and the cluster tweet-list view.
+    fn selected_tweet_url(&self) -> Option<String> {
+        // Cluster tweet-list view: tweets stored as IDs, not Tweet objects.
+        if self.current_view() == Some(&ViewKind::Cluster) {
+            if let Some(c) = self.selected_cluster
+                && let Some(ref result) = self.cluster_result
+            {
+                let indices = result.tweet_indices_for_cluster(c);
+                let orig_idx = *indices.get(self.selected_index())?;
+                let tweet_id = &result.tweet_ids[orig_idx];
+                let username = result.author_ids[orig_idx]
+                    .as_deref()
+                    .and_then(|aid| self.lookup_user(aid))
+                    .map(|u| u.username.as_str());
+                return Some(tweet_url(tweet_id, username));
+            }
+            return None;
+        }
+
+        let tweet = self.selected_tweet()?;
+        let username = tweet
+            .author_id
+            .as_deref()
+            .and_then(|aid| self.lookup_user(aid))
+            .map(|u| u.username.as_str());
+        Some(tweet_url(&tweet.id, username))
+    }
+
+    fn copy_tweet_url(&mut self) {
+        match self.selected_tweet_url() {
+            Some(url) => match crate::clipboard::copy_to_clipboard(&url) {
+                Ok(()) => {
+                    self.status_message = Some(format!("Copied: {url}"));
+                }
+                Err(e) => {
+                    self.status_message = Some(format!("Clipboard error: {e}"));
+                }
+            },
+            None => {
+                self.status_message = Some("No tweet selected".into());
+            }
+        }
+    }
+
+    fn open_tweet_url(&mut self) {
+        match self.selected_tweet_url() {
+            Some(url) => match open::that(&url) {
+                Ok(()) => {
+                    self.status_message = Some(format!("Opened: {url}"));
+                }
+                Err(e) => {
+                    self.status_message = Some(format!("Failed to open browser: {e}"));
+                }
+            },
+            None => {
+                self.status_message = Some("No tweet selected".into());
+            }
         }
     }
 
@@ -873,6 +954,8 @@ impl App {
                 let ids: Vec<String> = tweets.iter().map(|t| t.id.clone()).collect();
                 let conv_ids: Vec<Option<String>> =
                     tweets.iter().map(|t| t.conversation_id.clone()).collect();
+                let author_ids: Vec<Option<String>> =
+                    tweets.iter().map(|t| t.author_id.clone()).collect();
 
                 let resp = client
                     .embed(&model, &texts)
@@ -890,6 +973,7 @@ impl App {
                     texts,
                     ids,
                     conv_ids,
+                    author_ids,
                     k,
                 );
 
@@ -1391,5 +1475,13 @@ impl App {
     /// Look up a user by their ID from the includes cache.
     pub fn lookup_user(&self, user_id: &str) -> Option<&User> {
         self.users_cache.get(user_id)
+    }
+}
+
+/// Build a tweet URL. Uses `x.com/i/status/{id}` as fallback when username is unknown.
+fn tweet_url(tweet_id: &str, username: Option<&str>) -> String {
+    match username {
+        Some(name) => format!("https://x.com/{name}/status/{tweet_id}"),
+        None => format!("https://x.com/i/status/{tweet_id}"),
     }
 }

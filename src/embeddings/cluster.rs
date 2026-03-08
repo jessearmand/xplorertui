@@ -15,6 +15,8 @@ pub struct ClusterResult {
     pub tweet_ids: Vec<String>,
     /// Conversation ID per tweet (for opening threads).
     pub conversation_ids: Vec<Option<String>>,
+    /// Author ID per tweet (for building tweet URLs).
+    pub author_ids: Vec<Option<String>>,
     /// Representative label per cluster (tweet closest to centroid).
     pub cluster_topics: Vec<String>,
 }
@@ -142,6 +144,7 @@ pub fn build_cluster_result(
     tweet_texts: Vec<String>,
     tweet_ids: Vec<String>,
     conversation_ids: Vec<Option<String>>,
+    author_ids: Vec<Option<String>>,
     k: usize,
 ) -> ClusterResult {
     let labels = run_kmeans(embeddings, k);
@@ -154,6 +157,7 @@ pub fn build_cluster_result(
         tweet_texts,
         tweet_ids,
         conversation_ids,
+        author_ids,
         cluster_topics,
     }
 }
