@@ -179,6 +179,8 @@ xplorertui similar "rust async runtime" -m openai/text-embedding-3-small
 | `Enter` | Open selected item (thread view) |
 | `Esc` / `q` | Go back / quit |
 | `n` | Load next page |
+| `y` | Copy tweet URL to clipboard |
+| `o` | Open tweet in browser |
 
 ### Views
 
