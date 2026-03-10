@@ -85,8 +85,20 @@ impl Widget for HelpView {
             ),
             binding_line(":models", "Select embedding model", key_style, desc_style),
             binding_line(
+                ":text-models",
+                "Select chat model for topic labels",
+                key_style,
+                desc_style,
+            ),
+            binding_line(
                 ":cluster",
                 "Cluster home timeline topics",
+                key_style,
+                desc_style,
+            ),
+            binding_line(
+                ":topics",
+                "Regenerate cluster topic labels via LLM",
                 key_style,
                 desc_style,
             ),

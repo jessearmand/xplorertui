@@ -96,7 +96,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
                 );
             }
         }
-        Some(ViewKind::OpenRouterModels) => {
+        Some(ViewKind::OpenRouterModels) | Some(ViewKind::TextModels) => {
             frame.render_widget(ModelsView::new(app), main_area);
         }
         Some(ViewKind::Cluster) => {

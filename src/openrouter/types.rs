@@ -95,3 +95,82 @@ pub struct EmbeddingUsage {
     pub prompt_tokens: u64,
     pub total_tokens: u64,
 }
+
+// ---------------------------------------------------------------------------
+// Chat completion types (OpenAI-compatible)
+// ---------------------------------------------------------------------------
+
+/// A single message in a chat conversation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
+/// Controls reasoning token behavior in chat completions.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReasoningConfig {
+    /// When true, the model still reasons internally but reasoning
+    /// tokens are excluded from the response.
+    pub exclude: bool,
+}
+
+/// Request body for `POST /api/v1/chat/completions`.
+#[derive(Debug, Serialize)]
+pub struct ChatCompletionRequest {
+    pub model: String,
+    pub messages: Vec<ChatMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    /// Controls reasoning token output. Use `{ exclude: true }` to
+    /// suppress chain-of-thought from the response while the model
+    /// still reasons internally.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<ReasoningConfig>,
+}
+
+/// Response from `POST /api/v1/chat/completions`.
+#[derive(Debug, Deserialize)]
+pub struct ChatCompletionResponse {
+    pub choices: Vec<ChatChoice>,
+    #[serde(default)]
+    pub usage: Option<ChatUsage>,
+}
+
+/// A single choice in a chat completion response.
+#[derive(Debug, Deserialize)]
+pub struct ChatChoice {
+    pub message: ChatMessageResponse,
+    #[serde(default)]
+    pub finish_reason: Option<String>,
+}
+
+/// The message content in a chat completion choice.
+#[derive(Debug, Deserialize)]
+pub struct ChatMessageResponse {
+    #[serde(default)]
+    pub role: Option<String>,
+    #[serde(default)]
+    pub content: Option<String>,
+    /// Reasoning models may return their chain-of-thought here.
+    /// Used by DeepSeek R1, GLM-5, etc. (`reasoning-content` mechanism).
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
+    /// Alias for `reasoning_content` used by some providers
+    /// (`reasoning` mechanism).
+    #[serde(default)]
+    pub reasoning: Option<String>,
+}
+
+/// Token usage for a chat completion request.
+#[derive(Debug, Deserialize)]
+pub struct ChatUsage {
+    #[serde(default)]
+    pub prompt_tokens: Option<u64>,
+    #[serde(default)]
+    pub completion_tokens: Option<u64>,
+    #[serde(default)]
+    pub total_tokens: Option<u64>,
+}

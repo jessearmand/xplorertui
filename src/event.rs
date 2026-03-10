@@ -110,6 +110,11 @@ pub enum AppEvent {
     SelectEmbeddingModel {
         model_id: String,
     },
+    FetchTextModels,
+    TextModelsLoaded(ApiResult<Vec<Model>>),
+    SelectChatModel {
+        model_id: String,
+    },
 
     // -- Embeddings --
     EmbedAndRankSearch {
@@ -123,6 +128,8 @@ pub enum AppEvent {
     },
     ClusterTimeline,
     ClusteringComplete(ApiResult<ClusterResult>),
+    GenerateClusterTopics,
+    ClusterTopicsGenerated(ApiResult<Vec<String>>),
 }
 
 /// API result type using `Arc<String>` so errors are `Clone`.
@@ -139,6 +146,7 @@ pub enum ViewKind {
     Mentions,
     Bookmarks,
     OpenRouterModels,
+    TextModels,
     Cluster,
     Help,
 }
