@@ -64,6 +64,8 @@ impl Widget for StatusBar<'_> {
             }
             Some(ViewKind::Mentions) => "Mentions".to_string(),
             Some(ViewKind::Bookmarks) => "Bookmarks".to_string(),
+            Some(ViewKind::OpenRouterModels) => "Models".to_string(),
+            Some(ViewKind::Cluster) => "Clusters".to_string(),
             Some(ViewKind::Help) => "Help".to_string(),
             None => "xplorertui".to_string(),
         };

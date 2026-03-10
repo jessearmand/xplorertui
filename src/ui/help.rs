@@ -16,9 +16,9 @@ impl HelpView {
 
 impl Widget for HelpView {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // Center a panel that's 60 wide, 22 tall (or fit to area)
+        // Center a panel that's 60 wide, 30 tall (or fit to area)
         let width = 60u16.min(area.width.saturating_sub(4));
-        let height = 22u16.min(area.height.saturating_sub(2));
+        let height = 32u16.min(area.height.saturating_sub(2));
         let x = area.x + (area.width.saturating_sub(width)) / 2;
         let y = area.y + (area.height.saturating_sub(height)) / 2;
         let panel = Rect::new(x, y, width, height);
@@ -53,6 +53,9 @@ impl Widget for HelpView {
             binding_line("Enter", "Open selected item", key_style, desc_style),
             binding_line("Esc/q", "Go back / close", key_style, desc_style),
             binding_line("n", "Load next page", key_style, desc_style),
+            binding_line("r", "Refresh current view", key_style, desc_style),
+            binding_line("y", "Copy tweet URL", key_style, desc_style),
+            binding_line("o", "Open tweet in browser", key_style, desc_style),
             Line::from(""),
             Line::from(Span::styled("Views", section_style)),
             binding_line("1", "Home timeline", key_style, desc_style),
@@ -65,8 +68,30 @@ impl Widget for HelpView {
             binding_line(":", "Command mode", key_style, desc_style),
             binding_line("/", "Search tweets", key_style, desc_style),
             binding_line("@", "Look up user", key_style, desc_style),
-            binding_line(":auth", "Authenticate (OAuth2 PKCE)", key_style, desc_style),
             binding_line("Ctrl-C", "Quit", key_style, desc_style),
+            Line::from(""),
+            Line::from(Span::styled("Commands", section_style)),
+            binding_line(
+                ":auth",
+                "Authenticate (X OAuth2 PKCE)",
+                key_style,
+                desc_style,
+            ),
+            binding_line(
+                ":or-auth",
+                "Authenticate (OpenRouter)",
+                key_style,
+                desc_style,
+            ),
+            binding_line(":models", "Select embedding model", key_style, desc_style),
+            binding_line(
+                ":cluster",
+                "Cluster home timeline topics",
+                key_style,
+                desc_style,
+            ),
+            binding_line(":refresh", "Refresh current view", key_style, desc_style),
+            binding_line(":quit", "Quit", key_style, desc_style),
         ];
 
         let paragraph = Paragraph::new(bindings);

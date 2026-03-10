@@ -11,7 +11,10 @@ use crate::auth::AuthProvider;
 use crate::auth::credentials::CredentialSet;
 use crate::command::{self, Command};
 use crate::config::AppConfig;
+use crate::embeddings::cluster::ClusterResult;
 use crate::event::{ApiResult, AppEvent, Event, EventHandler, ViewKind};
+use crate::openrouter::client::OpenRouterClient;
+use crate::openrouter::types::Model;
 use crate::ui;
 
 // ---------------------------------------------------------------------------
@@ -89,6 +92,22 @@ pub struct App {
     // Includes cache (users from API responses for author lookup)
     pub users_cache: HashMap<String, User>,
 
+    // OpenRouter client
+    pub openrouter_client: Option<Arc<OpenRouterClient>>,
+
+    // OpenRouter model selection
+    pub openrouter_models: Vec<Model>,
+    pub selected_embedding_model: Option<String>,
+    pub models_loading: bool,
+
+    // Clustering state
+    pub cluster_result: Option<ClusterResult>,
+    pub cluster_loading: bool,
+    /// `None` = cluster list mode, `Some(c)` = viewing tweets in cluster c.
+    pub selected_cluster: Option<usize>,
+    /// When true, a cluster operation will be triggered after the home timeline refresh completes.
+    pub refresh_then_cluster: bool,
+
     // Status
     pub status_message: Option<String>,
     pub error_detail: Option<String>,
@@ -137,6 +156,14 @@ impl App {
             credentials,
             api_client: api_client.map(|c| Arc::new(Mutex::new(c))),
             users_cache: HashMap::new(),
+            openrouter_client: None,
+            openrouter_models: Vec::new(),
+            selected_embedding_model: None,
+            models_loading: false,
+            cluster_result: None,
+            cluster_loading: false,
+            selected_cluster: None,
+            refresh_then_cluster: false,
             status_message: None,
             error_detail: None,
             loading: false,
@@ -146,6 +173,9 @@ impl App {
     // -- Main event loop ----------------------------------------------------
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> color_eyre::Result<()> {
+        // Try to initialize OpenRouter client from stored credentials.
+        self.init_openrouter_client();
+
         // Trigger initial data fetch based on default view.
         match self.current_view() {
             Some(ViewKind::Home) => {
@@ -180,6 +210,8 @@ impl App {
                 Event::App(app_event) => {
                     if matches!(*app_event, AppEvent::StartAuth) {
                         self.run_auth_flow(&mut terminal).await;
+                    } else if matches!(*app_event, AppEvent::StartOpenRouterAuth) {
+                        self.run_openrouter_auth_flow(&mut terminal).await;
                     } else {
                         self.handle_app_event(*app_event);
                     }
@@ -252,7 +284,16 @@ impl App {
     fn handle_normal_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => {
-                if self.view_stack.len() > 1 {
+                // In cluster tweet list mode, go back to cluster list first
+                if self.current_view() == Some(&ViewKind::Cluster)
+                    && self.selected_cluster.is_some()
+                {
+                    let cluster_idx = self.selected_cluster.unwrap();
+                    self.selected_cluster = None;
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = cluster_idx;
+                    }
+                } else if self.view_stack.len() > 1 {
                     self.events.send(AppEvent::PopView);
                 } else {
                     self.events.send(AppEvent::Quit);
@@ -296,6 +337,15 @@ impl App {
             }
             KeyCode::Char('n') => {
                 self.load_next_page();
+            }
+            KeyCode::Char('y') => {
+                self.copy_tweet_url();
+            }
+            KeyCode::Char('o') => {
+                self.open_tweet_url();
+            }
+            KeyCode::Char('r') => {
+                self.events.send(AppEvent::RefreshView);
             }
             _ => {}
         }
@@ -387,6 +437,20 @@ impl App {
             Some(Command::Auth) => {
                 self.events.send(AppEvent::StartAuth);
             }
+            Some(Command::OpenRouterAuth) => {
+                self.events.send(AppEvent::StartOpenRouterAuth);
+            }
+            Some(Command::Models) => {
+                self.events.send(AppEvent::FetchOpenRouterModels);
+                self.events
+                    .send(AppEvent::PushView(ViewKind::OpenRouterModels));
+            }
+            Some(Command::Cluster) => {
+                self.events.send(AppEvent::ClusterTimeline);
+            }
+            Some(Command::Refresh) => {
+                self.events.send(AppEvent::RefreshView);
+            }
             Some(Command::Quit) => {
                 self.events.send(AppEvent::Quit);
             }
@@ -423,6 +487,18 @@ impl App {
             Some(ViewKind::UserTimeline(_)) => self.viewed_user_timeline.tweets.len(),
             Some(ViewKind::Thread(_)) => self.thread_tweets.len(),
             Some(ViewKind::UserProfile(_)) => 0,
+            Some(ViewKind::OpenRouterModels) => self.openrouter_models.len(),
+            Some(ViewKind::Cluster) => {
+                if let Some(ref result) = self.cluster_result {
+                    if let Some(c) = self.selected_cluster {
+                        result.tweet_indices_for_cluster(c).len()
+                    } else {
+                        result.num_clusters()
+                    }
+                } else {
+                    0
+                }
+            }
             Some(ViewKind::Help) => 0,
             None => 0,
         }
@@ -495,7 +571,115 @@ impl App {
                     });
                 }
             }
+            Some(ViewKind::OpenRouterModels) => {
+                if let Some(model) = self.openrouter_models.get(idx) {
+                    let model_id = model.id.clone();
+                    self.events
+                        .send(AppEvent::SelectEmbeddingModel { model_id });
+                }
+            }
+            Some(ViewKind::Cluster) => {
+                if let Some(ref result) = self.cluster_result {
+                    if let Some(c) = self.selected_cluster {
+                        // In tweet list mode — open the selected tweet's thread
+                        let indices = result.tweet_indices_for_cluster(c);
+                        if let Some(&orig_idx) = indices.get(idx) {
+                            let conv_id = result.conversation_ids[orig_idx]
+                                .clone()
+                                .unwrap_or_else(|| result.tweet_ids[orig_idx].clone());
+                            self.events.send(AppEvent::FetchThread {
+                                conversation_id: conv_id,
+                                pagination_token: None,
+                            });
+                        }
+                    } else {
+                        // In cluster list mode — enter tweet list for this cluster
+                        let num = result.num_clusters();
+                        if idx < num {
+                            self.selected_cluster = Some(idx);
+                            if let Some(vs) = self.view_stack.last_mut() {
+                                vs.selected_index = 0;
+                            }
+                        }
+                    }
+                }
+            }
             _ => {}
+        }
+    }
+
+    /// Returns a reference to the currently selected tweet, if any.
+    fn selected_tweet(&self) -> Option<&Tweet> {
+        let idx = self.selected_index();
+        match self.current_view() {
+            Some(ViewKind::Home) => self.home_timeline.tweets.get(idx),
+            Some(ViewKind::Mentions) => self.mentions.tweets.get(idx),
+            Some(ViewKind::Bookmarks) => self.bookmarks.tweets.get(idx),
+            Some(ViewKind::Search) => self.search_results.tweets.get(idx),
+            Some(ViewKind::UserTimeline(_)) => self.viewed_user_timeline.tweets.get(idx),
+            Some(ViewKind::Thread(_)) => self.thread_tweets.get(idx),
+            _ => None,
+        }
+    }
+
+    /// Builds the tweet URL for the current selection, handling both regular
+    /// views (via `selected_tweet()`) and the cluster tweet-list view.
+    fn selected_tweet_url(&self) -> Option<String> {
+        // Cluster tweet-list view: tweets stored as IDs, not Tweet objects.
+        if self.current_view() == Some(&ViewKind::Cluster) {
+            if let Some(c) = self.selected_cluster
+                && let Some(ref result) = self.cluster_result
+            {
+                let indices = result.tweet_indices_for_cluster(c);
+                let orig_idx = *indices.get(self.selected_index())?;
+                let tweet_id = &result.tweet_ids[orig_idx];
+                let username = result.author_ids[orig_idx]
+                    .as_deref()
+                    .and_then(|aid| self.lookup_user(aid))
+                    .map(|u| u.username.as_str());
+                return Some(tweet_url(tweet_id, username));
+            }
+            return None;
+        }
+
+        let tweet = self.selected_tweet()?;
+        let username = tweet
+            .author_id
+            .as_deref()
+            .and_then(|aid| self.lookup_user(aid))
+            .map(|u| u.username.as_str());
+        Some(tweet_url(&tweet.id, username))
+    }
+
+    fn copy_tweet_url(&mut self) {
+        match self.selected_tweet_url() {
+            Some(url) => match crate::clipboard::copy_to_clipboard(&url) {
+                Ok(()) => {
+                    self.status_message = Some(format!("Copied: {url}"));
+                }
+                Err(e) => {
+                    self.status_message = Some(format!("Clipboard error: {e}"));
+                }
+            },
+            None => {
+                self.status_message = Some("No tweet selected".into());
+            }
+        }
+    }
+
+    fn open_tweet_url(&mut self) {
+        match self.selected_tweet_url() {
+            Some(url) => match open::that(&url) {
+                Ok(()) => {
+                    self.status_message = Some(format!("Opened: {url}"));
+                }
+                Err(e) => {
+                    self.status_message = Some(format!("Failed to open browser: {e}"));
+                }
+            },
+            None => {
+                self.status_message = Some("No tweet selected".into());
+            }
         }
     }
 
@@ -550,6 +734,67 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn refresh_current_view(&mut self) {
+        match self.current_view().cloned() {
+            Some(ViewKind::Home) => {
+                self.reset_timeline(&mut Self::home_timeline_ref);
+                self.events.send(AppEvent::FetchHomeTimeline {
+                    pagination_token: None,
+                });
+            }
+            Some(ViewKind::Mentions) => {
+                self.reset_timeline(&mut Self::mentions_ref);
+                self.events.send(AppEvent::FetchMentions {
+                    pagination_token: None,
+                });
+            }
+            Some(ViewKind::Bookmarks) => {
+                self.reset_timeline(&mut Self::bookmarks_ref);
+                self.events.send(AppEvent::FetchBookmarks {
+                    pagination_token: None,
+                });
+            }
+            Some(ViewKind::Cluster) => {
+                self.reset_timeline(&mut Self::home_timeline_ref);
+                self.cluster_result = None;
+                self.selected_cluster = None;
+                self.refresh_then_cluster = true;
+                self.events.send(AppEvent::FetchHomeTimeline {
+                    pagination_token: None,
+                });
+            }
+            _ => {
+                self.status_message = Some("Refresh not supported for this view".into());
+            }
+        }
+    }
+
+    /// Clear a timeline and reset the view stack's selection/scroll to the top.
+    fn reset_timeline(&mut self, timeline_fn: &mut dyn FnMut(&mut Self) -> &mut TimelineState) {
+        let tl = timeline_fn(self);
+        tl.tweets.clear();
+        tl.next_token = None;
+        tl.selected_index = 0;
+        tl.scroll_offset = 0;
+        if let Some(vs) = self.view_stack.last_mut() {
+            vs.selected_index = 0;
+            vs.scroll_offset = 0;
+        }
+        self.status_message = Some("Refreshing...".into());
+    }
+
+    fn home_timeline_ref(&mut self) -> &mut TimelineState {
+        &mut self.home_timeline
+    }
+
+    fn mentions_ref(&mut self) -> &mut TimelineState {
+        &mut self.mentions
+    }
+
+    fn bookmarks_ref(&mut self) -> &mut TimelineState {
+        &mut self.bookmarks
     }
 
     // -- Auth flow (suspends TUI) ------------------------------------------
@@ -609,6 +854,207 @@ impl App {
         }
     }
 
+    // -- OpenRouter auth flow (suspends TUI) ---------------------------------
+
+    async fn run_openrouter_auth_flow(&mut self, terminal: &mut DefaultTerminal) {
+        ratatui::restore();
+
+        let port = if self.config.openrouter_callback_port == 8478 {
+            eprintln!(
+                "Using OpenRouter callback port 3000 (legacy 8478 value detected in config)."
+            );
+            3000
+        } else {
+            self.config.openrouter_callback_port
+        };
+
+        let result = crate::openrouter::auth::start_openrouter_auth(port).await;
+
+        match &result {
+            Ok(_) => {
+                println!();
+                println!("OpenRouter authentication successful! API key saved.");
+            }
+            Err(e) => {
+                println!();
+                println!("OpenRouter authentication failed: {e}");
+            }
+        }
+
+        println!();
+        println!("Press Enter to return to the TUI...");
+        let _ = std::io::stdin().read_line(&mut String::new());
+
+        // Re-initialize the terminal and event handler.
+        *terminal = ratatui::init();
+        self.events = EventHandler::new();
+
+        // On success, create the OpenRouter client.
+        if result.is_ok() {
+            match crate::cli::build_openrouter_client() {
+                Ok(client) => {
+                    self.openrouter_client = Some(Arc::new(client));
+                    self.status_message = Some("OpenRouter authenticated successfully!".into());
+                }
+                Err(e) => {
+                    self.status_message = Some(format!("OpenRouter client error: {e}"));
+                }
+            }
+        } else if let Err(e) = result {
+            self.status_message = Some(format!("OpenRouter auth failed: {e}"));
+        }
+    }
+
+    /// Try to initialize the OpenRouter client from stored credentials.
+    pub fn init_openrouter_client(&mut self) {
+        if self.openrouter_client.is_some() {
+            return;
+        }
+        if let Ok(client) = crate::cli::build_openrouter_client() {
+            self.openrouter_client = Some(Arc::new(client));
+        }
+    }
+
+    // -- OpenRouter dispatch methods ------------------------------------------
+
+    fn dispatch_openrouter_models(&self) {
+        let Some(ref client) = self.openrouter_client else {
+            self.events
+                .send(AppEvent::OpenRouterModelsLoaded(Err(Arc::new(
+                    "OpenRouter not configured. Use :openrouter-auth first.".into(),
+                ))));
+            return;
+        };
+        let client = Arc::clone(client);
+        let sender = self.events.sender();
+
+        tokio::spawn(async move {
+            let result: Result<crate::openrouter::types::ModelsResponse, _> =
+                client.get("/embeddings/models").await;
+            let mapped: ApiResult<Vec<Model>> =
+                result.map(|r| r.data).map_err(|e| Arc::new(e.to_string()));
+            let _ = sender.send(Event::App(Box::new(AppEvent::OpenRouterModelsLoaded(
+                mapped,
+            ))));
+        });
+    }
+
+    fn dispatch_embed_and_rank(&self, query: String, tweets: Vec<Tweet>) {
+        let Some(ref or_client) = self.openrouter_client else {
+            return;
+        };
+        let Some(ref model_id) = self.selected_embedding_model else {
+            return;
+        };
+        let client = Arc::clone(or_client);
+        let model = model_id.clone();
+        let sender = self.events.sender();
+        let query_clone = query.clone();
+
+        tokio::spawn(async move {
+            let result = async {
+                // Build texts: query + all tweet texts
+                let mut texts: Vec<String> = vec![query_clone.clone()];
+                texts.extend(tweets.iter().map(|t| t.text.clone()));
+
+                let resp = client
+                    .embed(&model, &texts)
+                    .await
+                    .map_err(|e| Arc::new(e.to_string()))?;
+
+                if resp.data.len() != texts.len() {
+                    return Err(Arc::new(format!(
+                        "Expected {} embeddings, got {}",
+                        texts.len(),
+                        resp.data.len()
+                    )));
+                }
+
+                // First embedding is the query, rest are tweets.
+                let mut sorted_data: Vec<_> = resp.data;
+                sorted_data.sort_by_key(|d| d.index);
+                let query_emb = &sorted_data[0].embedding;
+                let tweet_embs: Vec<(usize, Vec<f64>)> = sorted_data[1..]
+                    .iter()
+                    .enumerate()
+                    .map(|(i, d)| (i, d.embedding.clone()))
+                    .collect();
+
+                let ranked =
+                    crate::embeddings::similarity::rank_by_similarity(query_emb, &tweet_embs);
+
+                let result: Vec<(Tweet, f64)> = ranked
+                    .into_iter()
+                    .filter_map(|(idx, score)| tweets.get(idx).map(|t| (t.clone(), score)))
+                    .collect();
+
+                Ok(result)
+            }
+            .await;
+
+            let _ = sender.send(Event::App(Box::new(AppEvent::SearchRanked {
+                query: query_clone,
+                model_id: model,
+                result,
+            })));
+        });
+    }
+
+    fn dispatch_cluster_timeline(&self) {
+        let Some(ref or_client) = self.openrouter_client else {
+            self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
+                "OpenRouter not configured. Use :openrouter-auth first.".into(),
+            ))));
+            return;
+        };
+        let Some(ref model_id) = self.selected_embedding_model else {
+            self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
+                "No embedding model selected. Use :models first.".into(),
+            ))));
+            return;
+        };
+        let client = Arc::clone(or_client);
+        let model = model_id.clone();
+        let sender = self.events.sender();
+        let tweets = self.home_timeline.tweets.clone();
+
+        tokio::spawn(async move {
+            let result = async {
+                let texts: Vec<String> = tweets.iter().map(|t| t.text.clone()).collect();
+                let ids: Vec<String> = tweets.iter().map(|t| t.id.clone()).collect();
+                let conv_ids: Vec<Option<String>> =
+                    tweets.iter().map(|t| t.conversation_id.clone()).collect();
+                let author_ids: Vec<Option<String>> =
+                    tweets.iter().map(|t| t.author_id.clone()).collect();
+
+                let resp = client
+                    .embed(&model, &texts)
+                    .await
+                    .map_err(|e| Arc::new(e.to_string()))?;
+
+                let mut sorted_data: Vec<_> = resp.data;
+                sorted_data.sort_by_key(|d| d.index);
+                let embeddings: Vec<Vec<f64>> =
+                    sorted_data.into_iter().map(|d| d.embedding).collect();
+
+                let k = 5.min(tweets.len());
+                let cluster_result = crate::embeddings::cluster::build_cluster_result(
+                    &embeddings,
+                    texts,
+                    ids,
+                    conv_ids,
+                    author_ids,
+                    k,
+                );
+
+                Ok(cluster_result)
+            }
+            .await;
+
+            let _ = sender.send(Event::App(Box::new(AppEvent::ClusteringComplete(result))));
+        });
+    }
+
     // -- App event handling -------------------------------------------------
 
     fn handle_app_event(&mut self, event: AppEvent) {
@@ -623,6 +1069,10 @@ impl App {
             AppEvent::PopView => {
                 self.pop_view();
             }
+            AppEvent::RefreshView => {
+                self.refresh_current_view();
+            }
+
             AppEvent::SwitchView(kind) => {
                 // Replace the root view or push if stack is deeper.
                 if self.view_stack.len() <= 1 {
@@ -667,6 +1117,10 @@ impl App {
                     Err(e) => {
                         self.set_error(format!("Error loading timeline: {e}"));
                     }
+                }
+                if self.refresh_then_cluster {
+                    self.refresh_then_cluster = false;
+                    self.events.send(AppEvent::ClusterTimeline);
                 }
             }
             AppEvent::UserTimelineLoaded { user_id: _, result } => {
@@ -749,7 +1203,7 @@ impl App {
                     }
                 }
             }
-            AppEvent::SearchLoaded { query: _, result } => {
+            AppEvent::SearchLoaded { query, result } => {
                 self.loading = false;
                 self.search_results.loading = false;
                 match result {
@@ -758,7 +1212,17 @@ impl App {
                         self.search_results.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.search_results.includes = resp.includes;
-                        self.search_results.tweets = resp.data.unwrap_or_default();
+                        let tweets = resp.data.unwrap_or_default();
+                        self.search_results.tweets = tweets.clone();
+
+                        // If OpenRouter + model configured, trigger semantic re-ranking.
+                        if self.openrouter_client.is_some()
+                            && self.selected_embedding_model.is_some()
+                            && !tweets.is_empty()
+                        {
+                            self.events
+                                .send(AppEvent::EmbedAndRankSearch { query, tweets });
+                        }
                     }
                     Err(e) => {
                         self.set_error(format!("Error searching: {e}"));
@@ -830,6 +1294,94 @@ impl App {
                     self.set_error(format!("Auth failed: {e}"));
                 }
             },
+
+            // OpenRouter auth (intercepted in run() before reaching here)
+            AppEvent::StartOpenRouterAuth => {
+                unreachable!("StartOpenRouterAuth intercepted in run()")
+            }
+
+            // OpenRouter models
+            AppEvent::FetchOpenRouterModels => {
+                self.models_loading = true;
+                self.dispatch_openrouter_models();
+            }
+            AppEvent::OpenRouterModelsLoaded(result) => {
+                self.models_loading = false;
+                match result {
+                    Ok(models) => {
+                        self.openrouter_models = models;
+                        self.status_message = Some(format!(
+                            "Loaded {} embedding models",
+                            self.openrouter_models.len()
+                        ));
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading models: {e}"));
+                    }
+                }
+            }
+            AppEvent::SelectEmbeddingModel { model_id } => {
+                self.selected_embedding_model = Some(model_id.clone());
+                self.status_message = Some(format!("Selected model: {model_id}"));
+                self.pop_view();
+            }
+
+            // Embeddings: semantic search re-ranking
+            AppEvent::EmbedAndRankSearch { query, tweets } => {
+                self.loading = true;
+                self.dispatch_embed_and_rank(query, tweets);
+            }
+            AppEvent::SearchRanked {
+                query,
+                model_id,
+                result,
+            } => {
+                self.loading = false;
+                // Guard: only apply if the query and model still match current state.
+                let query_matches = self.search_query == query;
+                let model_matches = self.selected_embedding_model.as_deref() == Some(&model_id);
+                if !query_matches || !model_matches {
+                    self.status_message =
+                        Some("Stale ranking result discarded (query or model changed)".into());
+                    return;
+                }
+                match result {
+                    Ok(ranked) => {
+                        let tweets: Vec<Tweet> = ranked.into_iter().map(|(t, _)| t).collect();
+                        self.search_results.tweets = tweets;
+                        self.status_message =
+                            Some("Search results re-ranked by semantic similarity".into());
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Ranking error: {e}"));
+                    }
+                }
+            }
+
+            // Clustering
+            AppEvent::ClusterTimeline => {
+                if self.home_timeline.tweets.is_empty() {
+                    self.status_message =
+                        Some("No tweets to cluster. Load home timeline first.".into());
+                    return;
+                }
+                self.cluster_loading = true;
+                self.selected_cluster = None;
+                self.push_view(ViewKind::Cluster);
+                self.dispatch_cluster_timeline();
+            }
+            AppEvent::ClusteringComplete(result) => {
+                self.cluster_loading = false;
+                match result {
+                    Ok(cluster_result) => {
+                        self.cluster_result = Some(cluster_result);
+                        self.status_message = Some("Clustering complete!".into());
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Clustering error: {e}"));
+                    }
+                }
+            }
         }
     }
 
@@ -1001,5 +1553,13 @@ impl App {
     /// Look up a user by their ID from the includes cache.
     pub fn lookup_user(&self, user_id: &str) -> Option<&User> {
         self.users_cache.get(user_id)
+    }
+}
+
+/// Build a tweet URL. Uses `x.com/i/status/{id}` as fallback when username is unknown.
+fn tweet_url(tweet_id: &str, username: Option<&str>) -> String {
+    match username {
+        Some(name) => format!("https://x.com/{name}/status/{tweet_id}"),
+        None => format!("https://x.com/i/status/{tweet_id}"),
     }
 }

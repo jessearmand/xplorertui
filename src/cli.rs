@@ -6,6 +6,7 @@ use crate::api::types::{Includes, Tweet};
 use crate::auth::credentials::load_credentials;
 use crate::auth::{AuthMethod, AuthProvider};
 use crate::config::load_config;
+use crate::openrouter::client::OpenRouterClient;
 
 // ---------------------------------------------------------------------------
 // CLI definition
@@ -44,6 +45,28 @@ pub enum CliCommand {
     Open {
         /// Tweet ID or URL
         id_or_url: String,
+    },
+    /// Run the OpenRouter OAuth authorization flow
+    #[command(name = "openrouter-auth")]
+    OpenRouterAuth,
+    /// List OpenRouter embedding models (JSONL)
+    #[command(name = "openrouter-models")]
+    OpenRouterModels,
+    /// Generate an embedding for text (JSON)
+    Embed {
+        /// Text to embed
+        text: String,
+        /// Embedding model ID (e.g. openai/text-embedding-3-small)
+        #[arg(short, long)]
+        model: String,
+    },
+    /// Search and re-rank by semantic similarity (JSONL)
+    Similar {
+        /// Search query
+        query: String,
+        /// Embedding model ID
+        #[arg(short, long)]
+        model: String,
     },
 }
 
@@ -105,6 +128,13 @@ fn print_tweets(tweets: &[Tweet], includes: &Option<Includes>) -> eyre::Result<(
 // Client construction (shared with main.rs TUI path)
 // ---------------------------------------------------------------------------
 
+/// Build an `OpenRouterClient` from env var or stored API key.
+pub fn build_openrouter_client() -> eyre::Result<OpenRouterClient> {
+    crate::auth::credentials::load_env_files();
+    let api_key = crate::openrouter::auth::load_api_key().map_err(|e| eyre!("{e}"))?;
+    Ok(OpenRouterClient::new(api_key))
+}
+
 /// Build an authenticated `XApiClient` from env credentials + config.
 /// Returns an error if no credentials are found or auth setup fails.
 pub fn build_api_client() -> eyre::Result<(XApiClient, crate::auth::credentials::CredentialSet)> {
@@ -143,13 +173,33 @@ fn parse_tweet_id(id_or_url: &str) -> eyre::Result<String> {
 }
 
 pub async fn run_command(cmd: CliCommand) -> eyre::Result<()> {
+    // Commands that only need the OpenRouter client.
+    if let CliCommand::Embed { text, model } = cmd {
+        let or_client = build_openrouter_client()?;
+        let resp = or_client
+            .embed(&model, &[text])
+            .await
+            .map_err(|e| eyre!("{e}"))?;
+
+        let output = serde_json::json!({
+            "model": resp.model,
+            "embedding": resp.data.first().map(|d| &d.embedding),
+            "usage": resp.usage,
+        });
+        println!("{}", serde_json::to_string(&output)?);
+        return Ok(());
+    }
+
     let (mut client, _creds) = build_api_client()?;
     let config = load_config();
     let max = config.default_max_results;
 
     match cmd {
-        CliCommand::Tui | CliCommand::Auth => {
-            unreachable!("tui and auth are handled in main")
+        CliCommand::Tui
+        | CliCommand::Auth
+        | CliCommand::OpenRouterAuth
+        | CliCommand::Embed { .. } => {
+            unreachable!("tui, auth, openrouter-auth, and embed are handled above")
         }
 
         CliCommand::Home => {
@@ -234,6 +284,61 @@ pub async fn run_command(cmd: CliCommand) -> eyre::Result<()> {
                             serde_json::to_string(&denormalize_tweet(tweet, &thread.includes))?;
                         println!("{line}");
                     }
+                }
+            }
+        }
+
+        CliCommand::OpenRouterModels => {
+            let or_client = build_openrouter_client()?;
+            let resp: crate::openrouter::types::ModelsResponse = or_client
+                .get("/embeddings/models")
+                .await
+                .map_err(|e| eyre!("{e}"))?;
+
+            for model in &resp.data {
+                let line = serde_json::to_string(&model)?;
+                println!("{line}");
+            }
+        }
+
+        CliCommand::Similar { query, model } => {
+            let or_client = build_openrouter_client()?;
+            let resp = client
+                .search_tweets(&query, max, None)
+                .await
+                .map_err(|e| eyre!("{e}"))?;
+
+            let tweets = resp.data.unwrap_or_default();
+            if tweets.is_empty() {
+                return Ok(());
+            }
+
+            // Embed query + all tweet texts in one batch.
+            let mut texts: Vec<String> = vec![query.clone()];
+            texts.extend(tweets.iter().map(|t| t.text.clone()));
+
+            let embed_resp = or_client
+                .embed(&model, &texts)
+                .await
+                .map_err(|e| eyre!("{e}"))?;
+
+            let mut sorted_data = embed_resp.data;
+            sorted_data.sort_by_key(|d| d.index);
+
+            let query_emb = &sorted_data[0].embedding;
+            let tweet_embs: Vec<(usize, Vec<f64>)> = sorted_data[1..]
+                .iter()
+                .enumerate()
+                .map(|(i, d)| (i, d.embedding.clone()))
+                .collect();
+
+            let ranked = crate::embeddings::similarity::rank_by_similarity(query_emb, &tweet_embs);
+
+            for (idx, score) in &ranked {
+                if let Some(tweet) = tweets.get(*idx) {
+                    let mut obj = denormalize_tweet(tweet, &resp.includes);
+                    obj["similarity_score"] = serde_json::json!(score);
+                    println!("{}", serde_json::to_string(&obj)?);
                 }
             }
         }

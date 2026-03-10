@@ -42,6 +42,7 @@ Optional configuration file at `~/.config/xplorertui/config.toml`:
 tick_rate_fps = 30       # UI refresh rate
 default_max_results = 20 # Tweets per API request (10–100)
 default_view = "home"    # One of: home, mentions, bookmarks, search
+openrouter_callback_port = 3000 # OpenRouter OAuth localhost callback port
 ```
 
 ## Authentication
@@ -89,6 +90,45 @@ Read-only access. User-context endpoints (home timeline, mentions, bookmarks) wi
 X_BEARER_TOKEN=your_bearer_token
 ```
 
+## OpenRouter Integration
+
+xplorertui integrates with [OpenRouter](https://openrouter.ai) for embedding-powered features: semantic search re-ranking and topic clustering of your timeline.
+
+### Setup
+
+Authenticate with OpenRouter via the CLI or TUI:
+
+```bash
+xplorertui openrouter-auth          # CLI: browser-based OAuth PKCE flow
+```
+
+Or from within the TUI, type `:openrouter-auth` (alias `:or-auth`) in command mode. The API key is saved to `~/.config/xplorertui/openrouter_tokens.json`.
+
+You can also set the `OPENROUTER_API_KEY` environment variable directly in your `.env` file.
+
+### Embedding Model Selection
+
+Before using embedding features, select a model:
+
+1. Type `:models` in the TUI to open the model selection list
+2. Browse available embedding models with `j`/`k`
+3. Press `Enter` to select one (e.g. `openai/text-embedding-3-small`)
+
+### Semantic Search
+
+With an OpenRouter client and embedding model configured, search results (`/query`) are automatically re-ranked by semantic similarity to your query. The original API results are fetched first, then each tweet is embedded and sorted by cosine similarity to the query embedding.
+
+### Topic Clustering
+
+Type `:cluster` to cluster your home timeline tweets by topic:
+
+1. All tweet texts are embedded via the selected model
+2. K-means clustering groups tweets into 5 topic clusters
+3. PCA projects embeddings to 2D coordinates
+4. A scatter plot is displayed using [kuva](https://github.com/psy-fer/kuva)'s terminal backend with Unicode braille characters
+
+Each cluster is labeled with the tweet closest to its centroid.
+
 ## CLI Mode
 
 When a subcommand is provided, xplorertui bypasses the TUI and outputs JSONL (one JSON object per line) to stdout. This makes it easy to pipe X API data into other tools.
@@ -97,12 +137,16 @@ When a subcommand is provided, xplorertui bypasses the TUI and outputs JSONL (on
 xplorertui                          # Launch TUI (default)
 xplorertui tui                      # Launch TUI (explicit)
 xplorertui auth                     # OAuth 2.0 PKCE flow
+xplorertui openrouter-auth          # OpenRouter OAuth PKCE flow
 xplorertui home                     # Home timeline → JSONL
 xplorertui mentions                 # Mentions → JSONL
 xplorertui bookmarks                # Bookmarks → JSONL
 xplorertui search <query>           # Search tweets → JSONL
 xplorertui user <username>          # User profile → JSONL
 xplorertui open <tweet_id_or_url>   # Single tweet + thread → JSONL
+xplorertui openrouter-models        # List embedding models → JSONL
+xplorertui embed <text> -m <model>  # Generate embedding → JSON
+xplorertui similar <query> -m <model> # Semantic search → ranked JSONL
 ```
 
 Each tweet line is a denormalized JSON object with the tweet, its author, and any attached media embedded:
@@ -119,6 +163,9 @@ xplorertui search "rust lang" | jq '.tweet.text'
 
 # Open a tweet by URL
 xplorertui open https://x.com/user/status/1234567890
+
+# Semantic search (re-ranked by embedding similarity)
+xplorertui similar "rust async runtime" -m openai/text-embedding-3-small
 ```
 
 ## Keybindings
@@ -132,6 +179,8 @@ xplorertui open https://x.com/user/status/1234567890
 | `Enter` | Open selected item (thread view) |
 | `Esc` / `q` | Go back / quit |
 | `n` | Load next page |
+| `y` | Copy tweet URL to clipboard |
+| `o` | Open tweet in browser |
 
 ### Views
 
@@ -164,7 +213,10 @@ Type `:` to enter command mode, then:
 | `:home` | Switch to home timeline |
 | `:mentions` / `:m` | Switch to mentions |
 | `:bookmarks` / `:b` | Switch to bookmarks |
-| `:auth` / `:login` | Authenticate with OAuth 2.0 PKCE |
+| `:auth` / `:login` | Authenticate with X OAuth 2.0 PKCE |
+| `:openrouter-auth` / `:or-auth` | Authenticate with OpenRouter |
+| `:models` | Select an embedding model |
+| `:cluster` | Cluster home timeline by topic |
 | `:help` / `:h` | Show help |
 | `:quit` / `:q` | Quit |
 
