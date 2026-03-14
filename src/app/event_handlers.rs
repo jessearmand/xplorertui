@@ -322,6 +322,7 @@ impl App {
                 self.cluster_loading = false;
                 match result {
                     Ok(cluster_result) => {
+                        self.cluster_generation += 1;
                         self.cluster_result = Some(cluster_result);
                         self.status_message = Some("Clustering complete!".into());
                         // Auto-trigger LLM topic generation if a chat model is selected.
@@ -370,10 +371,15 @@ impl App {
                         Some("No chat model selected. Use :text-models first.".into());
                     return;
                 }
+                self.cluster_generation += 1;
                 self.cluster_topics_loading = true;
                 self.dispatch_generate_cluster_topics();
             }
-            AppEvent::ClusterTopicsGenerated(result) => {
+            AppEvent::ClusterTopicsGenerated(request_generation, result) => {
+                // Discard stale responses from a previous cluster/generation.
+                if request_generation != self.cluster_generation {
+                    return;
+                }
                 self.cluster_topics_loading = false;
                 match result {
                     Ok(labels) => {

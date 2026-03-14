@@ -118,6 +118,9 @@ pub struct App {
     pub cluster_result: Option<ClusterResult>,
     pub cluster_loading: bool,
     pub cluster_topics_loading: bool,
+    /// Monotonic counter incremented on each cluster/topic-generation request.
+    /// Used to discard stale async responses.
+    pub cluster_generation: u64,
     /// `None` = cluster list mode, `Some(c)` = viewing tweets in cluster c.
     pub selected_cluster: Option<usize>,
     /// When true, a cluster operation will be triggered after the home timeline refresh completes.
@@ -184,6 +187,7 @@ impl App {
             cluster_result: None,
             cluster_loading: false,
             cluster_topics_loading: false,
+            cluster_generation: 0,
             selected_cluster: None,
             refresh_then_cluster: false,
             status_message: None,

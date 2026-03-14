@@ -180,27 +180,40 @@ impl App {
     }
 
     pub(super) fn dispatch_generate_cluster_topics(&self) {
+        let generation = self.cluster_generation;
         let Some(ref or_client) = self.openrouter_client else {
-            self.events
-                .send(AppEvent::ClusterTopicsGenerated(Err(Arc::new(
-                    "OpenRouter not configured.".into(),
-                ))));
+            self.events.send(AppEvent::ClusterTopicsGenerated(
+                generation,
+                Err(Arc::new("OpenRouter not configured.".into())),
+            ));
             return;
         };
         let Some(ref model_id) = self.selected_chat_model else {
-            self.events
-                .send(AppEvent::ClusterTopicsGenerated(Err(Arc::new(
+            self.events.send(AppEvent::ClusterTopicsGenerated(
+                generation,
+                Err(Arc::new(
                     "No chat model selected. Use :text-models first.".into(),
-                ))));
+                )),
+            ));
             return;
         };
         let Some(ref result) = self.cluster_result else {
-            self.events
-                .send(AppEvent::ClusterTopicsGenerated(Err(Arc::new(
-                    "No cluster result. Use :cluster first.".into(),
-                ))));
+            self.events.send(AppEvent::ClusterTopicsGenerated(
+                generation,
+                Err(Arc::new("No cluster result. Use :cluster first.".into())),
+            ));
             return;
         };
+
+        // Derive max_tokens from the model's context_length to avoid
+        // rejection on models with smaller context windows.
+        let max_tokens: Option<u32> = self
+            .text_models
+            .iter()
+            .find(|m| m.id == *model_id)
+            .and_then(|m| m.context_length)
+            .map(|ctx| (ctx / 2).clamp(1024, 16384) as u32)
+            .or(Some(16384));
 
         let client = Arc::clone(or_client);
         let model = model_id.clone();
@@ -238,15 +251,12 @@ impl App {
         tokio::spawn(async move {
             let result = async {
                 // Exclude reasoning tokens -- we only need the final labels.
-                // Use a generous max_tokens because reasoning models
-                // allocate tokens to internal chain-of-thought first;
-                // 256 would be exhausted before any content is produced.
                 use crate::openrouter::types::ReasoningConfig;
                 let resp = client
                     .chat_completion(
                         &model,
                         messages,
-                        Some(16384),
+                        max_tokens,
                         Some(0.3),
                         Some(ReasoningConfig { exclude: true }),
                     )
@@ -324,7 +334,7 @@ impl App {
             .await;
 
             let _ = sender.send(Event::App(Box::new(AppEvent::ClusterTopicsGenerated(
-                result,
+                generation, result,
             ))));
         });
     }

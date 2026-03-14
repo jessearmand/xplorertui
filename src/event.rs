@@ -129,7 +129,7 @@ pub enum AppEvent {
     ClusterTimeline,
     ClusteringComplete(ApiResult<ClusterResult>),
     GenerateClusterTopics,
-    ClusterTopicsGenerated(ApiResult<Vec<String>>),
+    ClusterTopicsGenerated(u64, ApiResult<Vec<String>>),
 }
 
 /// API result type using `Arc<String>` so errors are `Clone`.
