@@ -197,10 +197,8 @@ impl App {
                         vs.selected_index = 0;
                     }
                 } else if is_model_view && self.model_filter.is_some() && key.code == KeyCode::Esc {
-                    // Re-open provider popup (clear provider filter)
+                    // Clear provider filter to show all models
                     self.model_filter = None;
-                    self.model_filter_open = true;
-                    self.model_filter_index = 0;
                     if let Some(vs) = self.view_stack.last_mut() {
                         vs.selected_index = 0;
                     }
