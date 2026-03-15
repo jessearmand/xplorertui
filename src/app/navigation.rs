@@ -63,14 +63,22 @@ impl App {
         }
     }
 
-    /// Returns models for the current model view, filtered by provider and sorted.
+    /// Returns models for the current model view, filtered by provider and search text, sorted.
     pub fn filtered_model_list(&self) -> Vec<&Model> {
+        let search = self.model_search.to_lowercase();
         let mut filtered: Vec<&Model> = self
             .current_model_list()
             .iter()
             .filter(|m| match &self.model_filter {
                 Some(provider) => openrouter::extract_provider(&m.id) == provider.as_str(),
                 None => true,
+            })
+            .filter(|m| {
+                search.is_empty()
+                    || m.id.to_lowercase().contains(&search)
+                    || m.name
+                        .as_deref()
+                        .is_some_and(|n| n.to_lowercase().contains(&search))
             })
             .collect();
 
@@ -94,6 +102,15 @@ impl App {
             .collect();
         providers.sort();
         providers
+    }
+
+    /// Returns providers filtered by `model_filter_search` (case-insensitive substring).
+    pub fn filtered_model_providers(&self) -> Vec<String> {
+        let query = self.model_filter_search.to_lowercase();
+        self.model_providers()
+            .into_iter()
+            .filter(|p| query.is_empty() || p.to_lowercase().contains(&query))
+            .collect()
     }
 
     pub(super) fn open_selected(&mut self) {

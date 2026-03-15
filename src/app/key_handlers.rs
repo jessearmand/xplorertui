@@ -32,6 +32,12 @@ impl App {
             return;
         }
 
+        // Handle model search input if active (swallow all keys).
+        if self.model_search_active {
+            self.handle_model_search_key(key);
+            return;
+        }
+
         match self.mode {
             AppMode::Normal => self.handle_normal_key(key),
             AppMode::Command => self.handle_command_key(key),
@@ -40,39 +46,138 @@ impl App {
     }
 
     fn handle_filter_popup_key(&mut self, key: KeyEvent) {
-        let providers = self.model_providers();
-        // Popup items: "All" + each provider
-        let item_count = providers.len() + 1;
+        let is_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
 
-        match key.code {
-            KeyCode::Esc | KeyCode::Char('f') => {
-                self.model_filter_open = false;
-            }
-            KeyCode::Char('j') | KeyCode::Down => {
+        if self.model_filter_search_active {
+            // Typing mode in provider search
+            // Handle C-j / C-k navigation first (before Char match eats them)
+            if is_ctrl && matches!(key.code, KeyCode::Char('j')) {
+                let item_count = self.filtered_model_providers().len() + 1;
                 if self.model_filter_index + 1 < item_count {
                     self.model_filter_index += 1;
                 }
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
+            } else if is_ctrl && matches!(key.code, KeyCode::Char('k')) {
                 self.model_filter_index = self.model_filter_index.saturating_sub(1);
-            }
-            KeyCode::Enter => {
-                if self.model_filter_index == 0 {
-                    self.model_filter = None;
-                } else if let Some(provider) = providers.get(self.model_filter_index - 1) {
-                    self.model_filter = Some(provider.clone());
+            } else {
+                match key.code {
+                    KeyCode::Char(c) => {
+                        self.model_filter_search.push(c);
+                        self.model_filter_index = 0;
+                    }
+                    KeyCode::Backspace => {
+                        self.model_filter_search.pop();
+                        let item_count = self.filtered_model_providers().len() + 1;
+                        if self.model_filter_index >= item_count {
+                            self.model_filter_index = item_count.saturating_sub(1);
+                        }
+                    }
+                    KeyCode::Enter => {
+                        // Confirm search filter (keep text, deactivate input)
+                        self.model_filter_search_active = false;
+                    }
+                    KeyCode::Esc => {
+                        // Clear search text and deactivate
+                        self.model_filter_search.clear();
+                        self.model_filter_search_active = false;
+                        self.model_filter_index = 0;
+                    }
+                    _ => {}
                 }
-                self.model_filter_open = false;
-                // Reset model selection since the filtered list changed
-                if let Some(vs) = self.view_stack.last_mut() {
-                    vs.selected_index = 0;
-                }
             }
-            _ => {}
+        } else {
+            // Navigation mode in provider popup
+            let providers = self.filtered_model_providers();
+            let item_count = providers.len() + 1;
+
+            match key.code {
+                KeyCode::Char('\\') => {
+                    self.model_filter_search_active = true;
+                }
+                KeyCode::Char('j') if is_ctrl => {
+                    if self.model_filter_index + 1 < item_count {
+                        self.model_filter_index += 1;
+                    }
+                }
+                KeyCode::Char('k') if is_ctrl => {
+                    self.model_filter_index = self.model_filter_index.saturating_sub(1);
+                }
+                KeyCode::Down => {
+                    if self.model_filter_index + 1 < item_count {
+                        self.model_filter_index += 1;
+                    }
+                }
+                KeyCode::Up => {
+                    self.model_filter_index = self.model_filter_index.saturating_sub(1);
+                }
+                KeyCode::Enter => {
+                    if self.model_filter_index == 0 {
+                        self.model_filter = None;
+                    } else if let Some(provider) = providers.get(self.model_filter_index - 1) {
+                        self.model_filter = Some(provider.clone());
+                    }
+                    self.model_filter_open = false;
+                    self.model_filter_search.clear();
+                    self.model_filter_search_active = false;
+                    // Reset model selection since the filtered list changed
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = 0;
+                    }
+                }
+                KeyCode::Esc => {
+                    self.model_filter_open = false;
+                    self.model_filter_search.clear();
+                    self.model_filter_search_active = false;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn handle_model_search_key(&mut self, key: KeyEvent) {
+        let is_ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+
+        // Handle C-j / C-k navigation first (before Char match)
+        if is_ctrl && matches!(key.code, KeyCode::Char('j')) {
+            self.move_selection_down();
+        } else if is_ctrl && matches!(key.code, KeyCode::Char('k')) {
+            self.move_selection_up();
+        } else {
+            match key.code {
+                KeyCode::Char(c) => {
+                    self.model_search.push(c);
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = 0;
+                    }
+                }
+                KeyCode::Backspace => {
+                    self.model_search.pop();
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = 0;
+                    }
+                }
+                KeyCode::Enter => {
+                    // Confirm search (keep text, deactivate input)
+                    self.model_search_active = false;
+                }
+                KeyCode::Esc => {
+                    // Clear search text and deactivate
+                    self.model_search.clear();
+                    self.model_search_active = false;
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = 0;
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
     fn handle_normal_key(&mut self, key: KeyEvent) {
+        let is_model_view = matches!(
+            self.current_view(),
+            Some(ViewKind::OpenRouterModels | ViewKind::TextModels)
+        );
+
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => {
                 // In cluster tweet list mode, go back to cluster list first
@@ -84,7 +189,22 @@ impl App {
                     if let Some(vs) = self.view_stack.last_mut() {
                         vs.selected_index = cluster_idx;
                     }
+                } else if is_model_view && !self.model_search.is_empty() {
+                    // Clear model search first
+                    self.model_search.clear();
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = 0;
+                    }
+                } else if is_model_view && self.model_filter.is_some() && key.code == KeyCode::Esc {
+                    // Re-open provider popup (clear provider filter)
+                    self.model_filter = None;
+                    self.model_filter_open = true;
+                    self.model_filter_index = 0;
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = 0;
+                    }
                 } else if self.view_stack.len() > 1 {
+                    self.clear_model_search_state();
                     self.events.send(AppEvent::PopView);
                 } else {
                     self.events.send(AppEvent::Quit);
@@ -139,12 +259,17 @@ impl App {
                 self.events.send(AppEvent::RefreshView);
             }
             KeyCode::Char('f') => {
-                if matches!(
-                    self.current_view(),
-                    Some(ViewKind::OpenRouterModels | ViewKind::TextModels)
-                ) {
+                if is_model_view {
+                    self.model_search.clear();
+                    self.model_search_active = false;
                     self.model_filter_open = true;
                     self.model_filter_index = 0;
+                }
+            }
+            KeyCode::Char('\\') => {
+                if is_model_view {
+                    self.model_search_active = true;
+                    self.model_search.clear();
                 }
             }
             _ => {}
@@ -197,5 +322,13 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    /// Clear all model search state (used when leaving model views).
+    fn clear_model_search_state(&mut self) {
+        self.model_search.clear();
+        self.model_search_active = false;
+        self.model_filter_search.clear();
+        self.model_filter_search_active = false;
     }
 }

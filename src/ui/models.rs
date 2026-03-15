@@ -1,5 +1,5 @@
 use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
@@ -9,6 +9,7 @@ use ratatui::widgets::{
 use crate::app::App;
 use crate::event::ViewKind;
 use crate::openrouter::extract_provider;
+use crate::ui::input::TextInput;
 
 /// Model selection list view for OpenRouter models (embedding or text),
 /// grouped by provider with an optional filter popup.
@@ -21,13 +22,15 @@ impl<'a> ModelsView<'a> {
         Self { app }
     }
 
-    /// Render a centered filter popup listing providers.
+    /// Render a centered filter popup listing providers with optional search.
     fn render_filter_popup(app: &App, area: Rect, buf: &mut Buffer) {
-        let providers = app.model_providers();
+        let providers = app.filtered_model_providers();
 
         let width = 40u16.min(area.width.saturating_sub(4));
         let item_count = providers.len() + 1; // "All" + each provider
-        let height = (item_count as u16 + 2).min(area.height.saturating_sub(2)); // +2 for borders
+        let show_search = app.model_filter_search_active || !app.model_filter_search.is_empty();
+        let search_rows: u16 = if show_search { 1 } else { 0 };
+        let height = (item_count as u16 + 2 + search_rows).min(area.height.saturating_sub(2));
         let x = area.x + (area.width.saturating_sub(width)) / 2;
         let y = area.y + (area.height.saturating_sub(height)) / 2;
         let popup = Rect::new(x, y, width, height);
@@ -37,13 +40,46 @@ impl<'a> ModelsView<'a> {
         let filter_label = app.model_filter.as_deref().unwrap_or("All");
         let block = Block::default()
             .borders(Borders::ALL)
-            .title(format!(" Filter by Provider (current: {filter_label}) "))
+            .title(format!(
+                " Filter by Provider (current: {filter_label}) [\\]search "
+            ))
             .title_style(
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             )
             .border_style(Style::default().fg(Color::Yellow));
+
+        let inner = block.inner(popup);
+        block.render(popup, buf);
+
+        if inner.height == 0 || inner.width == 0 {
+            return;
+        }
+
+        // Split inner area: optional search row at top, provider list below
+        let (search_area, list_area) = if show_search {
+            let chunks = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(inner);
+            (Some(chunks[0]), chunks[1])
+        } else {
+            (None, inner)
+        };
+
+        // Render search input if visible
+        if let Some(sa) = search_area {
+            let cursor = if app.model_filter_search_active {
+                "\u{2588}"
+            } else {
+                ""
+            };
+            let search_display = format!("\\ {}{cursor}", app.model_filter_search);
+            buf.set_string(
+                sa.x,
+                sa.y,
+                &search_display,
+                Style::default().fg(Color::Yellow),
+            );
+        }
 
         let mut items: Vec<ListItem> = Vec::with_capacity(item_count);
 
@@ -74,7 +110,6 @@ impl<'a> ModelsView<'a> {
         }
 
         let list = List::new(items)
-            .block(block)
             .highlight_style(
                 Style::default()
                     .fg(Color::Black)
@@ -84,7 +119,7 @@ impl<'a> ModelsView<'a> {
             .highlight_symbol("▸ ");
 
         let mut state = ListState::default().with_selected(Some(app.model_filter_index));
-        StatefulWidget::render(list, popup, buf, &mut state);
+        StatefulWidget::render(list, list_area, buf, &mut state);
     }
 }
 
@@ -117,13 +152,35 @@ impl Widget for ModelsView<'_> {
             Some(p) => format!(" [{p}]"),
             None => String::new(),
         };
-        let title = if let Some(selected) = selected {
-            format!(" {kind}{filter_hint} (selected: {selected}) [f]ilter ")
+        let search_hint = if !self.app.model_search.is_empty() {
+            format!(" search:\"{}\"", self.app.model_search)
         } else {
-            format!(" {kind}{filter_hint} (Enter to select) [f]ilter ")
+            String::new()
+        };
+        let title = if let Some(selected) = selected {
+            format!(" {kind}{filter_hint}{search_hint} (selected: {selected}) [f]ilter [\\]search ")
+        } else {
+            format!(" {kind}{filter_hint}{search_hint} (Enter to select) [f]ilter [\\]search ")
         };
 
         let block = Block::default().title(title).borders(Borders::ALL);
+
+        // Determine if we need a search input row at the bottom
+        let show_search = self.app.model_search_active || !self.app.model_search.is_empty();
+
+        // When search is active, render block ourselves and split inner area.
+        // Otherwise, pass block to the List widget below.
+        let (list_area, search_area, block_for_list) = if show_search {
+            let outer = block.inner(area);
+            block.render(area, buf);
+            if outer.height < 2 {
+                return;
+            }
+            let chunks = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(outer);
+            (chunks[0], Some(chunks[1]), None)
+        } else {
+            (area, None, Some(block))
+        };
 
         // Build grouped model list with provider headers
         let filtered = self.app.filtered_model_list();
@@ -187,17 +244,19 @@ impl Widget for ModelsView<'_> {
         }
 
         if items.is_empty() {
-            let inner_block = block;
-            let empty = Paragraph::new("No models match the current filter.").block(inner_block);
-            empty.render(area, buf);
+            let empty_msg = "No models match the current filter.";
+            let mut para = Paragraph::new(empty_msg);
+            if let Some(b) = block_for_list {
+                para = para.block(b);
+            }
+            para.render(list_area, buf);
         } else {
             let display_selected = model_to_display
                 .get(self.app.selected_index())
                 .copied()
                 .unwrap_or(0);
 
-            let list = List::new(items)
-                .block(block)
+            let mut list = List::new(items)
                 .highlight_style(
                     Style::default()
                         .fg(Color::Black)
@@ -206,8 +265,17 @@ impl Widget for ModelsView<'_> {
                 )
                 .highlight_symbol("▸ ");
 
+            if let Some(b) = block_for_list {
+                list = list.block(b);
+            }
+
             let mut state = ListState::default().with_selected(Some(display_selected));
-            StatefulWidget::render(list, area, buf, &mut state);
+            StatefulWidget::render(list, list_area, buf, &mut state);
+        }
+
+        // Render search input at bottom if active
+        if let Some(sa) = search_area {
+            TextInput::new("\\ ", &self.app.model_search).render(sa, buf);
         }
 
         // Render filter popup overlay if open
