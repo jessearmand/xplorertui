@@ -90,7 +90,7 @@ impl App {
             let item_count = providers.len() + 1;
 
             match key.code {
-                KeyCode::Char('\\') => {
+                KeyCode::Char('/') => {
                     self.model_filter_search_active = true;
                 }
                 KeyCode::Char('j') if is_ctrl => {
@@ -123,7 +123,7 @@ impl App {
                         vs.selected_index = 0;
                     }
                 }
-                KeyCode::Esc => {
+                KeyCode::Esc | KeyCode::Char('q') => {
                     self.model_filter_open = false;
                     self.model_filter_search.clear();
                     self.model_filter_search_active = false;
@@ -189,8 +189,9 @@ impl App {
                     if let Some(vs) = self.view_stack.last_mut() {
                         vs.selected_index = cluster_idx;
                     }
-                } else if is_model_view && !self.model_search.is_empty() {
-                    // Clear model search first
+                } else if is_model_view && !self.model_search.is_empty() && key.code == KeyCode::Esc
+                {
+                    // Esc clears model search first; q skips straight to back/quit
                     self.model_search.clear();
                     if let Some(vs) = self.view_stack.last_mut() {
                         vs.selected_index = 0;
@@ -220,8 +221,13 @@ impl App {
                 self.open_selected();
             }
             KeyCode::Char('/') => {
-                self.mode = AppMode::Search;
-                self.search_input.clear();
+                if is_model_view {
+                    self.model_search_active = true;
+                    self.model_search.clear();
+                } else {
+                    self.mode = AppMode::Search;
+                    self.search_input.clear();
+                }
             }
             KeyCode::Char(':') => {
                 self.mode = AppMode::Command;
@@ -264,12 +270,6 @@ impl App {
                     self.model_search_active = false;
                     self.model_filter_open = true;
                     self.model_filter_index = 0;
-                }
-            }
-            KeyCode::Char('\\') => {
-                if is_model_view {
-                    self.model_search_active = true;
-                    self.model_search.clear();
                 }
             }
             _ => {}

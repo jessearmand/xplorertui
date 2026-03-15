@@ -41,7 +41,7 @@ impl<'a> ModelsView<'a> {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(format!(
-                " Filter by Provider (current: {filter_label}) [\\]search "
+                " Filter by Provider (current: {filter_label}) [/]search "
             ))
             .title_style(
                 Style::default()
@@ -72,7 +72,7 @@ impl<'a> ModelsView<'a> {
             } else {
                 ""
             };
-            let search_display = format!("\\ {}{cursor}", app.model_filter_search);
+            let search_display = format!("/ {}{cursor}", app.model_filter_search);
             buf.set_string(
                 sa.x,
                 sa.y,
@@ -158,9 +158,9 @@ impl Widget for ModelsView<'_> {
             String::new()
         };
         let title = if let Some(selected) = selected {
-            format!(" {kind}{filter_hint}{search_hint} (selected: {selected}) [f]ilter [\\]search ")
+            format!(" {kind}{filter_hint}{search_hint} (selected: {selected}) [f]ilter [/]search ")
         } else {
-            format!(" {kind}{filter_hint}{search_hint} (Enter to select) [f]ilter [\\]search ")
+            format!(" {kind}{filter_hint}{search_hint} (Enter to select) [f]ilter [/]search ")
         };
 
         let block = Block::default().title(title).borders(Borders::ALL);
@@ -275,7 +275,7 @@ impl Widget for ModelsView<'_> {
 
         // Render search input at bottom if active
         if let Some(sa) = search_area {
-            TextInput::new("\\ ", &self.app.model_search).render(sa, buf);
+            TextInput::new("/ ", &self.app.model_search).render(sa, buf);
         }
 
         // Render filter popup overlay if open
