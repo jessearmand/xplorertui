@@ -59,6 +59,25 @@ impl OpenRouterClient {
         self.handle_response(resp).await
     }
 
+    /// Generate a chat completion.
+    pub async fn chat_completion(
+        &self,
+        model: &str,
+        messages: Vec<super::types::ChatMessage>,
+        max_tokens: Option<u32>,
+        temperature: Option<f32>,
+        reasoning: Option<super::types::ReasoningConfig>,
+    ) -> Result<super::types::ChatCompletionResponse, OpenRouterError> {
+        let request = super::types::ChatCompletionRequest {
+            model: model.to_string(),
+            messages,
+            max_tokens,
+            temperature,
+            reasoning,
+        };
+        self.post("/chat/completions", &request).await
+    }
+
     /// Generate embeddings for a batch of texts.
     pub async fn embed(
         &self,
@@ -88,6 +107,7 @@ impl OpenRouterClient {
         }
 
         let body = resp.text().await?;
+        tracing::debug!("openrouter response: {body}");
         Ok(serde_json::from_str::<T>(&body)?)
     }
 }

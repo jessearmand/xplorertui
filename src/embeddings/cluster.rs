@@ -129,7 +129,8 @@ fn closest_to_centroid(
         if let Some(idx) = best_idx {
             let text = &tweet_texts[idx];
             topics[c] = if text.len() > 140 {
-                format!("{}...", &text[..137])
+                let truncated: String = text.chars().take(137).collect();
+                format!("{truncated}...")
             } else {
                 text.clone()
             };

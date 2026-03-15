@@ -1,0 +1,406 @@
+use super::{App, TimelineState};
+use crate::api::types::Tweet;
+use crate::event::{AppEvent, ViewKind};
+
+impl App {
+    // -- App event handling -------------------------------------------------
+
+    pub(super) fn handle_app_event(&mut self, event: AppEvent) {
+        match event {
+            // Navigation
+            AppEvent::Quit => {
+                self.running = false;
+            }
+            AppEvent::PushView(kind) => {
+                self.push_view(kind);
+            }
+            AppEvent::PopView => {
+                self.pop_view();
+            }
+            AppEvent::RefreshView => {
+                self.refresh_current_view();
+            }
+
+            AppEvent::SwitchView(kind) => {
+                // Replace the root view or push if stack is deeper.
+                if self.view_stack.len() <= 1 {
+                    self.view_stack.clear();
+                    self.push_view(kind.clone());
+                } else {
+                    self.push_view(kind.clone());
+                }
+                // Trigger fetch if data is empty.
+                self.fetch_for_view(&kind);
+            }
+
+            // API request triggers -> dispatch to async tasks.
+            ref evt @ (AppEvent::FetchHomeTimeline { .. }
+            | AppEvent::FetchUserTimeline { .. }
+            | AppEvent::FetchTweet { .. }
+            | AppEvent::FetchThread { .. }
+            | AppEvent::FetchUser { .. }
+            | AppEvent::FetchSearch { .. }
+            | AppEvent::FetchMentions { .. }
+            | AppEvent::FetchBookmarks { .. }
+            | AppEvent::FetchFollowers { .. }
+            | AppEvent::FetchFollowing { .. }) => {
+                self.loading = true;
+                self.dispatch_api_request(evt.clone());
+            }
+
+            // API response events
+            AppEvent::HomeTimelineLoaded(result) => {
+                self.loading = false;
+                self.home_timeline.loading = false;
+                match result {
+                    Ok(resp) => {
+                        self.cache_users_from_includes(&resp.includes);
+                        self.home_timeline.next_token =
+                            resp.meta.as_ref().and_then(|m| m.next_token.clone());
+                        self.home_timeline.includes = resp.includes;
+                        self.home_timeline
+                            .tweets
+                            .extend(resp.data.unwrap_or_default());
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading timeline: {e}"));
+                    }
+                }
+                if self.refresh_then_cluster {
+                    self.refresh_then_cluster = false;
+                    self.events.send(AppEvent::ClusterTimeline);
+                }
+            }
+            AppEvent::UserTimelineLoaded { user_id: _, result } => {
+                self.loading = false;
+                self.viewed_user_timeline.loading = false;
+                match result {
+                    Ok(resp) => {
+                        self.cache_users_from_includes(&resp.includes);
+                        self.viewed_user_timeline.next_token =
+                            resp.meta.as_ref().and_then(|m| m.next_token.clone());
+                        self.viewed_user_timeline.includes = resp.includes;
+                        self.viewed_user_timeline
+                            .tweets
+                            .extend(resp.data.unwrap_or_default());
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading user timeline: {e}"));
+                    }
+                }
+            }
+            AppEvent::TweetLoaded(result) => {
+                self.loading = false;
+                match *result {
+                    Ok(resp) => {
+                        self.cache_users_from_includes(&resp.includes);
+                        if let Some(tweet) = resp.data {
+                            let conv_id = tweet
+                                .conversation_id
+                                .clone()
+                                .unwrap_or_else(|| tweet.id.clone());
+                            self.thread_root = Some(tweet);
+                            self.events.send(AppEvent::FetchThread {
+                                conversation_id: conv_id.clone(),
+                                pagination_token: None,
+                            });
+                            self.push_view(ViewKind::Thread(conv_id));
+                        } else {
+                            self.status_message = Some("Tweet not found".to_string());
+                        }
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading tweet: {e}"));
+                    }
+                }
+            }
+            AppEvent::ThreadLoaded {
+                conversation_id,
+                result,
+            } => {
+                self.loading = false;
+                match result {
+                    Ok(resp) => {
+                        self.cache_users_from_includes(&resp.includes);
+                        self.thread_tweets = resp.data.unwrap_or_default();
+                        // Push the thread view if not already on it.
+                        if self.current_view() != Some(&ViewKind::Thread(conversation_id.clone())) {
+                            self.push_view(ViewKind::Thread(conversation_id));
+                        }
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading thread: {e}"));
+                    }
+                }
+            }
+            AppEvent::UserLoaded(result) => {
+                self.loading = false;
+                match result {
+                    Ok(resp) => {
+                        if let Some(user) = resp.data {
+                            let username = user.username.clone();
+                            self.viewed_user = Some(user);
+                            self.viewed_user_timeline = TimelineState::default();
+                            self.push_view(ViewKind::UserProfile(username));
+                        } else {
+                            self.status_message = Some("User not found".to_string());
+                        }
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading user: {e}"));
+                    }
+                }
+            }
+            AppEvent::SearchLoaded { query, result } => {
+                self.loading = false;
+                self.search_results.loading = false;
+                match result {
+                    Ok(resp) => {
+                        self.cache_users_from_includes(&resp.includes);
+                        self.search_results.next_token =
+                            resp.meta.as_ref().and_then(|m| m.next_token.clone());
+                        self.search_results.includes = resp.includes;
+                        let tweets = resp.data.unwrap_or_default();
+                        self.search_results.tweets = tweets.clone();
+
+                        // If OpenRouter + model configured, trigger semantic re-ranking.
+                        if self.openrouter_client.is_some()
+                            && self.selected_embedding_model.is_some()
+                            && !tweets.is_empty()
+                        {
+                            self.events
+                                .send(AppEvent::EmbedAndRankSearch { query, tweets });
+                        }
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error searching: {e}"));
+                    }
+                }
+            }
+            AppEvent::MentionsLoaded(result) => {
+                self.loading = false;
+                self.mentions.loading = false;
+                match result {
+                    Ok(resp) => {
+                        self.cache_users_from_includes(&resp.includes);
+                        self.mentions.next_token =
+                            resp.meta.as_ref().and_then(|m| m.next_token.clone());
+                        self.mentions.includes = resp.includes;
+                        self.mentions.tweets.extend(resp.data.unwrap_or_default());
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading mentions: {e}"));
+                    }
+                }
+            }
+            AppEvent::BookmarksLoaded(result) => {
+                self.loading = false;
+                self.bookmarks.loading = false;
+                match result {
+                    Ok(resp) => {
+                        self.cache_users_from_includes(&resp.includes);
+                        self.bookmarks.next_token =
+                            resp.meta.as_ref().and_then(|m| m.next_token.clone());
+                        self.bookmarks.includes = resp.includes;
+                        self.bookmarks.tweets.extend(resp.data.unwrap_or_default());
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading bookmarks: {e}"));
+                    }
+                }
+            }
+            AppEvent::FollowersLoaded { user_id: _, result } => {
+                self.loading = false;
+                match result {
+                    Ok(resp) => {
+                        self.followers = resp.data.unwrap_or_default();
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading followers: {e}"));
+                    }
+                }
+            }
+            AppEvent::FollowingLoaded { user_id: _, result } => {
+                self.loading = false;
+                match result {
+                    Ok(resp) => {
+                        self.following = resp.data.unwrap_or_default();
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading following: {e}"));
+                    }
+                }
+            }
+
+            // Auth (StartAuth is handled in run() before reaching here)
+            AppEvent::StartAuth => unreachable!("StartAuth intercepted in run()"),
+            AppEvent::AuthCompleted(result) => match result {
+                Ok(user_id) => {
+                    self.status_message = Some(format!("Authenticated as {user_id}"));
+                }
+                Err(e) => {
+                    self.set_error(format!("Auth failed: {e}"));
+                }
+            },
+
+            // OpenRouter auth (intercepted in run() before reaching here)
+            AppEvent::StartOpenRouterAuth => {
+                unreachable!("StartOpenRouterAuth intercepted in run()")
+            }
+
+            // OpenRouter models
+            AppEvent::FetchOpenRouterModels => {
+                self.models_loading = true;
+                self.dispatch_openrouter_models();
+            }
+            AppEvent::OpenRouterModelsLoaded(result) => {
+                self.models_loading = false;
+                match result {
+                    Ok(models) => {
+                        self.openrouter_models = models;
+                        self.status_message = Some(format!(
+                            "Loaded {} embedding models",
+                            self.openrouter_models.len()
+                        ));
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading models: {e}"));
+                    }
+                }
+            }
+            AppEvent::SelectEmbeddingModel { model_id } => {
+                self.selected_embedding_model = Some(model_id.clone());
+                self.status_message = Some(format!("Selected model: {model_id}"));
+                self.pop_view();
+            }
+
+            // Embeddings: semantic search re-ranking
+            AppEvent::EmbedAndRankSearch { query, tweets } => {
+                self.loading = true;
+                self.dispatch_embed_and_rank(query, tweets);
+            }
+            AppEvent::SearchRanked {
+                query,
+                model_id,
+                result,
+            } => {
+                self.loading = false;
+                // Guard: only apply if the query and model still match current state.
+                let query_matches = self.search_query == query;
+                let model_matches = self.selected_embedding_model.as_deref() == Some(&model_id);
+                if !query_matches || !model_matches {
+                    self.status_message =
+                        Some("Stale ranking result discarded (query or model changed)".into());
+                    return;
+                }
+                match result {
+                    Ok(ranked) => {
+                        let tweets: Vec<Tweet> = ranked.into_iter().map(|(t, _)| t).collect();
+                        self.search_results.tweets = tweets;
+                        self.status_message =
+                            Some("Search results re-ranked by semantic similarity".into());
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Ranking error: {e}"));
+                    }
+                }
+            }
+
+            // Clustering
+            AppEvent::ClusterTimeline => {
+                if self.home_timeline.tweets.is_empty() {
+                    self.status_message =
+                        Some("No tweets to cluster. Load home timeline first.".into());
+                    return;
+                }
+                self.cluster_loading = true;
+                self.selected_cluster = None;
+                self.push_view(ViewKind::Cluster);
+                self.dispatch_cluster_timeline();
+            }
+            AppEvent::ClusteringComplete(result) => {
+                self.cluster_loading = false;
+                match result {
+                    Ok(cluster_result) => {
+                        self.cluster_generation += 1;
+                        self.cluster_result = Some(cluster_result);
+                        self.status_message = Some("Clustering complete!".into());
+                        // Auto-trigger LLM topic generation if a chat model is selected.
+                        if self.selected_chat_model.is_some() {
+                            self.cluster_topics_loading = true;
+                            self.dispatch_generate_cluster_topics();
+                        }
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Clustering error: {e}"));
+                    }
+                }
+            }
+
+            // Text models (for chat/topic generation)
+            AppEvent::FetchTextModels => {
+                self.text_models_loading = true;
+                self.dispatch_text_models();
+            }
+            AppEvent::TextModelsLoaded(result) => {
+                self.text_models_loading = false;
+                match result {
+                    Ok(models) => {
+                        self.status_message = Some(format!("Loaded {} text models", models.len()));
+                        self.text_models = models;
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading text models: {e}"));
+                    }
+                }
+            }
+            AppEvent::SelectChatModel { model_id } => {
+                self.selected_chat_model = Some(model_id.clone());
+                self.status_message = Some(format!("Selected chat model: {model_id}"));
+                self.pop_view();
+            }
+
+            // LLM cluster topic generation
+            AppEvent::GenerateClusterTopics => {
+                if self.cluster_result.is_none() {
+                    self.status_message = Some("No cluster result. Use :cluster first.".into());
+                    return;
+                }
+                if self.selected_chat_model.is_none() {
+                    self.status_message =
+                        Some("No chat model selected. Use :text-models first.".into());
+                    return;
+                }
+                self.cluster_generation += 1;
+                self.cluster_topics_loading = true;
+                self.dispatch_generate_cluster_topics();
+            }
+            AppEvent::ClusterTopicsGenerated(request_generation, result) => {
+                // Discard stale responses from a previous cluster/generation.
+                if request_generation != self.cluster_generation {
+                    return;
+                }
+                self.cluster_topics_loading = false;
+                match result {
+                    Ok(labels) => {
+                        let label_count = labels.len();
+                        if let Some(ref mut cr) = self.cluster_result {
+                            let cluster_count = cr.cluster_topics.len();
+                            for (i, label) in labels.into_iter().enumerate() {
+                                if i < cluster_count {
+                                    cr.cluster_topics[i] = label;
+                                }
+                            }
+                            self.status_message = Some(format!(
+                                "LLM generated {label_count}/{cluster_count} topic labels"
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Topic generation error: {e}"));
+                    }
+                }
+            }
+        }
+    }
+}

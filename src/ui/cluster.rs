@@ -102,12 +102,16 @@ impl<'a> ClusterView<'a> {
     fn render_cluster_list(
         result: &ClusterResult,
         selected_index: usize,
+        topics_loading: bool,
         area: Rect,
         buf: &mut Buffer,
     ) {
-        let block = Block::default()
-            .title(" Topic Clusters (Enter to browse, Esc to go back) ")
-            .borders(Borders::ALL);
+        let title = if topics_loading {
+            " Topic Clusters (generating labels...) "
+        } else {
+            " Topic Clusters (Enter to browse, Esc to go back) "
+        };
+        let block = Block::default().title(title).borders(Borders::ALL);
 
         let num_clusters = result.num_clusters();
         let legend_height = (num_clusters as u16).clamp(1, 10) + 2; // +2 for list block borders
@@ -265,7 +269,13 @@ impl Widget for ClusterView<'_> {
         if let Some(cluster) = self.app.selected_cluster {
             Self::render_tweet_list(result, cluster, selected_index, area, buf);
         } else {
-            Self::render_cluster_list(result, selected_index, area, buf);
+            Self::render_cluster_list(
+                result,
+                selected_index,
+                self.app.cluster_topics_loading,
+                area,
+                buf,
+            );
         }
     }
 }
