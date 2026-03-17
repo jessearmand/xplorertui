@@ -53,7 +53,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # ML / embeddings
 ndarray = "0.15"
-linfa = "0.7"
+linfa = "0.8"
 linfa-clustering = "0.7"
 linfa-reduction = "0.7"
 
