@@ -140,6 +140,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "approx"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "atomic"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1352,6 +1361,15 @@ dependencies = [
 
 [[package]]
 name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
@@ -1462,7 +1480,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56f9097edc7c89d03d526efbacf6d90914e3a8fa53bd56c2d1489e3a90819370"
 dependencies = [
  "approx 0.4.0",
- "ndarray",
+ "ndarray 0.15.6",
  "num-traits",
  "rand 0.8.5",
  "sprs",
@@ -1470,22 +1488,36 @@ dependencies = [
 ]
 
 [[package]]
-name = "linfa-clustering"
-version = "0.7.1"
+name = "linfa"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be0bc52d5e4da397609cd0e6007efc6bd278158d1803673bd936c374f27513c5"
+checksum = "d2361c22359417e9b84bacfe81ae77f511b947282c366f141485c2beba8792c6"
 dependencies = [
- "linfa",
- "linfa-linalg",
- "linfa-nn",
- "ndarray",
- "ndarray-rand",
- "ndarray-stats",
+ "approx 0.5.1",
+ "ndarray 0.16.1",
+ "num-traits",
+ "rand 0.8.5",
+ "sprs",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "linfa-clustering"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "075e220f7f69d8b0960a0b5ac8e33ee70ecc1b554a44c58a80f9893452fa214e"
+dependencies = [
+ "linfa 0.8.0",
+ "linfa-linalg 0.2.1",
+ "linfa-nn 0.8.0",
+ "ndarray 0.16.1",
+ "ndarray-rand 0.15.0",
+ "ndarray-stats 0.6.0",
  "noisy_float",
  "num-traits",
  "rand_xoshiro",
  "space",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1494,9 +1526,9 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4aaf4785928ee6f004dd484779f68b92bdaf08cbcbd767c552bc17b6854aef0d"
 dependencies = [
- "linfa",
- "linfa-nn",
- "ndarray",
+ "linfa 0.7.1",
+ "linfa-nn 0.7.2",
+ "ndarray 0.15.6",
  "num-traits",
  "sprs",
 ]
@@ -1507,9 +1539,20 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56e7562b41c8876d3367897067013bb2884cc78e6893f092ecd26b305176ac82"
 dependencies = [
- "ndarray",
+ "ndarray 0.15.6",
  "num-traits",
  "rand 0.8.5",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "linfa-linalg"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02a834c0ec063937688a0d13573aa515ab8c425bd8de3154b908dd3b9c197dc4"
+dependencies = [
+ "ndarray 0.16.1",
+ "num-traits",
  "thiserror 1.0.69",
 ]
 
@@ -1520,13 +1563,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b31aeb1beadf239210aa6bc142d95aba626b729da707e2a38e7e953ad2775653"
 dependencies = [
  "kdtree",
- "linfa",
- "ndarray",
- "ndarray-stats",
+ "linfa 0.7.1",
+ "ndarray 0.15.6",
+ "ndarray-stats 0.5.1",
  "noisy_float",
  "num-traits",
  "order-stat",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "linfa-nn"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65817bb3b1eced0b20b00abcd1dc010b5a1c2bacc827f3dbd71bbca3119e11d7"
+dependencies = [
+ "kdtree",
+ "linfa 0.8.0",
+ "ndarray 0.16.1",
+ "ndarray-stats 0.6.0",
+ "noisy_float",
+ "num-traits",
+ "order-stat",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1535,11 +1594,11 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f523f34273da53be46449a1ed5233b5fe534602f4dc29d5ab05c8117c4cc103f"
 dependencies = [
- "linfa",
+ "linfa 0.7.1",
  "linfa-kernel",
- "linfa-linalg",
- "ndarray",
- "ndarray-rand",
+ "linfa-linalg 0.1.0",
+ "ndarray 0.15.6",
+ "ndarray-rand 0.14.0",
  "num-traits",
  "rand 0.8.5",
  "rand_xoshiro",
@@ -1707,6 +1766,22 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rawpointer",
+]
+
+[[package]]
+name = "ndarray"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "882ed72dce9365842bf196bdeedf5055305f11fc8c03dee7bb0194a6cad34841"
+dependencies = [
+ "approx 0.5.1",
+ "matrixmultiply",
+ "num-complex 0.4.6",
+ "num-integer",
+ "num-traits",
+ "portable-atomic",
+ "portable-atomic-util",
+ "rawpointer",
  "rayon",
 ]
 
@@ -1716,7 +1791,18 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65608f937acc725f5b164dcf40f4f0bc5d67dc268ab8a649d3002606718c4588"
 dependencies = [
- "ndarray",
+ "ndarray 0.15.6",
+ "rand 0.8.5",
+ "rand_distr",
+]
+
+[[package]]
+name = "ndarray-rand"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f093b3db6fd194718dcdeea6bd8c829417deae904e3fcc7732dabcd4416d25d8"
+dependencies = [
+ "ndarray 0.16.1",
  "rand 0.8.5",
  "rand_distr",
 ]
@@ -1729,7 +1815,22 @@ checksum = "af5a8477ac96877b5bd1fd67e0c28736c12943aba24eda92b127e036b0c8f400"
 dependencies = [
  "indexmap 1.9.3",
  "itertools 0.10.5",
- "ndarray",
+ "ndarray 0.15.6",
+ "noisy_float",
+ "num-integer",
+ "num-traits",
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "ndarray-stats"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17ebbe97acce52d06aebed4cd4a87c0941f4b2519b59b82b4feb5bd0ce003dfd"
+dependencies = [
+ "indexmap 2.13.0",
+ "itertools 0.13.0",
+ "ndarray 0.16.1",
  "noisy_float",
  "num-integer",
  "num-traits",
@@ -2136,6 +2237,15 @@ name = "portable-atomic"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c33a9471896f1c69cecef8d20cbe2f7accd12527ce60845ff44c153bb2a21b49"
+
+[[package]]
+name = "portable-atomic-util"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "091397be61a01d4be58e7841595bd4bfedb15f1cd54977d79b8271e94ed799a3"
+dependencies = [
+ "portable-atomic",
+]
 
 [[package]]
 name = "potential_utf"
@@ -2878,7 +2988,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88bab60b0a18fb9b3e0c26e92796b3c3a278bf5fa4880f5ad5cc3bdfb843d0b1"
 dependencies = [
  "alga",
- "ndarray",
+ "ndarray 0.15.6",
  "num-complex 0.4.6",
  "num-traits",
  "num_cpus",
@@ -4095,10 +4205,10 @@ dependencies = [
  "hex",
  "hmac",
  "kuva",
- "linfa",
+ "linfa 0.7.1",
  "linfa-clustering",
  "linfa-reduction",
- "ndarray",
+ "ndarray 0.15.6",
  "oauth2",
  "open",
  "percent-encoding",
