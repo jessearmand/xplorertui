@@ -3,8 +3,10 @@ use std::sync::Arc;
 use super::App;
 use crate::api::types::{Includes, Tweet, User};
 use crate::event::{ApiResult, AppEvent, Event, ViewKind};
+use crate::mlx::client::MlxClient;
 use crate::openrouter;
-use crate::openrouter::types::Model;
+use crate::openrouter::client::OpenRouterClient;
+use crate::openrouter::types::{EmbeddingResponse, Model};
 
 impl App {
     // -- OpenRouter dispatch methods ------------------------------------------
@@ -32,14 +34,10 @@ impl App {
     }
 
     pub(super) fn dispatch_embed_and_rank(&self, query: String, tweets: Vec<Tweet>) {
-        let Some(ref or_client) = self.openrouter_client else {
+        let embed_provider = self.resolve_embed_provider();
+        let Some((provider, model)) = embed_provider else {
             return;
         };
-        let Some(ref model_id) = self.selected_embedding_model else {
-            return;
-        };
-        let client = Arc::clone(or_client);
-        let model = model_id.clone();
         let sender = self.events.sender();
         let query_clone = query.clone();
 
@@ -49,10 +47,7 @@ impl App {
                 let mut texts: Vec<String> = vec![query_clone.clone()];
                 texts.extend(tweets.iter().map(|t| t.text.clone()));
 
-                let resp = client
-                    .embed(&model, &texts)
-                    .await
-                    .map_err(|e| Arc::new(e.to_string()))?;
+                let resp = provider.embed(&model, &texts).await?;
 
                 if resp.data.len() != texts.len() {
                     return Err(Arc::new(format!(
@@ -93,20 +88,15 @@ impl App {
     }
 
     pub(super) fn dispatch_cluster_timeline(&self) {
-        let Some(ref or_client) = self.openrouter_client else {
+        let embed_provider = self.resolve_embed_provider();
+        let Some((provider, model)) = embed_provider else {
             self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
-                "OpenRouter not configured. Use :openrouter-auth first.".into(),
+                "No embedding provider configured. Set mlx_server_url in config \
+                 or use :openrouter-auth + :models."
+                    .into(),
             ))));
             return;
         };
-        let Some(ref model_id) = self.selected_embedding_model else {
-            self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
-                "No embedding model selected. Use :models first.".into(),
-            ))));
-            return;
-        };
-        let client = Arc::clone(or_client);
-        let model = model_id.clone();
         let sender = self.events.sender();
         let tweets = self.home_timeline.tweets.clone();
 
@@ -119,10 +109,7 @@ impl App {
                 let author_ids: Vec<Option<String>> =
                     tweets.iter().map(|t| t.author_id.clone()).collect();
 
-                let resp = client
-                    .embed(&model, &texts)
-                    .await
-                    .map_err(|e| Arc::new(e.to_string()))?;
+                let resp = provider.embed(&model, &texts).await?;
 
                 let mut sorted_data: Vec<_> = resp.data;
                 sorted_data.sort_by_key(|d| d.index);
@@ -507,5 +494,61 @@ impl App {
     /// Look up a user by their ID from the includes cache.
     pub fn lookup_user(&self, user_id: &str) -> Option<&User> {
         self.users_cache.get(user_id)
+    }
+
+    /// Resolve which embedding provider to use.
+    ///
+    /// Priority: MLX server (if configured) > OpenRouter (if authenticated
+    /// and a model is selected).  Returns `None` if neither is available.
+    fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {
+        // MLX takes priority when configured.
+        if let Some(ref mlx) = self.mlx_client {
+            // Use selected model or fall back to default.
+            let model = self
+                .selected_embedding_model
+                .clone()
+                .unwrap_or_else(|| "mlx-community/Qwen3-Embedding-0.6B-mxfp8".to_string());
+            return Some((EmbedProvider::Mlx(Arc::clone(mlx)), model));
+        }
+
+        // Fall back to OpenRouter.
+        if let Some(ref or_client) = self.openrouter_client
+            && let Some(ref model_id) = self.selected_embedding_model
+        {
+            return Some((
+                EmbedProvider::OpenRouter(Arc::clone(or_client)),
+                model_id.clone(),
+            ));
+        }
+
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Embedding provider abstraction
+// ---------------------------------------------------------------------------
+
+/// A unified embedding provider that wraps either OpenRouter or a local MLX
+/// server.  Both return `EmbeddingResponse` in the same OpenAI-compatible
+/// format.
+#[derive(Clone)]
+enum EmbedProvider {
+    OpenRouter(Arc<OpenRouterClient>),
+    Mlx(Arc<MlxClient>),
+}
+
+impl EmbedProvider {
+    async fn embed(&self, model: &str, texts: &[String]) -> Result<EmbeddingResponse, Arc<String>> {
+        match self {
+            Self::OpenRouter(client) => client
+                .embed(model, texts)
+                .await
+                .map_err(|e| Arc::new(e.to_string())),
+            Self::Mlx(client) => client
+                .embed(model, texts)
+                .await
+                .map_err(|e| Arc::new(e.to_string())),
+        }
     }
 }
