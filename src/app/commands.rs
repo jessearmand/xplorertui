@@ -47,6 +47,10 @@ impl App {
             Some(Command::Models) => {
                 self.model_filter = None;
                 self.model_filter_open = false;
+                self.model_search.clear();
+                self.model_search_active = false;
+                self.model_filter_search.clear();
+                self.model_filter_search_active = false;
                 self.events.send(AppEvent::FetchOpenRouterModels);
                 self.events
                     .send(AppEvent::PushView(ViewKind::OpenRouterModels));
@@ -54,6 +58,10 @@ impl App {
             Some(Command::TextModels) => {
                 self.model_filter = None;
                 self.model_filter_open = false;
+                self.model_search.clear();
+                self.model_search_active = false;
+                self.model_filter_search.clear();
+                self.model_filter_search_active = false;
                 self.events.send(AppEvent::FetchTextModels);
                 self.events.send(AppEvent::PushView(ViewKind::TextModels));
             }

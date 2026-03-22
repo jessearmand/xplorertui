@@ -114,6 +114,12 @@ pub struct App {
     pub model_filter_open: bool,
     pub model_filter_index: usize,
 
+    // Model search state
+    pub model_filter_search: String,
+    pub model_filter_search_active: bool,
+    pub model_search: String,
+    pub model_search_active: bool,
+
     // Clustering state
     pub cluster_result: Option<ClusterResult>,
     pub cluster_loading: bool,
@@ -184,6 +190,10 @@ impl App {
             model_filter: None,
             model_filter_open: false,
             model_filter_index: 0,
+            model_filter_search: String::new(),
+            model_filter_search_active: false,
+            model_search: String::new(),
+            model_search_active: false,
             cluster_result: None,
             cluster_loading: false,
             cluster_topics_loading: false,
