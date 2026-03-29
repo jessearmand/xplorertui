@@ -17,6 +17,7 @@ use crate::auth::credentials::CredentialSet;
 use crate::config::AppConfig;
 use crate::embeddings::cluster::ClusterResult;
 use crate::event::{AppEvent, Event, EventHandler, ViewKind};
+use crate::mlx::client::MlxClient;
 use crate::openrouter::client::OpenRouterClient;
 use crate::openrouter::types::Model;
 use crate::ui;
@@ -99,6 +100,9 @@ pub struct App {
     // OpenRouter client
     pub openrouter_client: Option<Arc<OpenRouterClient>>,
 
+    // MLX embedding server client
+    pub mlx_client: Option<Arc<MlxClient>>,
+
     // OpenRouter model selection
     pub openrouter_models: Vec<Model>,
     pub selected_embedding_model: Option<String>,
@@ -157,6 +161,11 @@ impl App {
             selected_index: 0,
         };
 
+        let mlx_client = config
+            .mlx_server_url
+            .as_ref()
+            .map(|url| Arc::new(MlxClient::new(url.clone())));
+
         Self {
             running: true,
             events: EventHandler::new(),
@@ -180,6 +189,7 @@ impl App {
             credentials,
             api_client: api_client.map(|c| Arc::new(Mutex::new(c))),
             users_cache: HashMap::new(),
+            mlx_client,
             openrouter_client: None,
             openrouter_models: Vec::new(),
             selected_embedding_model: None,
