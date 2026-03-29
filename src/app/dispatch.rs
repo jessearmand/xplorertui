@@ -8,6 +8,8 @@ use crate::openrouter;
 use crate::openrouter::client::OpenRouterClient;
 use crate::openrouter::types::{EmbeddingResponse, Model};
 
+const DEFAULT_MLX_EMBEDDING_MODEL: &str = "mlx-community/Qwen3-Embedding-0.6B-mxfp8";
+
 impl App {
     // -- OpenRouter dispatch methods ------------------------------------------
 
@@ -500,14 +502,20 @@ impl App {
     ///
     /// Priority: MLX server (if configured) > OpenRouter (if authenticated
     /// and a model is selected).  Returns `None` if neither is available.
+    /// Returns `true` if any embedding provider (MLX or OpenRouter) is available.
+    pub(super) fn has_embed_provider(&self) -> bool {
+        self.resolve_embed_provider().is_some()
+    }
+
     fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {
         // MLX takes priority when configured.
+        // Uses its own model ID from config — never the OpenRouter-selected model.
         if let Some(ref mlx) = self.mlx_client {
-            // Use selected model or fall back to default.
             let model = self
-                .selected_embedding_model
+                .config
+                .mlx_embedding_model
                 .clone()
-                .unwrap_or_else(|| "mlx-community/Qwen3-Embedding-0.6B-mxfp8".to_string());
+                .unwrap_or_else(|| DEFAULT_MLX_EMBEDDING_MODEL.to_string());
             return Some((EmbedProvider::Mlx(Arc::clone(mlx)), model));
         }
 

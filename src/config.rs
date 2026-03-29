@@ -20,6 +20,10 @@ pub struct AppConfig {
     /// OpenRouter.
     #[serde(default)]
     pub mlx_server_url: Option<String>,
+    /// Model ID to use with the MLX embedding server.
+    /// Falls back to `DEFAULT_MLX_EMBEDDING_MODEL` when not set.
+    #[serde(default)]
+    pub mlx_embedding_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -57,6 +61,7 @@ impl Default for AppConfig {
             oauth_callback_port: default_oauth_callback_port(),
             openrouter_callback_port: default_openrouter_callback_port(),
             mlx_server_url: None,
+            mlx_embedding_model: None,
         }
     }
 }

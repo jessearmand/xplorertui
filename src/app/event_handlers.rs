@@ -163,11 +163,8 @@ impl App {
                         let tweets = resp.data.unwrap_or_default();
                         self.search_results.tweets = tweets.clone();
 
-                        // If OpenRouter + model configured, trigger semantic re-ranking.
-                        if self.openrouter_client.is_some()
-                            && self.selected_embedding_model.is_some()
-                            && !tweets.is_empty()
-                        {
+                        // If any embedding provider is available, trigger semantic re-ranking.
+                        if self.has_embed_provider() && !tweets.is_empty() {
                             self.events
                                 .send(AppEvent::EmbedAndRankSearch { query, tweets });
                         }
