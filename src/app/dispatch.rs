@@ -507,6 +507,11 @@ impl App {
         self.resolve_embed_provider().is_some()
     }
 
+    /// Returns the model ID of the currently resolved embedding provider, if any.
+    pub(super) fn resolved_embed_model(&self) -> Option<String> {
+        self.resolve_embed_provider().map(|(_, model)| model)
+    }
+
     fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {
         // MLX takes priority when configured.
         // Uses its own model ID from config — never the OpenRouter-selected model.

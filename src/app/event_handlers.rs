@@ -284,7 +284,8 @@ impl App {
                 self.loading = false;
                 // Guard: only apply if the query and model still match current state.
                 let query_matches = self.search_query == query;
-                let model_matches = self.selected_embedding_model.as_deref() == Some(&model_id);
+                let model_matches =
+                    self.resolved_embed_model().as_deref() == Some(model_id.as_str());
                 if !query_matches || !model_matches {
                     self.status_message =
                         Some("Stale ranking result discarded (query or model changed)".into());
