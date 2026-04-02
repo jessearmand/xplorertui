@@ -163,11 +163,8 @@ impl App {
                         let tweets = resp.data.unwrap_or_default();
                         self.search_results.tweets = tweets.clone();
 
-                        // If OpenRouter + model configured, trigger semantic re-ranking.
-                        if self.openrouter_client.is_some()
-                            && self.selected_embedding_model.is_some()
-                            && !tweets.is_empty()
-                        {
+                        // If any embedding provider is available, trigger semantic re-ranking.
+                        if self.has_embed_provider() && !tweets.is_empty() {
                             self.events
                                 .send(AppEvent::EmbedAndRankSearch { query, tweets });
                         }
@@ -287,7 +284,8 @@ impl App {
                 self.loading = false;
                 // Guard: only apply if the query and model still match current state.
                 let query_matches = self.search_query == query;
-                let model_matches = self.selected_embedding_model.as_deref() == Some(&model_id);
+                let model_matches =
+                    self.resolved_embed_model().as_deref() == Some(model_id.as_str());
                 if !query_matches || !model_matches {
                     self.status_message =
                         Some("Stale ranking result discarded (query or model changed)".into());

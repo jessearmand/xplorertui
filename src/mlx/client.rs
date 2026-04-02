@@ -1,0 +1,82 @@
+use reqwest::Response;
+use serde::Serialize;
+
+use super::MlxError;
+use crate::openrouter::types::EmbeddingResponse;
+
+/// Client for a local MLX embedding server.
+///
+/// The server exposes OpenAI-compatible endpoints so we reuse the same
+/// request/response types as OpenRouter.
+pub struct MlxClient {
+    http: reqwest::Client,
+    base_url: String,
+}
+
+/// Request body for the multimodal embedding endpoint.
+#[derive(Debug, Serialize)]
+pub struct MultimodalEmbeddingRequest {
+    pub model: String,
+    pub texts: Vec<String>,
+    pub images: Vec<String>,
+}
+
+impl MlxClient {
+    pub fn new(base_url: String) -> Self {
+        let http = reqwest::Client::builder()
+            .build()
+            .expect("failed to build HTTP client");
+
+        // Strip trailing slash for consistent URL joining.
+        let base_url = base_url.trim_end_matches('/').to_string();
+
+        Self { http, base_url }
+    }
+
+    /// Generate text embeddings via the local MLX server.
+    pub async fn embed(
+        &self,
+        model: &str,
+        texts: &[String],
+    ) -> Result<EmbeddingResponse, MlxError> {
+        let url = format!("{}/v1/embeddings", self.base_url);
+        let request = crate::openrouter::types::EmbeddingRequest {
+            model: model.to_string(),
+            input: texts.to_vec(),
+        };
+        let resp = self.http.post(&url).json(&request).send().await?;
+        self.handle_response(resp).await
+    }
+
+    /// Generate multimodal (text + image) embeddings via the local MLX server.
+    pub async fn embed_multimodal(
+        &self,
+        model: &str,
+        texts: &[String],
+        image_urls: &[String],
+    ) -> Result<EmbeddingResponse, MlxError> {
+        let url = format!("{}/v1/embeddings/multimodal", self.base_url);
+        let request = MultimodalEmbeddingRequest {
+            model: model.to_string(),
+            texts: texts.to_vec(),
+            images: image_urls.to_vec(),
+        };
+        let resp = self.http.post(&url).json(&request).send().await?;
+        self.handle_response(resp).await
+    }
+
+    async fn handle_response<T: serde::de::DeserializeOwned>(
+        &self,
+        resp: Response,
+    ) -> Result<T, MlxError> {
+        let status = resp.status();
+        if !status.is_success() {
+            let detail = resp.text().await.unwrap_or_default();
+            return Err(MlxError::ServerError {
+                status: status.as_u16(),
+                detail,
+            });
+        }
+        Ok(resp.json().await?)
+    }
+}

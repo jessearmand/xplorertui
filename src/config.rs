@@ -15,6 +15,15 @@ pub struct AppConfig {
     pub oauth_callback_port: u16,
     #[serde(default = "default_openrouter_callback_port")]
     pub openrouter_callback_port: u16,
+    /// Base URL for a local MLX embedding server (e.g. "http://localhost:8678").
+    /// When set, embedding requests can be routed to this server instead of
+    /// OpenRouter.
+    #[serde(default)]
+    pub mlx_server_url: Option<String>,
+    /// Model ID to use with the MLX embedding server.
+    /// Falls back to `DEFAULT_MLX_EMBEDDING_MODEL` when not set.
+    #[serde(default)]
+    pub mlx_embedding_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -51,6 +60,8 @@ impl Default for AppConfig {
             default_view: DefaultView::default(),
             oauth_callback_port: default_oauth_callback_port(),
             openrouter_callback_port: default_openrouter_callback_port(),
+            mlx_server_url: None,
+            mlx_embedding_model: None,
         }
     }
 }
