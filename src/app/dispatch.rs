@@ -9,6 +9,7 @@ use crate::openrouter::client::OpenRouterClient;
 use crate::openrouter::types::{EmbeddingResponse, Model};
 
 const DEFAULT_MLX_EMBEDDING_MODEL: &str = "mlx-community/Qwen3-Embedding-0.6B-mxfp8";
+const DEFAULT_MLX_CHAT_MODEL: &str = "mlx-community/Qwen3.5-0.8B-OptiQ-4bit";
 
 impl App {
     // -- OpenRouter dispatch methods ------------------------------------------
@@ -170,18 +171,13 @@ impl App {
 
     pub(super) fn dispatch_generate_cluster_topics(&self) {
         let generation = self.cluster_generation;
-        let Some(ref or_client) = self.openrouter_client else {
-            self.events.send(AppEvent::ClusterTopicsGenerated(
-                generation,
-                Err(Arc::new("OpenRouter not configured.".into())),
-            ));
-            return;
-        };
-        let Some(ref model_id) = self.selected_chat_model else {
+        let Some((provider, model)) = self.resolve_chat_provider() else {
             self.events.send(AppEvent::ClusterTopicsGenerated(
                 generation,
                 Err(Arc::new(
-                    "No chat model selected. Use :text-models first.".into(),
+                    "No chat provider configured. Set mlx_server_url in config \
+                     or use :openrouter-auth + :text-models."
+                        .into(),
                 )),
             ));
             return;
@@ -194,18 +190,15 @@ impl App {
             return;
         };
 
-        // Derive max_tokens from the model's context_length to avoid
-        // rejection on models with smaller context windows.
+        // Derive max_tokens from the model's context_length (OpenRouter models)
+        // or use a sensible default for local MLX models.
         let max_tokens: Option<u32> = self
             .text_models
             .iter()
-            .find(|m| m.id == *model_id)
+            .find(|m| m.id == model)
             .and_then(|m| m.context_length)
             .map(|ctx| (ctx / 2).clamp(1024, 16384) as u32)
             .or(Some(16384));
-
-        let client = Arc::clone(or_client);
-        let model = model_id.clone();
         let sender = self.events.sender();
 
         // Build the prompt: collect up to 8 representative tweets per cluster.
@@ -241,7 +234,7 @@ impl App {
             let result = async {
                 // Exclude reasoning tokens -- we only need the final labels.
                 use crate::openrouter::types::ReasoningConfig;
-                let resp = client
+                let resp = provider
                     .chat_completion(
                         &model,
                         messages,
@@ -249,8 +242,7 @@ impl App {
                         Some(0.3),
                         Some(ReasoningConfig { exclude: true }),
                     )
-                    .await
-                    .map_err(|e| Arc::new(e.to_string()))?;
+                    .await?;
 
                 let choice = resp
                     .choices
@@ -512,6 +504,39 @@ impl App {
         self.resolve_embed_provider().map(|(_, model)| model)
     }
 
+    /// Returns `true` if any chat provider (MLX or OpenRouter) is available.
+    pub(super) fn has_chat_provider(&self) -> bool {
+        self.resolve_chat_provider().is_some()
+    }
+
+    /// Resolve which chat provider to use.
+    ///
+    /// Priority: MLX server (if configured) > OpenRouter (if authenticated
+    /// and a chat model is selected).
+    fn resolve_chat_provider(&self) -> Option<(ChatProvider, String)> {
+        // MLX takes priority when configured.
+        if let Some(ref mlx) = self.mlx_client {
+            let model = self
+                .config
+                .mlx_chat_model
+                .clone()
+                .unwrap_or_else(|| DEFAULT_MLX_CHAT_MODEL.to_string());
+            return Some((ChatProvider::Mlx(Arc::clone(mlx)), model));
+        }
+
+        // Fall back to OpenRouter.
+        if let Some(ref or_client) = self.openrouter_client
+            && let Some(ref model_id) = self.selected_chat_model
+        {
+            return Some((
+                ChatProvider::OpenRouter(Arc::clone(or_client)),
+                model_id.clone(),
+            ));
+        }
+
+        None
+    }
+
     fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {
         // MLX takes priority when configured.
         // Uses its own model ID from config — never the OpenRouter-selected model.
@@ -560,6 +585,41 @@ impl EmbedProvider {
                 .map_err(|e| Arc::new(e.to_string())),
             Self::Mlx(client) => client
                 .embed(model, texts)
+                .await
+                .map_err(|e| Arc::new(e.to_string())),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Chat provider abstraction
+// ---------------------------------------------------------------------------
+
+/// A unified chat provider that wraps either OpenRouter or a local MLX
+/// server.  Both return `ChatCompletionResponse` in the same OpenAI-compatible
+/// format.
+#[derive(Clone)]
+enum ChatProvider {
+    OpenRouter(Arc<OpenRouterClient>),
+    Mlx(Arc<MlxClient>),
+}
+
+impl ChatProvider {
+    async fn chat_completion(
+        &self,
+        model: &str,
+        messages: Vec<openrouter::types::ChatMessage>,
+        max_tokens: Option<u32>,
+        temperature: Option<f32>,
+        reasoning: Option<openrouter::types::ReasoningConfig>,
+    ) -> Result<openrouter::types::ChatCompletionResponse, Arc<String>> {
+        match self {
+            Self::OpenRouter(client) => client
+                .chat_completion(model, messages, max_tokens, temperature, reasoning)
+                .await
+                .map_err(|e| Arc::new(e.to_string())),
+            Self::Mlx(client) => client
+                .chat_completion(model, messages, max_tokens, temperature, reasoning)
                 .await
                 .map_err(|e| Arc::new(e.to_string())),
         }

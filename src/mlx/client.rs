@@ -2,7 +2,9 @@ use reqwest::Response;
 use serde::Serialize;
 
 use super::MlxError;
-use crate::openrouter::types::EmbeddingResponse;
+use crate::openrouter::types::{
+    ChatCompletionRequest, ChatCompletionResponse, ChatMessage, EmbeddingResponse, ReasoningConfig,
+};
 
 /// Client for a local MLX embedding server.
 ///
@@ -43,6 +45,27 @@ impl MlxClient {
         let request = crate::openrouter::types::EmbeddingRequest {
             model: model.to_string(),
             input: texts.to_vec(),
+        };
+        let resp = self.http.post(&url).json(&request).send().await?;
+        self.handle_response(resp).await
+    }
+
+    /// Generate a chat completion via the local MLX server.
+    pub async fn chat_completion(
+        &self,
+        model: &str,
+        messages: Vec<ChatMessage>,
+        max_tokens: Option<u32>,
+        temperature: Option<f32>,
+        _reasoning: Option<ReasoningConfig>,
+    ) -> Result<ChatCompletionResponse, MlxError> {
+        let url = format!("{}/v1/chat/completions", self.base_url);
+        let request = ChatCompletionRequest {
+            model: model.to_string(),
+            messages,
+            max_tokens,
+            temperature,
+            reasoning: None, // MLX server does not support reasoning config
         };
         let resp = self.http.post(&url).json(&request).send().await?;
         self.handle_response(resp).await

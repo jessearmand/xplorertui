@@ -323,8 +323,8 @@ impl App {
                         self.cluster_generation += 1;
                         self.cluster_result = Some(cluster_result);
                         self.status_message = Some("Clustering complete!".into());
-                        // Auto-trigger LLM topic generation if a chat model is selected.
-                        if self.selected_chat_model.is_some() {
+                        // Auto-trigger LLM topic generation if a chat provider is available.
+                        if self.has_chat_provider() {
                             self.cluster_topics_loading = true;
                             self.dispatch_generate_cluster_topics();
                         }
@@ -364,9 +364,12 @@ impl App {
                     self.status_message = Some("No cluster result. Use :cluster first.".into());
                     return;
                 }
-                if self.selected_chat_model.is_none() {
-                    self.status_message =
-                        Some("No chat model selected. Use :text-models first.".into());
+                if !self.has_chat_provider() {
+                    self.status_message = Some(
+                        "No chat provider configured. Set mlx_server_url in config \
+                         or use :openrouter-auth + :text-models."
+                            .into(),
+                    );
                     return;
                 }
                 self.cluster_generation += 1;

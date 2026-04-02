@@ -1,7 +1,8 @@
-"""MLX Embedding Server — OpenAI-compatible REST API for local embedding inference.
+"""MLX Server — OpenAI-compatible REST API for local embedding and chat inference.
 
-Supports text embeddings via mlx-embeddings and multimodal (image+text)
-embeddings via mlx-vlm.  Designed to be called from the xplorertui Rust TUI.
+Supports text embeddings via mlx-embeddings, multimodal (image+text)
+embeddings via mlx-vlm, and chat completions via mlx-lm.
+Designed to be called from the xplorertui Rust TUI.
 
 Usage:
     uv run fastapi run server.py --port 8678
@@ -10,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import time
 from contextlib import asynccontextmanager
 from typing import cast
@@ -18,12 +20,18 @@ import httpx
 from fastapi import FastAPI, HTTPException
 
 from registry import (
+    DEFAULT_CHAT_MODEL,
     DEFAULT_MODEL,
     ModelRegistry,
     decode_images,
     mx_to_list,
 )
 from schemas import (
+    ChatChoice,
+    ChatChoiceMessage,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    ChatUsage,
     EmbeddingData,
     EmbeddingRequest,
     EmbeddingResponse,
@@ -73,6 +81,8 @@ async def list_models():
     ids = registry.loaded_model_ids()
     if registry.default_model and registry.default_model not in ids:
         ids.insert(0, registry.default_model)
+    if DEFAULT_CHAT_MODEL and DEFAULT_CHAT_MODEL not in ids:
+        ids.append(DEFAULT_CHAT_MODEL)
     return ModelsResponse(
         data=[ModelInfo(id=mid) for mid in ids],
     )
@@ -170,6 +180,65 @@ async def create_multimodal_embeddings(request: MultimodalEmbeddingRequest):
         usage=EmbeddingUsage(
             prompt_tokens=token_count,
             total_tokens=token_count,
+        ),
+    )
+
+
+@app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
+async def chat_completions(request: ChatCompletionRequest):
+    """Generate a chat completion (OpenAI-compatible)."""
+    model_id = request.model or DEFAULT_CHAT_MODEL
+    if not model_id:
+        raise HTTPException(status_code=400, detail="No model specified")
+
+    try:
+        model, tokenizer = registry.get_chat_model(model_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load model: {e}")
+
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    prompt = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+
+    max_tokens = request.max_tokens or 512
+    temp = request.temperature if request.temperature is not None else 0.0
+
+    try:
+        from mlx_lm import generate
+        from mlx_lm.sample_utils import make_sampler
+
+        sampler = make_sampler(temp=temp)
+
+        # Run in thread pool — mlx_lm.generate is synchronous and
+        # compute-bound; blocking the event loop would stall other endpoints.
+        text = await asyncio.to_thread(
+            generate,
+            model,
+            tokenizer,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            sampler=sampler,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
+
+    # Approximate token counts via tokenizer.
+    prompt_tokens = len(tokenizer.encode(prompt))
+    completion_tokens = len(tokenizer.encode(text))
+
+    return ChatCompletionResponse(
+        choices=[
+            ChatChoice(
+                message=ChatChoiceMessage(content=text),
+                finish_reason="stop",
+            )
+        ],
+        model=model_id,
+        usage=ChatUsage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
         ),
     )
 

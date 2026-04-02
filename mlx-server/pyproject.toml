@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi[standard]>=0.115.0",
     "mlx-embeddings @ git+https://github.com/Blaizzy/mlx-embeddings.git@v0.1.0",
+    "mlx-lm>=0.31.0",
     "mlx-vlm>=0.4.0",
     "mlx>=0.31.0",
     "numpy>=1.26.0",

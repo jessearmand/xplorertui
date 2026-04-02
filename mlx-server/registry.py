@@ -16,6 +16,10 @@ DEFAULT_MODEL = os.environ.get(
     "MLX_DEFAULT_MODEL", "mlx-community/Qwen3-Embedding-0.6B-mxfp8"
 )
 
+DEFAULT_CHAT_MODEL = os.environ.get(
+    "MLX_DEFAULT_CHAT_MODEL", "mlx-community/Qwen3.5-0.8B-OptiQ-4bit"
+)
+
 
 # ---------------------------------------------------------------------------
 # Model registry — lazy-loads models on first use
@@ -28,6 +32,7 @@ class ModelRegistry:
     def __init__(self, default_model: str | None = None) -> None:
         self._text_models: dict[str, tuple[Any, Any]] = {}
         self._vl_models: dict[str, tuple[Any, Any]] = {}
+        self._chat_models: dict[str, tuple[Any, Any]] = {}
         self.default_model = default_model
 
     def get_text_model(self, model_id: str) -> tuple[Any, Any]:
@@ -38,6 +43,15 @@ class ModelRegistry:
             model, tokenizer = load(model_id)
             self._text_models[model_id] = (model, tokenizer)
         return self._text_models[model_id]
+
+    def get_chat_model(self, model_id: str, lazy: bool = True) -> tuple[Any, Any]:
+        """Return (model, tokenizer) for a chat/generation model."""
+        if model_id not in self._chat_models:
+            from mlx_lm import load
+
+            model, tokenizer = load(model_id, lazy=lazy)
+            self._chat_models[model_id] = (model, tokenizer)
+        return self._chat_models[model_id]
 
     def get_vl_model(self, model_id: str) -> tuple[Any, Any]:
         """Return (model, processor) for a vision-language model."""
@@ -51,7 +65,8 @@ class ModelRegistry:
     def loaded_model_ids(self) -> list[str]:
         text_ids = list(self._text_models.keys())
         vl_ids = list(self._vl_models.keys())
-        return text_ids + vl_ids
+        chat_ids = list(self._chat_models.keys())
+        return text_ids + vl_ids + chat_ids
 
 
 # ---------------------------------------------------------------------------

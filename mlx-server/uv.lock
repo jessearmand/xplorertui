@@ -1025,6 +1025,7 @@ dependencies = [
     { name = "httpx" },
     { name = "mlx" },
     { name = "mlx-embeddings" },
+    { name = "mlx-lm" },
     { name = "mlx-vlm" },
     { name = "numpy" },
 ]
@@ -1035,6 +1036,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "mlx", specifier = ">=0.31.0" },
     { name = "mlx-embeddings", git = "https://github.com/Blaizzy/mlx-embeddings.git?rev=v0.1.0" },
+    { name = "mlx-lm", specifier = ">=0.31.0" },
     { name = "mlx-vlm", specifier = ">=0.4.0" },
     { name = "numpy", specifier = ">=1.26.0" },
 ]
