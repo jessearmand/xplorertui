@@ -177,3 +177,9 @@ async def create_multimodal_embeddings(request: MultimodalEmbeddingRequest):
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": time.time()}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("server:app", host="0.0.0.0", port=8678)
