@@ -392,8 +392,9 @@ impl App {
                                     cr.cluster_topics[i] = label;
                                 }
                             }
+                            let provider = self.resolved_chat_provider_name().unwrap_or("LLM");
                             self.status_message = Some(format!(
-                                "LLM generated {label_count}/{cluster_count} topic labels"
+                                "{provider} generated {label_count}/{cluster_count} topic labels"
                             ));
                         }
                     }

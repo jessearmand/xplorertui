@@ -245,7 +245,11 @@ async def chat_completions(request: ChatCompletionRequest):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "timestamp": time.time()}
+    return {
+        "status": "ok",
+        "timestamp": time.time(),
+        "capabilities": ["embeddings", "chat"],
+    }
 
 
 if __name__ == "__main__":

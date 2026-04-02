@@ -15,6 +15,7 @@ pub enum Command {
     TextModels,
     Cluster,
     Topics,
+    Provider(Option<String>),
     Refresh,
     Quit,
 }
@@ -45,6 +46,8 @@ pub fn parse_command(input: &str) -> Option<Command> {
         "text-models" | "tm" => Some(Command::TextModels),
         "cluster" => Some(Command::Cluster),
         "topics" => Some(Command::Topics),
+        "provider" if args.is_empty() => Some(Command::Provider(None)),
+        "provider" => Some(Command::Provider(Some(args.to_owned()))),
         "refresh" | "r" => Some(Command::Refresh),
         "quit" | "q" => Some(Command::Quit),
         _ => None,

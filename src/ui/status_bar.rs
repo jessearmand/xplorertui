@@ -90,7 +90,7 @@ impl Widget for StatusBar<'_> {
             }
             spans.push(Span::styled(
                 &msg[..msg_width],
-                Style::default().bg(Color::DarkGray).fg(Color::Red),
+                Style::default().bg(Color::DarkGray).fg(Color::Cyan),
             ));
         }
 

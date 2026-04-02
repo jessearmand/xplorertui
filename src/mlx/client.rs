@@ -35,6 +35,24 @@ impl MlxClient {
         Self { http, base_url }
     }
 
+    /// Check whether the MLX server supports chat completions.
+    ///
+    /// Probes the `/health` endpoint for a `capabilities` array containing
+    /// `"chat"`.  Returns `false` on any error (server down, old version
+    /// without the field, etc.).
+    pub async fn supports_chat(&self) -> bool {
+        let url = format!("{}/health", self.base_url);
+        let Ok(resp) = self.http.get(&url).send().await else {
+            return false;
+        };
+        let Ok(json) = resp.json::<serde_json::Value>().await else {
+            return false;
+        };
+        json.get("capabilities")
+            .and_then(|v| v.as_array())
+            .is_some_and(|caps| caps.iter().any(|c| c.as_str() == Some("chat")))
+    }
+
     /// Generate text embeddings via the local MLX server.
     pub async fn embed(
         &self,

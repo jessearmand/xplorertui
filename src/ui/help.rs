@@ -18,7 +18,7 @@ impl Widget for HelpView {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Center a panel that's 60 wide, 30 tall (or fit to area)
         let width = 60u16.min(area.width.saturating_sub(4));
-        let height = 32u16.min(area.height.saturating_sub(2));
+        let height = 34u16.min(area.height.saturating_sub(2));
         let x = area.x + (area.width.saturating_sub(width)) / 2;
         let y = area.y + (area.height.saturating_sub(height)) / 2;
         let panel = Rect::new(x, y, width, height);
@@ -87,6 +87,12 @@ impl Widget for HelpView {
             binding_line(
                 ":text-models",
                 "Select chat model for topic labels",
+                key_style,
+                desc_style,
+            ),
+            binding_line(
+                ":provider",
+                "Set chat provider (mlx|openrouter|auto)",
                 key_style,
                 desc_style,
             ),

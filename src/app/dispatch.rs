@@ -11,6 +11,13 @@ use crate::openrouter::types::{EmbeddingResponse, Model};
 const DEFAULT_MLX_EMBEDDING_MODEL: &str = "mlx-community/Qwen3-Embedding-0.6B-mxfp8";
 const DEFAULT_MLX_CHAT_MODEL: &str = "mlx-community/Qwen3.5-0.8B-OptiQ-4bit";
 
+/// Identifies which chat provider the user prefers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChatProviderKind {
+    Mlx,
+    OpenRouter,
+}
+
 impl App {
     // -- OpenRouter dispatch methods ------------------------------------------
 
@@ -511,30 +518,53 @@ impl App {
 
     /// Resolve which chat provider to use.
     ///
-    /// Priority: MLX server (if configured) > OpenRouter (if authenticated
-    /// and a chat model is selected).
+    /// Respects `preferred_chat_provider` when set.  Default priority:
+    /// MLX server (if configured and chat-capable) > OpenRouter (if
+    /// authenticated and a model is selected).
     fn resolve_chat_provider(&self) -> Option<(ChatProvider, String)> {
-        // MLX takes priority when configured.
-        if let Some(ref mlx) = self.mlx_client {
-            let model = self
-                .config
-                .mlx_chat_model
-                .clone()
-                .unwrap_or_else(|| DEFAULT_MLX_CHAT_MODEL.to_string());
-            return Some((ChatProvider::Mlx(Arc::clone(mlx)), model));
-        }
+        let mlx = self.resolve_mlx_chat();
+        let openrouter = self.resolve_openrouter_chat();
 
-        // Fall back to OpenRouter.
-        if let Some(ref or_client) = self.openrouter_client
-            && let Some(ref model_id) = self.selected_chat_model
-        {
-            return Some((
-                ChatProvider::OpenRouter(Arc::clone(or_client)),
-                model_id.clone(),
-            ));
+        match self.preferred_chat_provider {
+            Some(ChatProviderKind::Mlx) => mlx.or(openrouter),
+            Some(ChatProviderKind::OpenRouter) => openrouter.or(mlx),
+            None => mlx.or(openrouter),
         }
+    }
 
-        None
+    fn resolve_mlx_chat(&self) -> Option<(ChatProvider, String)> {
+        if !self.mlx_chat_supported {
+            return None;
+        }
+        let mlx = self.mlx_client.as_ref()?;
+        let model = self
+            .config
+            .mlx_chat_model
+            .clone()
+            .unwrap_or_else(|| DEFAULT_MLX_CHAT_MODEL.to_string());
+        Some((ChatProvider::Mlx(Arc::clone(mlx)), model))
+    }
+
+    fn resolve_openrouter_chat(&self) -> Option<(ChatProvider, String)> {
+        let or_client = self.openrouter_client.as_ref()?;
+        let model_id = self.selected_chat_model.as_ref()?;
+        Some((
+            ChatProvider::OpenRouter(Arc::clone(or_client)),
+            model_id.clone(),
+        ))
+    }
+
+    /// Returns the name of the currently resolved chat provider, if any.
+    pub(crate) fn resolved_chat_provider_name(&self) -> Option<&'static str> {
+        self.resolve_chat_provider().map(|(p, _)| match p {
+            ChatProvider::Mlx(_) => "MLX",
+            ChatProvider::OpenRouter(_) => "OpenRouter",
+        })
+    }
+
+    /// Returns the model ID of the currently resolved chat provider, if any.
+    pub(super) fn resolved_chat_model(&self) -> Option<String> {
+        self.resolve_chat_provider().map(|(_, model)| model)
     }
 
     fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {

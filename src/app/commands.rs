@@ -1,4 +1,5 @@
 use super::App;
+use super::dispatch::ChatProviderKind;
 use crate::command::{self, Command};
 use crate::event::{AppEvent, ViewKind};
 
@@ -71,6 +72,52 @@ impl App {
             Some(Command::Topics) => {
                 self.events.send(AppEvent::GenerateClusterTopics);
             }
+            Some(Command::Provider(arg)) => match arg.as_deref() {
+                Some("mlx") => {
+                    self.preferred_chat_provider = Some(ChatProviderKind::Mlx);
+                    if self.has_chat_provider() {
+                        let name = self.resolved_chat_provider_name().unwrap_or("MLX");
+                        let model = self
+                            .resolved_chat_model()
+                            .unwrap_or_else(|| "(default)".into());
+                        self.status_message = Some(format!("Chat provider set to {name}: {model}"));
+                    } else {
+                        self.status_message = Some(
+                            "MLX chat not available. Is mlx_server_url set \
+                                 and the server running with chat support?"
+                                .into(),
+                        );
+                    }
+                }
+                Some("openrouter" | "or") => {
+                    self.preferred_chat_provider = Some(ChatProviderKind::OpenRouter);
+                    if self.has_chat_provider() {
+                        let model = self
+                            .resolved_chat_model()
+                            .unwrap_or_else(|| "(none selected)".into());
+                        self.status_message =
+                            Some(format!("Chat provider set to OpenRouter: {model}"));
+                    } else {
+                        self.status_message = Some(
+                            "OpenRouter chat not available. Use :openrouter-auth \
+                                 and :text-models first."
+                                .into(),
+                        );
+                    }
+                }
+                Some("auto") => {
+                    self.preferred_chat_provider = None;
+                    let name = self.resolved_chat_provider_name().unwrap_or("none");
+                    self.status_message =
+                        Some(format!("Chat provider set to auto (resolved: {name})"));
+                }
+                _ => {
+                    let current = self.resolved_chat_provider_name().unwrap_or("none");
+                    self.status_message = Some(format!(
+                        "Active: {current}. Usage: :provider <mlx|openrouter|auto>"
+                    ));
+                }
+            },
             Some(Command::Refresh) => {
                 self.events.send(AppEvent::RefreshView);
             }
