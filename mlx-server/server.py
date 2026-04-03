@@ -5,8 +5,8 @@ embeddings via mlx-vlm, and chat completions via mlx-lm.
 Designed to be called from the xplorertui Rust TUI.
 
 Usage:
-    uv run fastapi run server.py --port 8678
-    MLX_DEFAULT_MODEL=my-model uv run fastapi run server.py --port 8678
+    uv run uvicorn server:app --host 0.0.0.0 --port 8678
+    MLX_DEFAULT_MODEL=my-model uv run uvicorn server:app --host 0.0.0.0 --port 8678
 """
 
 from __future__ import annotations

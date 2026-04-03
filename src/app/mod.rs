@@ -102,6 +102,8 @@ pub struct App {
 
     // MLX embedding server client
     pub mlx_client: Option<Arc<MlxClient>>,
+    /// Whether the MLX server supports embeddings (probed at startup).
+    pub mlx_embed_supported: bool,
     /// Whether the MLX server supports chat completions (probed at startup).
     pub mlx_chat_supported: bool,
 
@@ -201,6 +203,7 @@ impl App {
             api_client: api_client.map(|c| Arc::new(Mutex::new(c))),
             users_cache: HashMap::new(),
             mlx_client,
+            mlx_embed_supported: false,
             mlx_chat_supported: false,
             openrouter_client: None,
             openrouter_models: Vec::new(),
@@ -240,9 +243,11 @@ impl App {
         // Try to initialize OpenRouter client from stored credentials.
         self.init_openrouter_client();
 
-        // Probe MLX server for chat support (non-blocking, fast health check).
+        // Probe MLX server capabilities (non-blocking, fast health check).
         if let Some(ref mlx) = self.mlx_client {
-            self.mlx_chat_supported = mlx.supports_chat().await;
+            let caps = mlx.capabilities().await;
+            self.mlx_embed_supported = caps.iter().any(|c| c == "embeddings");
+            self.mlx_chat_supported = caps.iter().any(|c| c == "chat");
         }
 
         // Trigger initial data fetch based on default view.
