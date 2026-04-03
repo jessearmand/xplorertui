@@ -67,6 +67,7 @@ impl Widget for StatusBar<'_> {
             Some(ViewKind::OpenRouterModels) => "Embedding Models".to_string(),
             Some(ViewKind::TextModels) => "Text Models".to_string(),
             Some(ViewKind::Cluster) => "Clusters".to_string(),
+            Some(ViewKind::HuggingFaceModels) => "HuggingFace Models".to_string(),
             Some(ViewKind::Help) => "Help".to_string(),
             None => "xplorertui".to_string(),
         };

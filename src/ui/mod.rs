@@ -3,6 +3,7 @@ pub mod cluster;
 pub mod command_bar;
 pub mod error_popup;
 pub mod help;
+pub mod hf_models;
 pub mod input;
 pub mod models;
 pub mod search;
@@ -98,6 +99,9 @@ pub fn draw(frame: &mut Frame, app: &App) {
         }
         Some(ViewKind::OpenRouterModels) | Some(ViewKind::TextModels) => {
             frame.render_widget(ModelsView::new(app), main_area);
+        }
+        Some(ViewKind::HuggingFaceModels) => {
+            frame.render_widget(hf_models::HfModelsView::new(app), main_area);
         }
         Some(ViewKind::Cluster) => {
             frame.render_widget(ClusterView::new(app), main_area);

@@ -45,6 +45,7 @@ impl App {
                     0
                 }
             }
+            Some(ViewKind::HuggingFaceModels) => self.hf_models.len(),
             Some(ViewKind::Help) => 0,
             None => 0,
         }
@@ -189,6 +190,14 @@ impl App {
                 if let Some(model) = filtered.get(idx) {
                     let model_id = model.id.clone();
                     self.events.send(AppEvent::SelectChatModel { model_id });
+                }
+            }
+            Some(ViewKind::HuggingFaceModels) => {
+                if let Some(model) = self.hf_models.get(idx) {
+                    let model_id = model.id.clone();
+                    self.config.mlx_chat_model = Some(model_id.clone());
+                    self.status_message = Some(format!("MLX chat model set to: {model_id}"));
+                    self.pop_view();
                 }
             }
             Some(ViewKind::Cluster) => {

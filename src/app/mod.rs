@@ -129,6 +129,12 @@ pub struct App {
     pub model_search: String,
     pub model_search_active: bool,
 
+    // HuggingFace Hub models
+    pub hf_models: Vec<crate::huggingface::types::HfModel>,
+    pub hf_models_loading: bool,
+    pub hf_search: String,
+    pub hf_search_active: bool,
+
     // Clustering state
     pub cluster_result: Option<ClusterResult>,
     pub cluster_loading: bool,
@@ -211,6 +217,11 @@ impl App {
             model_filter_search_active: false,
             model_search: String::new(),
             model_search_active: false,
+            hf_models: Vec::new(),
+            hf_models_loading: false,
+            hf_search: String::new(),
+            hf_search_active: false,
+
             cluster_result: None,
             cluster_loading: false,
             cluster_topics_loading: false,

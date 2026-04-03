@@ -176,6 +176,26 @@ impl App {
         });
     }
 
+    pub(super) fn dispatch_hf_models(&self) {
+        let sender = self.events.sender();
+        let query = if self.hf_search.is_empty() {
+            None
+        } else {
+            Some(self.hf_search.clone())
+        };
+
+        tokio::spawn(async move {
+            let client = crate::huggingface::client::HfHubClient::new();
+            let result = client
+                .search_mlx_models(query.as_deref(), 50)
+                .await
+                .map_err(|e| Arc::new(e.to_string()));
+            let _ = sender.send(Event::App(Box::new(AppEvent::HuggingFaceModelsLoaded(
+                result,
+            ))));
+        });
+    }
+
     pub(super) fn dispatch_generate_cluster_topics(&self) {
         let generation = self.cluster_generation;
         let Some((provider, model)) = self.resolve_chat_provider() else {
