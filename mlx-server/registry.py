@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import enum
 import io
 import os
 from typing import Any
 
+import logging
+
 import httpx
 import mlx.core as mx
 import numpy as np
+
+logger = logging.getLogger("mlx-server")
 
 DEFAULT_MODEL = os.environ.get(
     "MLX_DEFAULT_MODEL", "mlx-community/Qwen3-Embedding-0.6B-mxfp8"
@@ -26,13 +31,20 @@ DEFAULT_CHAT_MODEL = os.environ.get(
 # ---------------------------------------------------------------------------
 
 
+class ChatBackend(enum.Enum):
+    """Which library loaded a chat model."""
+
+    MLX_LM = "mlx_lm"
+    MLX_VLM = "mlx_vlm"
+
+
 class ModelRegistry:
     """Manages loaded MLX models with lazy initialization."""
 
     def __init__(self, default_model: str | None = None) -> None:
         self._text_models: dict[str, tuple[Any, Any]] = {}
         self._vl_models: dict[str, tuple[Any, Any]] = {}
-        self._chat_models: dict[str, tuple[Any, Any]] = {}
+        self._chat_models: dict[str, tuple[ChatBackend, Any, Any]] = {}
         self.default_model = default_model
 
     def get_text_model(self, model_id: str) -> tuple[Any, Any]:
@@ -44,13 +56,31 @@ class ModelRegistry:
             self._text_models[model_id] = (model, tokenizer)
         return self._text_models[model_id]
 
-    def get_chat_model(self, model_id: str, lazy: bool = True) -> tuple[Any, Any]:
-        """Return (model, tokenizer) for a chat/generation model."""
-        if model_id not in self._chat_models:
-            from mlx_lm import load
+    def get_chat_model(self, model_id: str) -> tuple[ChatBackend, Any, Any]:
+        """Return (backend, model, tokenizer/processor) for a chat model.
 
-            model, tokenizer = load(model_id, lazy=lazy)
-            self._chat_models[model_id] = (model, tokenizer)
+        Tries mlx_lm first (text-only LLMs). If the model architecture is
+        unsupported, falls back to mlx_vlm (vision-language models like gemma-4).
+        """
+        if model_id not in self._chat_models:
+            try:
+                from mlx_lm import load
+
+                logger.info("Trying mlx_lm for: %s", model_id)
+                model, tokenizer = load(model_id, lazy=True)
+                self._chat_models[model_id] = (ChatBackend.MLX_LM, model, tokenizer)
+                logger.info("Loaded %s via mlx_lm", model_id)
+            except (ValueError, KeyError) as exc:
+                # Architecture not supported by mlx_lm — try mlx_vlm
+                logger.info(
+                    "mlx_lm unsupported for %s (%s), falling back to mlx_vlm",
+                    model_id, exc,
+                )
+                from mlx_vlm import load
+
+                model, processor = load(model_id)
+                self._chat_models[model_id] = (ChatBackend.MLX_VLM, model, processor)
+                logger.info("Loaded %s via mlx_vlm", model_id)
         return self._chat_models[model_id]
 
     def get_vl_model(self, model_id: str) -> tuple[Any, Any]:

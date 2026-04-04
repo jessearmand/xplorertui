@@ -358,6 +358,29 @@ impl App {
                 self.pop_view();
             }
 
+            // HuggingFace Hub models
+            AppEvent::FetchHuggingFaceModels => {
+                self.hf_models_loading = true;
+                self.dispatch_hf_models();
+            }
+            AppEvent::HuggingFaceModelsLoaded { query, result } => {
+                // Discard stale responses from a previous search.
+                if query != self.hf_search {
+                    return;
+                }
+                self.hf_models_loading = false;
+                match result {
+                    Ok(models) => {
+                        self.status_message =
+                            Some(format!("Loaded {} HuggingFace models", models.len()));
+                        self.hf_models = models;
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading HF models: {e}"));
+                    }
+                }
+            }
+
             // LLM cluster topic generation
             AppEvent::GenerateClusterTopics => {
                 if self.cluster_result.is_none() {

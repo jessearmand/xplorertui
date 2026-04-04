@@ -38,6 +38,12 @@ impl App {
             return;
         }
 
+        // Handle HF model search input if active.
+        if self.hf_search_active {
+            self.handle_hf_search_key(key);
+            return;
+        }
+
         match self.mode {
             AppMode::Normal => self.handle_normal_key(key),
             AppMode::Command => self.handle_command_key(key),
@@ -172,6 +178,35 @@ impl App {
         }
     }
 
+    fn handle_hf_search_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char(c) => {
+                self.hf_search.push(c);
+            }
+            KeyCode::Backspace => {
+                self.hf_search.pop();
+            }
+            KeyCode::Enter => {
+                // Submit search — trigger API fetch with current query
+                self.hf_search_active = false;
+                self.events.send(AppEvent::FetchHuggingFaceModels);
+                if let Some(vs) = self.view_stack.last_mut() {
+                    vs.selected_index = 0;
+                }
+            }
+            KeyCode::Esc => {
+                self.hf_search.clear();
+                self.hf_search_active = false;
+                // Re-fetch default list
+                self.events.send(AppEvent::FetchHuggingFaceModels);
+                if let Some(vs) = self.view_stack.last_mut() {
+                    vs.selected_index = 0;
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn handle_normal_key(&mut self, key: KeyEvent) {
         let is_model_view = matches!(
             self.current_view(),
@@ -188,6 +223,16 @@ impl App {
                     self.selected_cluster = None;
                     if let Some(vs) = self.view_stack.last_mut() {
                         vs.selected_index = cluster_idx;
+                    }
+                } else if self.current_view() == Some(&ViewKind::HuggingFaceModels)
+                    && !self.hf_search.is_empty()
+                    && key.code == KeyCode::Esc
+                {
+                    // Clear HF search and re-fetch default list
+                    self.hf_search.clear();
+                    self.events.send(AppEvent::FetchHuggingFaceModels);
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = 0;
                     }
                 } else if is_model_view && !self.model_search.is_empty() && key.code == KeyCode::Esc
                 {
@@ -222,6 +267,9 @@ impl App {
                 if is_model_view {
                     self.model_search_active = true;
                     self.model_search.clear();
+                } else if self.current_view() == Some(&ViewKind::HuggingFaceModels) {
+                    self.hf_search_active = true;
+                    self.hf_search.clear();
                 } else {
                     self.mode = AppMode::Search;
                     self.search_input.clear();

@@ -176,6 +176,28 @@ impl App {
         });
     }
 
+    pub(super) fn dispatch_hf_models(&self) {
+        let sender = self.events.sender();
+        let search = self.hf_search.clone();
+        let api_query = if search.is_empty() {
+            None
+        } else {
+            Some(search.clone())
+        };
+
+        tokio::spawn(async move {
+            let client = crate::huggingface::client::HfHubClient::new();
+            let result = client
+                .search_mlx_models(api_query.as_deref(), 50)
+                .await
+                .map_err(|e| Arc::new(e.to_string()));
+            let _ = sender.send(Event::App(Box::new(AppEvent::HuggingFaceModelsLoaded {
+                query: search,
+                result,
+            })));
+        });
+    }
+
     pub(super) fn dispatch_generate_cluster_topics(&self) {
         let generation = self.cluster_generation;
         let Some((provider, model)) = self.resolve_chat_provider() else {
@@ -568,28 +590,31 @@ impl App {
     }
 
     fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {
-        // MLX takes priority when configured.
-        // Uses its own model ID from config — never the OpenRouter-selected model.
-        if let Some(ref mlx) = self.mlx_client {
-            let model = self
-                .config
-                .mlx_embedding_model
-                .clone()
-                .unwrap_or_else(|| DEFAULT_MLX_EMBEDDING_MODEL.to_string());
-            return Some((EmbedProvider::Mlx(Arc::clone(mlx)), model));
-        }
+        let mlx = self.resolve_mlx_embed();
+        let openrouter = self.resolve_openrouter_embed();
+        mlx.or(openrouter)
+    }
 
-        // Fall back to OpenRouter.
-        if let Some(ref or_client) = self.openrouter_client
-            && let Some(ref model_id) = self.selected_embedding_model
-        {
-            return Some((
-                EmbedProvider::OpenRouter(Arc::clone(or_client)),
-                model_id.clone(),
-            ));
+    fn resolve_mlx_embed(&self) -> Option<(EmbedProvider, String)> {
+        if !self.mlx_embed_supported {
+            return None;
         }
+        let mlx = self.mlx_client.as_ref()?;
+        let model = self
+            .config
+            .mlx_embedding_model
+            .clone()
+            .unwrap_or_else(|| DEFAULT_MLX_EMBEDDING_MODEL.to_string());
+        Some((EmbedProvider::Mlx(Arc::clone(mlx)), model))
+    }
 
-        None
+    fn resolve_openrouter_embed(&self) -> Option<(EmbedProvider, String)> {
+        let or_client = self.openrouter_client.as_ref()?;
+        let model_id = self.selected_embedding_model.as_ref()?;
+        Some((
+            EmbedProvider::OpenRouter(Arc::clone(or_client)),
+            model_id.clone(),
+        ))
     }
 }
 

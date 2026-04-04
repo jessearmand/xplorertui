@@ -6,13 +6,13 @@ Local MLX server exposing OpenAI-compatible REST endpoints for text embeddings, 
 
 ```bash
 cd mlx-server
-uv run fastapi run server.py --port 8678
+uv run uvicorn server:app --host 0.0.0.0 --port 8678
 ```
 
 Override the default model via environment variable:
 
 ```bash
-MLX_DEFAULT_MODEL=mlx-community/Qwen3-Embedding-0.6B-mxfp8 uv run fastapi run server.py --port 8678
+MLX_DEFAULT_MODEL=mlx-community/Qwen3-Embedding-0.6B-mxfp8 uv run uvicorn server:app --host 0.0.0.0 --port 8678
 ```
 
 The server pre-loads the default embedding model at startup. Chat and additional models are lazy-loaded on first request.

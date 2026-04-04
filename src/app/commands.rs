@@ -66,6 +66,11 @@ impl App {
                 self.events.send(AppEvent::FetchTextModels);
                 self.events.send(AppEvent::PushView(ViewKind::TextModels));
             }
+            Some(Command::HuggingFaceModels) => {
+                self.events.send(AppEvent::FetchHuggingFaceModels);
+                self.events
+                    .send(AppEvent::PushView(ViewKind::HuggingFaceModels));
+            }
             Some(Command::Cluster) => {
                 self.events.send(AppEvent::ClusterTimeline);
             }
