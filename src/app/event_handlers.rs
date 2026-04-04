@@ -363,7 +363,11 @@ impl App {
                 self.hf_models_loading = true;
                 self.dispatch_hf_models();
             }
-            AppEvent::HuggingFaceModelsLoaded(result) => {
+            AppEvent::HuggingFaceModelsLoaded { query, result } => {
+                // Discard stale responses from a previous search.
+                if query != self.hf_search {
+                    return;
+                }
                 self.hf_models_loading = false;
                 match result {
                     Ok(models) => {

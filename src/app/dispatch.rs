@@ -178,21 +178,23 @@ impl App {
 
     pub(super) fn dispatch_hf_models(&self) {
         let sender = self.events.sender();
-        let query = if self.hf_search.is_empty() {
+        let search = self.hf_search.clone();
+        let api_query = if search.is_empty() {
             None
         } else {
-            Some(self.hf_search.clone())
+            Some(search.clone())
         };
 
         tokio::spawn(async move {
             let client = crate::huggingface::client::HfHubClient::new();
             let result = client
-                .search_mlx_models(query.as_deref(), 50)
+                .search_mlx_models(api_query.as_deref(), 50)
                 .await
                 .map_err(|e| Arc::new(e.to_string()));
-            let _ = sender.send(Event::App(Box::new(AppEvent::HuggingFaceModelsLoaded(
+            let _ = sender.send(Event::App(Box::new(AppEvent::HuggingFaceModelsLoaded {
+                query: search,
                 result,
-            ))));
+            })));
         });
     }
 

@@ -29,6 +29,14 @@ impl HfModel {
         })
     }
 
+    /// Whether this model can be used for text generation / chat.
+    pub fn is_chat_capable(&self) -> bool {
+        matches!(
+            self.pipeline_tag.as_deref(),
+            Some("text-generation" | "any-to-any" | "image-text-to-text" | "video-text-to-text")
+        )
+    }
+
     /// Extract the provider/org from the model ID (e.g. "mlx-community").
     pub fn org(&self) -> &str {
         self.id.split('/').next().unwrap_or(&self.id)

@@ -194,6 +194,14 @@ impl App {
             }
             Some(ViewKind::HuggingFaceModels) => {
                 if let Some(model) = self.hf_models.get(idx) {
+                    if !model.is_chat_capable() {
+                        self.status_message = Some(format!(
+                            "Model {} is not chat-capable (pipeline: {})",
+                            model.id,
+                            model.pipeline_tag.as_deref().unwrap_or("unknown"),
+                        ));
+                        return;
+                    }
                     let model_id = model.id.clone();
                     self.config.mlx_chat_model = Some(model_id.clone());
                     self.status_message = Some(format!("MLX chat model set to: {model_id}"));

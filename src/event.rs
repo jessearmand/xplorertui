@@ -119,7 +119,11 @@ pub enum AppEvent {
 
     // -- HuggingFace Hub --
     FetchHuggingFaceModels,
-    HuggingFaceModelsLoaded(ApiResult<Vec<HfModel>>),
+    HuggingFaceModelsLoaded {
+        /// The search query that produced these results (empty = default browse).
+        query: String,
+        result: ApiResult<Vec<HfModel>>,
+    },
 
     // -- Embeddings --
     EmbedAndRankSearch {
