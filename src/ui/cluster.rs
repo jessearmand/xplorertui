@@ -103,13 +103,17 @@ impl<'a> ClusterView<'a> {
         result: &ClusterResult,
         selected_index: usize,
         topics_loading: bool,
+        chat_provider_name: Option<&str>,
         area: Rect,
         buf: &mut Buffer,
     ) {
         let title = if topics_loading {
-            " Topic Clusters (generating labels...) "
+            format!(
+                " Topic Clusters (generating labels via {}...) ",
+                chat_provider_name.unwrap_or("…"),
+            )
         } else {
-            " Topic Clusters (Enter to browse, Esc to go back) "
+            " Topic Clusters (Enter to browse, Esc to go back) ".to_string()
         };
         let block = Block::default().title(title).borders(Borders::ALL);
 
@@ -273,6 +277,7 @@ impl Widget for ClusterView<'_> {
                 result,
                 selected_index,
                 self.app.cluster_topics_loading,
+                self.app.resolved_chat_provider_name(),
                 area,
                 buf,
             );

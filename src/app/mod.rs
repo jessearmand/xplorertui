@@ -102,6 +102,10 @@ pub struct App {
 
     // MLX embedding server client
     pub mlx_client: Option<Arc<MlxClient>>,
+    /// Whether the MLX server supports embeddings (probed at startup).
+    pub mlx_embed_supported: bool,
+    /// Whether the MLX server supports chat completions (probed at startup).
+    pub mlx_chat_supported: bool,
 
     // OpenRouter model selection
     pub openrouter_models: Vec<Model>,
@@ -113,6 +117,9 @@ pub struct App {
     pub selected_chat_model: Option<String>,
     pub text_models_loading: bool,
 
+    /// User-preferred chat provider. `None` = auto (MLX if available, else OpenRouter).
+    pub preferred_chat_provider: Option<dispatch::ChatProviderKind>,
+
     // Model filter state (shared by both model views)
     pub model_filter: Option<String>,
     pub model_filter_open: bool,
@@ -123,6 +130,16 @@ pub struct App {
     pub model_filter_search_active: bool,
     pub model_search: String,
     pub model_search_active: bool,
+
+    // HuggingFace Hub models
+    pub hf_models: Vec<crate::huggingface::types::HfModel>,
+    pub hf_models_loading: bool,
+    pub hf_search: String,
+    pub hf_search_active: bool,
+    /// Org filter for HF models view (e.g. "mlx-community").
+    pub hf_org_filter: Option<String>,
+    pub hf_org_filter_open: bool,
+    pub hf_org_filter_index: usize,
 
     // Clustering state
     pub cluster_result: Option<ClusterResult>,
@@ -190,6 +207,8 @@ impl App {
             api_client: api_client.map(|c| Arc::new(Mutex::new(c))),
             users_cache: HashMap::new(),
             mlx_client,
+            mlx_embed_supported: false,
+            mlx_chat_supported: false,
             openrouter_client: None,
             openrouter_models: Vec::new(),
             selected_embedding_model: None,
@@ -197,6 +216,7 @@ impl App {
             text_models: Vec::new(),
             selected_chat_model: None,
             text_models_loading: false,
+            preferred_chat_provider: None,
             model_filter: None,
             model_filter_open: false,
             model_filter_index: 0,
@@ -204,6 +224,14 @@ impl App {
             model_filter_search_active: false,
             model_search: String::new(),
             model_search_active: false,
+            hf_models: Vec::new(),
+            hf_models_loading: false,
+            hf_search: String::new(),
+            hf_search_active: false,
+            hf_org_filter: None,
+            hf_org_filter_open: false,
+            hf_org_filter_index: 0,
+
             cluster_result: None,
             cluster_loading: false,
             cluster_topics_loading: false,
@@ -221,6 +249,13 @@ impl App {
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> color_eyre::Result<()> {
         // Try to initialize OpenRouter client from stored credentials.
         self.init_openrouter_client();
+
+        // Probe MLX server capabilities (non-blocking, fast health check).
+        if let Some(ref mlx) = self.mlx_client {
+            let caps = mlx.capabilities().await;
+            self.mlx_embed_supported = caps.iter().any(|c| c == "embeddings");
+            self.mlx_chat_supported = caps.iter().any(|c| c == "chat");
+        }
 
         // Trigger initial data fetch based on default view.
         match self.current_view() {

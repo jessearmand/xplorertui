@@ -323,8 +323,8 @@ impl App {
                         self.cluster_generation += 1;
                         self.cluster_result = Some(cluster_result);
                         self.status_message = Some("Clustering complete!".into());
-                        // Auto-trigger LLM topic generation if a chat model is selected.
-                        if self.selected_chat_model.is_some() {
+                        // Auto-trigger LLM topic generation if a chat provider is available.
+                        if self.has_chat_provider() {
                             self.cluster_topics_loading = true;
                             self.dispatch_generate_cluster_topics();
                         }
@@ -358,15 +358,63 @@ impl App {
                 self.pop_view();
             }
 
+            // MLX capability probe
+            AppEvent::ProbeMLXCapabilities => {
+                self.dispatch_probe_mlx();
+            }
+            AppEvent::MLXCapabilitiesProbed { embed, chat } => {
+                self.mlx_embed_supported = embed;
+                self.mlx_chat_supported = chat;
+
+                if embed || chat {
+                    let mut caps = Vec::new();
+                    if embed {
+                        caps.push("embeddings");
+                    }
+                    if chat {
+                        caps.push("chat");
+                    }
+                    self.status_message = Some(format!("MLX server detected: {}", caps.join(", ")));
+                } else {
+                    self.status_message = Some("MLX server not reachable.".into());
+                }
+            }
+
+            // HuggingFace Hub models
+            AppEvent::FetchHuggingFaceModels => {
+                self.hf_models_loading = true;
+                self.dispatch_hf_models();
+            }
+            AppEvent::HuggingFaceModelsLoaded { query, result } => {
+                // Discard stale responses from a previous search.
+                if query != self.hf_search {
+                    return;
+                }
+                self.hf_models_loading = false;
+                match result {
+                    Ok(models) => {
+                        self.status_message =
+                            Some(format!("Loaded {} HuggingFace models", models.len()));
+                        self.hf_models = models;
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Error loading HF models: {e}"));
+                    }
+                }
+            }
+
             // LLM cluster topic generation
             AppEvent::GenerateClusterTopics => {
                 if self.cluster_result.is_none() {
                     self.status_message = Some("No cluster result. Use :cluster first.".into());
                     return;
                 }
-                if self.selected_chat_model.is_none() {
-                    self.status_message =
-                        Some("No chat model selected. Use :text-models first.".into());
+                if !self.has_chat_provider() {
+                    self.status_message = Some(
+                        "No chat provider configured. Set mlx_server_url in config \
+                         or use :openrouter-auth + :text-models."
+                            .into(),
+                    );
                     return;
                 }
                 self.cluster_generation += 1;
@@ -389,8 +437,9 @@ impl App {
                                     cr.cluster_topics[i] = label;
                                 }
                             }
+                            let provider = self.resolved_chat_provider_name().unwrap_or("LLM");
                             self.status_message = Some(format!(
-                                "LLM generated {label_count}/{cluster_count} topic labels"
+                                "{provider} generated {label_count}/{cluster_count} topic labels"
                             ));
                         }
                     }

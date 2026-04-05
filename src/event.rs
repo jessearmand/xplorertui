@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 
 use crate::api::types::{ListResponse, SingleResponse, Tweet, User};
 use crate::embeddings::cluster::ClusterResult;
+use crate::huggingface::types::HfModel;
 use crate::openrouter::types::Model;
 
 /// The frequency at which tick events are emitted.
@@ -116,6 +117,21 @@ pub enum AppEvent {
         model_id: String,
     },
 
+    // -- MLX capability probe --
+    ProbeMLXCapabilities,
+    MLXCapabilitiesProbed {
+        embed: bool,
+        chat: bool,
+    },
+
+    // -- HuggingFace Hub --
+    FetchHuggingFaceModels,
+    HuggingFaceModelsLoaded {
+        /// The search query that produced these results (empty = default browse).
+        query: String,
+        result: ApiResult<Vec<HfModel>>,
+    },
+
     // -- Embeddings --
     EmbedAndRankSearch {
         query: String,
@@ -148,6 +164,7 @@ pub enum ViewKind {
     OpenRouterModels,
     TextModels,
     Cluster,
+    HuggingFaceModels,
     Help,
 }
 
