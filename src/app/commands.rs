@@ -80,21 +80,10 @@ impl App {
             Some(Command::Provider(arg)) => match arg.as_deref() {
                 Some("mlx") => {
                     self.preferred_chat_provider = Some(ChatProviderKind::Mlx);
-                    // Re-probe capabilities in case the server started after the TUI.
+                    // Always re-probe — the result arrives asynchronously via
+                    // MLXCapabilitiesProbed, which updates flags and shows status.
                     self.events.send(AppEvent::ProbeMLXCapabilities);
-                    if self.has_chat_provider() {
-                        let name = self.resolved_chat_provider_name().unwrap_or("MLX");
-                        let model = self
-                            .resolved_chat_model()
-                            .unwrap_or_else(|| "(default)".into());
-                        self.status_message = Some(format!("Chat provider set to {name}: {model}"));
-                    } else {
-                        self.status_message = Some(
-                            "MLX chat not available. Probing server... \
-                                 Try again in a moment."
-                                .into(),
-                        );
-                    }
+                    self.status_message = Some("Preferred provider: MLX. Probing server...".into());
                 }
                 Some("openrouter" | "or") => {
                     self.preferred_chat_provider = Some(ChatProviderKind::OpenRouter);
@@ -116,9 +105,8 @@ impl App {
                     self.preferred_chat_provider = None;
                     // Re-probe in case MLX server started after the TUI.
                     self.events.send(AppEvent::ProbeMLXCapabilities);
-                    let name = self.resolved_chat_provider_name().unwrap_or("none");
                     self.status_message =
-                        Some(format!("Chat provider set to auto (resolved: {name})"));
+                        Some("Preferred provider: auto. Probing MLX server...".into());
                 }
                 _ => {
                     let current = self.resolved_chat_provider_name().unwrap_or("none");

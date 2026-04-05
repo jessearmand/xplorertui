@@ -32,6 +32,12 @@ impl App {
             return;
         }
 
+        // Handle HF org filter popup if open.
+        if self.hf_org_filter_open {
+            self.handle_hf_org_filter_key(key);
+            return;
+        }
+
         // Handle model search input if active (swallow all keys).
         if self.model_search_active {
             self.handle_model_search_key(key);
@@ -178,6 +184,38 @@ impl App {
         }
     }
 
+    fn handle_hf_org_filter_key(&mut self, key: KeyEvent) {
+        // "All" is index 0, then orgs follow at index 1..
+        let orgs = self.hf_orgs();
+        let item_count = 1 + orgs.len(); // "All" + orgs
+
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if self.hf_org_filter_index + 1 < item_count {
+                    self.hf_org_filter_index += 1;
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.hf_org_filter_index = self.hf_org_filter_index.saturating_sub(1);
+            }
+            KeyCode::Enter => {
+                if self.hf_org_filter_index == 0 {
+                    self.hf_org_filter = None;
+                } else if let Some(org) = orgs.get(self.hf_org_filter_index - 1) {
+                    self.hf_org_filter = Some(org.clone());
+                }
+                self.hf_org_filter_open = false;
+                if let Some(vs) = self.view_stack.last_mut() {
+                    vs.selected_index = 0;
+                }
+            }
+            KeyCode::Esc | KeyCode::Char('q') => {
+                self.hf_org_filter_open = false;
+            }
+            _ => {}
+        }
+    }
+
     fn handle_hf_search_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char(c) => {
@@ -225,12 +263,21 @@ impl App {
                         vs.selected_index = cluster_idx;
                     }
                 } else if self.current_view() == Some(&ViewKind::HuggingFaceModels)
-                    && !self.hf_search.is_empty()
                     && key.code == KeyCode::Esc
+                    && !self.hf_search.is_empty()
                 {
                     // Clear HF search and re-fetch default list
                     self.hf_search.clear();
                     self.events.send(AppEvent::FetchHuggingFaceModels);
+                    if let Some(vs) = self.view_stack.last_mut() {
+                        vs.selected_index = 0;
+                    }
+                } else if self.current_view() == Some(&ViewKind::HuggingFaceModels)
+                    && key.code == KeyCode::Esc
+                    && self.hf_org_filter.is_some()
+                {
+                    // Clear org filter
+                    self.hf_org_filter = None;
                     if let Some(vs) = self.view_stack.last_mut() {
                         vs.selected_index = 0;
                     }
@@ -316,6 +363,9 @@ impl App {
                     self.model_search_active = false;
                     self.model_filter_open = true;
                     self.model_filter_index = 0;
+                } else if self.current_view() == Some(&ViewKind::HuggingFaceModels) {
+                    self.hf_org_filter_open = true;
+                    self.hf_org_filter_index = 0;
                 }
             }
             _ => {}

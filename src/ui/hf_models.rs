@@ -2,11 +2,11 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, StatefulWidget, Widget};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, StatefulWidget, Widget};
 
 use crate::app::App;
 
-/// View for browsing HuggingFace Hub models.
+/// View for browsing HuggingFace Hub models, grouped by organization.
 pub struct HfModelsView<'a> {
     pub app: &'a App,
 }
@@ -19,18 +19,25 @@ impl<'a> HfModelsView<'a> {
 
 impl Widget for HfModelsView<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let filtered = self.app.filtered_hf_models();
+
+        // Build title with filter/search hints
+        let filter_hint = match &self.app.hf_org_filter {
+            Some(org) => format!(" [{org}]"),
+            None => String::new(),
+        };
         let search_hint = if self.app.hf_search.is_empty() {
-            " [/]search".to_string()
+            String::new()
         } else {
             format!(" search:\"{}\"", self.app.hf_search)
         };
 
         let title = if self.app.hf_models_loading {
-            format!(" HuggingFace MLX Models (loading...){search_hint} ")
+            format!(" HuggingFace MLX Models (loading...){filter_hint}{search_hint} ")
         } else {
             format!(
-                " HuggingFace MLX Models ({}){search_hint} ",
-                self.app.hf_models.len()
+                " HuggingFace MLX Models ({}){filter_hint}{search_hint} [/]search [f]ilter ",
+                filtered.len()
             )
         };
 
@@ -48,35 +55,61 @@ impl Widget for HfModelsView<'_> {
             (inner, None)
         };
 
-        if !self.app.hf_models.is_empty() {
-            let items: Vec<ListItem> = self
-                .app
-                .hf_models
-                .iter()
-                .map(|m| {
-                    let quant = m.quant_tag().unwrap_or("fp");
-                    let pipeline = m.pipeline_tag.as_deref().unwrap_or("");
-                    let downloads = format_downloads(m.downloads);
+        if !filtered.is_empty() {
+            let mut items: Vec<ListItem> = Vec::new();
+            let mut model_to_display: Vec<usize> = Vec::with_capacity(filtered.len());
+            let mut current_org = "";
 
-                    ListItem::new(Line::from(vec![
+            for (i, model) in filtered.iter().enumerate() {
+                let org = model.org();
+
+                // Insert org header when org changes
+                if org != current_org {
+                    let count = filtered[i..].iter().take_while(|m| m.org() == org).count();
+                    items.push(ListItem::new(Line::from(vec![
                         Span::styled(
-                            m.short_name(),
+                            format!("── {org} "),
                             Style::default()
-                                .fg(Color::Cyan)
+                                .fg(Color::Yellow)
                                 .add_modifier(Modifier::BOLD),
                         ),
-                        Span::styled(format!("  [{quant}]"), Style::default().fg(Color::Yellow)),
                         Span::styled(
-                            format!("  {pipeline}"),
+                            format!("({count}) ──"),
                             Style::default().fg(Color::DarkGray),
                         ),
-                        Span::styled(
-                            format!("  ⬇ {downloads}"),
-                            Style::default().fg(Color::DarkGray),
-                        ),
-                    ]))
-                })
-                .collect();
+                    ])));
+                    current_org = org;
+                }
+
+                model_to_display.push(items.len());
+
+                let quant = model.quant_tag().unwrap_or("fp");
+                let pipeline = model.pipeline_tag.as_deref().unwrap_or("");
+                let downloads = format_downloads(model.downloads);
+
+                items.push(ListItem::new(Line::from(vec![
+                    Span::styled("  ", Style::default()),
+                    Span::styled(
+                        model.short_name(),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(format!("  [{quant}]"), Style::default().fg(Color::Yellow)),
+                    Span::styled(
+                        format!("  {pipeline}"),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled(
+                        format!("  ⬇ {downloads}"),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ])));
+            }
+
+            // Map the logical selection index to the display index (skipping headers)
+            let selected = self.app.selected_index();
+            let display_idx = model_to_display.get(selected).copied().unwrap_or(0);
 
             let list = List::new(items)
                 .highlight_style(
@@ -87,7 +120,7 @@ impl Widget for HfModelsView<'_> {
                 )
                 .highlight_symbol("▸ ");
 
-            let mut state = ListState::default().with_selected(Some(self.app.selected_index()));
+            let mut state = ListState::default().with_selected(Some(display_idx));
             StatefulWidget::render(list, list_area, buf, &mut state);
         }
 
@@ -101,7 +134,69 @@ impl Widget for HfModelsView<'_> {
             ]);
             buf.set_line(search_area.x, search_area.y, &line, search_area.width);
         }
+
+        // Render org filter popup overlay
+        if self.app.hf_org_filter_open {
+            render_org_filter_popup(self.app, area, buf);
+        }
     }
+}
+
+fn render_org_filter_popup(app: &App, area: Rect, buf: &mut Buffer) {
+    let orgs = app.hf_orgs();
+
+    // "All" + each org
+    let mut items: Vec<ListItem> = Vec::new();
+    items.push(ListItem::new(Line::from(Span::styled(
+        "All",
+        Style::default()
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD),
+    ))));
+    for org in &orgs {
+        let count = app
+            .hf_models
+            .iter()
+            .filter(|m| m.org() == org.as_str())
+            .count();
+        items.push(ListItem::new(Line::from(vec![
+            Span::styled(org.as_str(), Style::default().fg(Color::Cyan)),
+            Span::styled(format!(" ({count})"), Style::default().fg(Color::DarkGray)),
+        ])));
+    }
+
+    let width = 40u16.min(area.width.saturating_sub(4));
+    let height = ((items.len() + 2) as u16).min(area.height.saturating_sub(4));
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    let popup = Rect::new(x, y, width, height);
+
+    Clear.render(popup, buf);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Filter by Organization ")
+        .title_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+        .border_style(Style::default().fg(Color::Yellow));
+
+    let inner = block.inner(popup);
+    block.render(popup, buf);
+
+    let list = List::new(items)
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("▸ ");
+
+    let mut state = ListState::default().with_selected(Some(app.hf_org_filter_index));
+    StatefulWidget::render(list, inner, buf, &mut state);
 }
 
 fn format_downloads(n: u64) -> String {

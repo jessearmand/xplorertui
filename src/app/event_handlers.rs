@@ -365,6 +365,19 @@ impl App {
             AppEvent::MLXCapabilitiesProbed { embed, chat } => {
                 self.mlx_embed_supported = embed;
                 self.mlx_chat_supported = chat;
+
+                if embed || chat {
+                    let mut caps = Vec::new();
+                    if embed {
+                        caps.push("embeddings");
+                    }
+                    if chat {
+                        caps.push("chat");
+                    }
+                    self.status_message = Some(format!("MLX server detected: {}", caps.join(", ")));
+                } else {
+                    self.status_message = Some("MLX server not reachable.".into());
+                }
             }
 
             // HuggingFace Hub models

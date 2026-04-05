@@ -45,7 +45,7 @@ impl App {
                     0
                 }
             }
-            Some(ViewKind::HuggingFaceModels) => self.hf_models.len(),
+            Some(ViewKind::HuggingFaceModels) => self.filtered_hf_models().len(),
             Some(ViewKind::Help) => 0,
             None => 0,
         }
@@ -112,6 +112,30 @@ impl App {
             .into_iter()
             .filter(|p| query.is_empty() || p.to_lowercase().contains(&query))
             .collect()
+    }
+
+    // -- HuggingFace model helpers ------------------------------------------
+
+    /// Returns HF models filtered by the active org filter, sorted by org then ID.
+    pub fn filtered_hf_models(&self) -> Vec<&crate::huggingface::types::HfModel> {
+        let mut filtered: Vec<_> = self
+            .hf_models
+            .iter()
+            .filter(|m| match &self.hf_org_filter {
+                Some(org) => m.org() == org.as_str(),
+                None => true,
+            })
+            .collect();
+        filtered.sort_by(|a, b| a.org().cmp(b.org()).then_with(|| a.id.cmp(&b.id)));
+        filtered
+    }
+
+    /// Returns unique orgs from the current HF models list.
+    pub fn hf_orgs(&self) -> Vec<String> {
+        let mut orgs: Vec<String> = self.hf_models.iter().map(|m| m.org().to_string()).collect();
+        orgs.sort();
+        orgs.dedup();
+        orgs
     }
 
     pub(super) fn open_selected(&mut self) {
@@ -193,7 +217,8 @@ impl App {
                 }
             }
             Some(ViewKind::HuggingFaceModels) => {
-                if let Some(model) = self.hf_models.get(idx) {
+                let filtered = self.filtered_hf_models();
+                if let Some(model) = filtered.get(idx) {
                     if !model.is_chat_capable() {
                         self.status_message = Some(format!(
                             "Model {} is not chat-capable (pipeline: {})",

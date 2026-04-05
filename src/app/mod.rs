@@ -136,6 +136,10 @@ pub struct App {
     pub hf_models_loading: bool,
     pub hf_search: String,
     pub hf_search_active: bool,
+    /// Org filter for HF models view (e.g. "mlx-community").
+    pub hf_org_filter: Option<String>,
+    pub hf_org_filter_open: bool,
+    pub hf_org_filter_index: usize,
 
     // Clustering state
     pub cluster_result: Option<ClusterResult>,
@@ -224,6 +228,9 @@ impl App {
             hf_models_loading: false,
             hf_search: String::new(),
             hf_search_active: false,
+            hf_org_filter: None,
+            hf_org_filter_open: false,
+            hf_org_filter_index: 0,
 
             cluster_result: None,
             cluster_loading: false,

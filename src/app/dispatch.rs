@@ -98,19 +98,72 @@ impl App {
     }
 
     pub(super) fn dispatch_cluster_timeline(&self) {
+        // Try to resolve an embed provider now; if none is available but
+        // an MLX client exists, pass it along so the async task can
+        // re-probe the server (it may have started after the TUI).
         let embed_provider = self.resolve_embed_provider();
-        let Some((provider, model)) = embed_provider else {
+        let mlx_fallback = if embed_provider.is_none() {
+            self.mlx_client.as_ref().map(|mlx| {
+                let model = self
+                    .config
+                    .mlx_embedding_model
+                    .clone()
+                    .unwrap_or_else(|| DEFAULT_MLX_EMBEDDING_MODEL.to_string());
+                (Arc::clone(mlx), model)
+            })
+        } else {
+            None
+        };
+        let openrouter_fallback = if embed_provider.is_none() {
+            self.resolve_openrouter_embed()
+        } else {
+            None
+        };
+
+        if embed_provider.is_none() && mlx_fallback.is_none() && openrouter_fallback.is_none() {
             self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
                 "No embedding provider configured. Set mlx_server_url in config \
                  or use :openrouter-auth + :models."
                     .into(),
             ))));
             return;
-        };
+        }
+
         let sender = self.events.sender();
         let tweets = self.home_timeline.tweets.clone();
 
         tokio::spawn(async move {
+            // If we had a resolved provider, use it. Otherwise try MLX
+            // with a live probe, falling back to OpenRouter.
+            let (provider, model) = if let Some((p, m)) = embed_provider {
+                (p, m)
+            } else if let Some((mlx_client, mlx_model)) = mlx_fallback {
+                // Re-probe: check if server is now reachable.
+                let caps = mlx_client.capabilities().await;
+                if caps.iter().any(|c| c == "embeddings") {
+                    // Update flags via event so future calls don't need to re-probe.
+                    let chat = caps.iter().any(|c| c == "chat");
+                    let _ = sender.send(Event::App(Box::new(AppEvent::MLXCapabilitiesProbed {
+                        embed: true,
+                        chat,
+                    })));
+                    (EmbedProvider::Mlx(mlx_client), mlx_model)
+                } else if let Some((p, m)) = openrouter_fallback {
+                    (p, m)
+                } else {
+                    let _ = sender.send(Event::App(Box::new(AppEvent::ClusteringComplete(Err(
+                        Arc::new(
+                            "MLX server not reachable and no OpenRouter fallback configured."
+                                .into(),
+                        ),
+                    )))));
+                    return;
+                }
+            } else if let Some((p, m)) = openrouter_fallback {
+                (p, m)
+            } else {
+                unreachable!("checked above");
+            };
             let result = async {
                 let texts: Vec<String> = tweets.iter().map(|t| t.text.clone()).collect();
                 let ids: Vec<String> = tweets.iter().map(|t| t.id.clone()).collect();
