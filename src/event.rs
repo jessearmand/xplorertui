@@ -117,6 +117,13 @@ pub enum AppEvent {
         model_id: String,
     },
 
+    // -- MLX capability probe --
+    ProbeMLXCapabilities,
+    MLXCapabilitiesProbed {
+        embed: bool,
+        chat: bool,
+    },
+
     // -- HuggingFace Hub --
     FetchHuggingFaceModels,
     HuggingFaceModelsLoaded {

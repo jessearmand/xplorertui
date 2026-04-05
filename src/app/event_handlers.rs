@@ -358,6 +358,15 @@ impl App {
                 self.pop_view();
             }
 
+            // MLX capability probe
+            AppEvent::ProbeMLXCapabilities => {
+                self.dispatch_probe_mlx();
+            }
+            AppEvent::MLXCapabilitiesProbed { embed, chat } => {
+                self.mlx_embed_supported = embed;
+                self.mlx_chat_supported = chat;
+            }
+
             // HuggingFace Hub models
             AppEvent::FetchHuggingFaceModels => {
                 self.hf_models_loading = true;

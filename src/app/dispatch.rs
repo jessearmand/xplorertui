@@ -176,6 +176,23 @@ impl App {
         });
     }
 
+    pub(super) fn dispatch_probe_mlx(&self) {
+        let Some(ref mlx) = self.mlx_client else {
+            return;
+        };
+        let mlx = Arc::clone(mlx);
+        let sender = self.events.sender();
+        tokio::spawn(async move {
+            let caps = mlx.capabilities().await;
+            let embed = caps.iter().any(|c| c == "embeddings");
+            let chat = caps.iter().any(|c| c == "chat");
+            let _ = sender.send(Event::App(Box::new(AppEvent::MLXCapabilitiesProbed {
+                embed,
+                chat,
+            })));
+        });
+    }
+
     pub(super) fn dispatch_hf_models(&self) {
         let sender = self.events.sender();
         let search = self.hf_search.clone();
@@ -548,8 +565,12 @@ impl App {
         let openrouter = self.resolve_openrouter_chat();
 
         match self.preferred_chat_provider {
-            Some(ChatProviderKind::Mlx) => mlx.or(openrouter),
-            Some(ChatProviderKind::OpenRouter) => openrouter.or(mlx),
+            // Explicit preference: no fallback — return None so the user
+            // gets a clear error instead of silent rerouting to a
+            // potentially paid/remote provider.
+            Some(ChatProviderKind::Mlx) => mlx,
+            Some(ChatProviderKind::OpenRouter) => openrouter,
+            // Auto: MLX preferred, OpenRouter fallback.
             None => mlx.or(openrouter),
         }
     }

@@ -80,6 +80,8 @@ impl App {
             Some(Command::Provider(arg)) => match arg.as_deref() {
                 Some("mlx") => {
                     self.preferred_chat_provider = Some(ChatProviderKind::Mlx);
+                    // Re-probe capabilities in case the server started after the TUI.
+                    self.events.send(AppEvent::ProbeMLXCapabilities);
                     if self.has_chat_provider() {
                         let name = self.resolved_chat_provider_name().unwrap_or("MLX");
                         let model = self
@@ -88,8 +90,8 @@ impl App {
                         self.status_message = Some(format!("Chat provider set to {name}: {model}"));
                     } else {
                         self.status_message = Some(
-                            "MLX chat not available. Is mlx_server_url set \
-                                 and the server running with chat support?"
+                            "MLX chat not available. Probing server... \
+                                 Try again in a moment."
                                 .into(),
                         );
                     }
@@ -112,6 +114,8 @@ impl App {
                 }
                 Some("auto") => {
                     self.preferred_chat_provider = None;
+                    // Re-probe in case MLX server started after the TUI.
+                    self.events.send(AppEvent::ProbeMLXCapabilities);
                     let name = self.resolved_chat_provider_name().unwrap_or("none");
                     self.status_message =
                         Some(format!("Chat provider set to auto (resolved: {name})"));
