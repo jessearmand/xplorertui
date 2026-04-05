@@ -296,8 +296,8 @@ impl App {
             .iter()
             .find(|m| m.id == model)
             .and_then(|m| m.context_length)
-            .map(|ctx| (ctx / 2).clamp(1024, 16384) as u32)
-            .or(Some(16384));
+            .map(|ctx| (ctx / 2).clamp(1024, 131072) as u32)
+            .or(Some(131072));
         let sender = self.events.sender();
 
         // Build the prompt: collect up to 8 representative tweets per cluster.

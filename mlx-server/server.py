@@ -276,7 +276,10 @@ async def _generate_mlx_lm(
     from mlx_lm.sample_utils import make_sampler
 
     prompt = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+        enable_thinking=False,
     )
     sampler = make_sampler(temp=temp)
 
@@ -289,6 +292,7 @@ async def _generate_mlx_lm(
         sampler=sampler,
     )
 
+    text = _strip_thinking(text)
     prompt_tokens = len(tokenizer.encode(prompt))
     completion_tokens = len(tokenizer.encode(text))
     return text, prompt_tokens, completion_tokens
@@ -301,7 +305,9 @@ async def _generate_mlx_vlm(
     from mlx_vlm import generate
     from mlx_vlm.prompt_utils import apply_chat_template
 
-    prompt = apply_chat_template(processor, model.config, messages)
+    prompt = apply_chat_template(
+        processor, model.config, messages, enable_thinking=False
+    )
 
     result = await asyncio.to_thread(
         generate,
@@ -310,9 +316,31 @@ async def _generate_mlx_vlm(
         prompt,
         max_tokens=max_tokens,
         temperature=temp,
+        enable_thinking=False,
     )
 
-    return result.text, result.prompt_tokens, result.generation_tokens
+    return _strip_thinking(result.text), result.prompt_tokens, result.generation_tokens
+
+
+def _strip_thinking(text: str) -> str:
+    """Remove reasoning/thinking blocks from generated text.
+
+    Handles multiple formats:
+    - <think>...</think> (Qwen, DeepSeek)
+    - <channel|>...<|channel> (Gemma 4)
+    """
+    import re
+
+    # <think>...</think> — greedy within blocks, DOTALL for multiline
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    # Unclosed <think> at the start — strip everything from <think> onward
+    if "<think>" in text:
+        text = text[: text.index("<think>")]
+    # <channel|>...<|channel> (Gemma 4 thinking format)
+    text = re.sub(r"<channel\|>.*?<\|channel>", "", text, flags=re.DOTALL)
+    if "<channel|>" in text:
+        text = text[: text.index("<channel|>")]
+    return text.strip()
 
 
 @app.get("/health")
