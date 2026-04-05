@@ -55,7 +55,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ndarray = "0.15"
 linfa = "0.7"
 linfa-clustering = "0.7"
-linfa-reduction = "0.7"
+linfa-reduction = "0.8"
 
 # Plotting
 kuva = "0.1"
