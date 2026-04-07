@@ -1,21 +1,21 @@
 # mlx-server
 
-Local MLX embedding server exposing OpenAI-compatible REST endpoints for text and multimodal (image+text) embeddings. Runs on Apple Silicon via `mlx-embeddings` and `mlx-vlm`. Designed to be launched manually or spawned by xplorertui.
+Local MLX server exposing OpenAI-compatible REST endpoints for text embeddings, multimodal embeddings, and chat completions. Runs on Apple Silicon via `mlx-embeddings`, `mlx-vlm`, and `mlx-lm`. Designed to be launched manually or spawned by xplorertui.
 
 ## Running
 
 ```bash
 cd mlx-server
-uv run fastapi run server.py --port 8678
+uv run uvicorn server:app --host 0.0.0.0 --port 8678
 ```
 
 Override the default model via environment variable:
 
 ```bash
-MLX_DEFAULT_MODEL=mlx-community/Qwen3-Embedding-0.6B-mxfp8 uv run fastapi run server.py --port 8678
+MLX_DEFAULT_MODEL=mlx-community/Qwen3-Embedding-0.6B-mxfp8 uv run uvicorn server:app --host 0.0.0.0 --port 8678
 ```
 
-The server pre-loads the default model at startup. Additional models are lazy-loaded on first request.
+The server pre-loads the default embedding model at startup. Chat and additional models are lazy-loaded on first request.
 
 ## Endpoints
 
@@ -23,6 +23,7 @@ The server pre-loads the default model at startup. Additional models are lazy-lo
 |--------|------|-------------|
 | POST | `/v1/embeddings` | Text embeddings (OpenAI-compatible) |
 | POST | `/v1/embeddings/multimodal` | Text + image embeddings |
+| POST | `/v1/chat/completions` | Chat completions (OpenAI-compatible) |
 | GET | `/v1/models` | List loaded/available models |
 | GET | `/health` | Health check |
 
@@ -32,13 +33,15 @@ Interactive API docs are available at `/docs` when the server is running.
 
 | Environment Variable | Default | Description |
 |---|---|---|
-| `MLX_DEFAULT_MODEL` | `mlx-community/Qwen3-Embedding-0.6B-mxfp8` | Model to pre-load at startup and use when requests omit `model` |
+| `MLX_DEFAULT_MODEL` | `mlx-community/Qwen3-Embedding-0.6B-mxfp8` | Embedding model to pre-load at startup |
+| `MLX_DEFAULT_CHAT_MODEL` | `mlx-community/Qwen3.5-0.8B-OptiQ-4bit` | Chat model (lazy-loaded on first request) |
 
 The xplorertui Rust client connects to this server when `mlx_server_url` is set in `~/.config/xplorertui/config.toml`:
 
 ```toml
 mlx_server_url = "http://localhost:8678"
 mlx_embedding_model = "mlx-community/Qwen3-Embedding-0.6B-mxfp8"  # optional
+mlx_chat_model = "mlx-community/Qwen3.5-0.8B-OptiQ-4bit"          # optional
 ```
 
 ## Module Layout

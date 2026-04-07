@@ -7,6 +7,7 @@ pub mod command;
 pub mod config;
 pub mod embeddings;
 pub mod event;
+pub mod huggingface;
 pub mod mlx;
 pub mod openrouter;
 pub mod ui;

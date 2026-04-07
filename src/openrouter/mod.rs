@@ -11,23 +11,35 @@ pub fn extract_provider(model_id: &str) -> &str {
 
 /// Strip `<think>...</think>` blocks from text.
 ///
-/// Reasoning models may embed chain-of-thought in these tags within the
-/// content field. Handles missing close tags gracefully.
+/// Strip reasoning/thinking blocks from model output.
+///
+/// Handles multiple formats used by different model families:
+/// - `<think>...</think>` (Qwen, DeepSeek)
+/// - `<channel|>...<|channel>` (Gemma 4)
+///
+/// Handles missing close tags gracefully by truncating at the open tag.
 pub fn strip_think_tags(text: &str) -> String {
-    if !text.contains("<think>") {
+    let mut result = strip_tag_pair(text, "<think>", "</think>");
+    result = strip_tag_pair(&result, "<channel|>", "<|channel>");
+    result
+}
+
+fn strip_tag_pair(text: &str, open: &str, close: &str) -> String {
+    if !text.contains(open) {
         return text.to_string();
     }
 
     let mut result = String::with_capacity(text.len());
     let mut rest = text;
 
-    while let Some(start) = rest.find("<think>") {
+    while let Some(start) = rest.find(open) {
         result.push_str(&rest[..start]);
-        rest = &rest[start + "<think>".len()..];
+        rest = &rest[start + open.len()..];
 
-        if let Some(end) = rest.find("</think>") {
-            rest = &rest[end + "</think>".len()..];
+        if let Some(end) = rest.find(close) {
+            rest = &rest[end + close.len()..];
         } else {
+            // Unclosed tag — truncate here.
             return result;
         }
     }

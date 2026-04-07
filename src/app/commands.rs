@@ -1,4 +1,5 @@
 use super::App;
+use super::dispatch::ChatProviderKind;
 use crate::command::{self, Command};
 use crate::event::{AppEvent, ViewKind};
 
@@ -65,12 +66,55 @@ impl App {
                 self.events.send(AppEvent::FetchTextModels);
                 self.events.send(AppEvent::PushView(ViewKind::TextModels));
             }
+            Some(Command::HuggingFaceModels) => {
+                self.events.send(AppEvent::FetchHuggingFaceModels);
+                self.events
+                    .send(AppEvent::PushView(ViewKind::HuggingFaceModels));
+            }
             Some(Command::Cluster) => {
                 self.events.send(AppEvent::ClusterTimeline);
             }
             Some(Command::Topics) => {
                 self.events.send(AppEvent::GenerateClusterTopics);
             }
+            Some(Command::Provider(arg)) => match arg.as_deref() {
+                Some("mlx") => {
+                    self.preferred_chat_provider = Some(ChatProviderKind::Mlx);
+                    // Always re-probe — the result arrives asynchronously via
+                    // MLXCapabilitiesProbed, which updates flags and shows status.
+                    self.events.send(AppEvent::ProbeMLXCapabilities);
+                    self.status_message = Some("Preferred provider: MLX. Probing server...".into());
+                }
+                Some("openrouter" | "or") => {
+                    self.preferred_chat_provider = Some(ChatProviderKind::OpenRouter);
+                    if self.has_chat_provider() {
+                        let model = self
+                            .resolved_chat_model()
+                            .unwrap_or_else(|| "(none selected)".into());
+                        self.status_message =
+                            Some(format!("Chat provider set to OpenRouter: {model}"));
+                    } else {
+                        self.status_message = Some(
+                            "OpenRouter chat not available. Use :openrouter-auth \
+                                 and :text-models first."
+                                .into(),
+                        );
+                    }
+                }
+                Some("auto") => {
+                    self.preferred_chat_provider = None;
+                    // Re-probe in case MLX server started after the TUI.
+                    self.events.send(AppEvent::ProbeMLXCapabilities);
+                    self.status_message =
+                        Some("Preferred provider: auto. Probing MLX server...".into());
+                }
+                _ => {
+                    let current = self.resolved_chat_provider_name().unwrap_or("none");
+                    self.status_message = Some(format!(
+                        "Active: {current}. Usage: :provider <mlx|openrouter|auto>"
+                    ));
+                }
+            },
             Some(Command::Refresh) => {
                 self.events.send(AppEvent::RefreshView);
             }

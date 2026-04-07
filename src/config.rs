@@ -24,6 +24,10 @@ pub struct AppConfig {
     /// Falls back to `DEFAULT_MLX_EMBEDDING_MODEL` when not set.
     #[serde(default)]
     pub mlx_embedding_model: Option<String>,
+    /// Model ID to use with the MLX server for chat completions.
+    /// Falls back to `DEFAULT_MLX_CHAT_MODEL` when not set.
+    #[serde(default)]
+    pub mlx_chat_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -62,6 +66,7 @@ impl Default for AppConfig {
             openrouter_callback_port: default_openrouter_callback_port(),
             mlx_server_url: None,
             mlx_embedding_model: None,
+            mlx_chat_model: None,
         }
     }
 }
