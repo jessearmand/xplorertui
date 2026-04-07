@@ -125,7 +125,9 @@ async def create_embeddings(request: EmbeddingRequest):
         elapsed = time.perf_counter() - t0
         logger.info(
             "Embedding complete: %d texts, %.2fs, model=%s",
-            len(request.input), elapsed, model_id,
+            len(request.input),
+            elapsed,
+            model_id,
         )
     except Exception as e:
         logger.error("Embedding failed for model %s: %s", model_id, e)
@@ -228,19 +230,29 @@ async def chat_completions(request: ChatCompletionRequest):
 
     logger.info(
         "Generating: model=%s, backend=%s, messages=%d, max_tokens=%d, temp=%.2f",
-        model_id, backend.value, len(messages), max_tokens, temp,
+        model_id,
+        backend.value,
+        len(messages),
+        max_tokens,
+        temp,
     )
     t0 = time.perf_counter()
 
     try:
         if backend == ChatBackend.MLX_LM:
-            text, prompt_tokens, completion_tokens = await _generate_mlx_lm(
-                model, tokenizer, messages, max_tokens, temp
-            )
+            (
+                text,
+                prompt_tokens,
+                completion_tokens,
+                finish_reason,
+            ) = await _generate_mlx_lm(model, tokenizer, messages, max_tokens, temp)
         else:
-            text, prompt_tokens, completion_tokens = await _generate_mlx_vlm(
-                model, tokenizer, messages, max_tokens, temp
-            )
+            (
+                text,
+                prompt_tokens,
+                completion_tokens,
+                finish_reason,
+            ) = await _generate_mlx_vlm(model, tokenizer, messages, max_tokens, temp)
     except Exception as e:
         logger.error("Generation failed for %s: %s", model_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
@@ -249,14 +261,17 @@ async def chat_completions(request: ChatCompletionRequest):
     tps = completion_tokens / elapsed if elapsed > 0 else 0
     logger.info(
         "Generation complete: %d prompt + %d completion tokens, %.2fs (%.1f tok/s)",
-        prompt_tokens, completion_tokens, elapsed, tps,
+        prompt_tokens,
+        completion_tokens,
+        elapsed,
+        tps,
     )
 
     return ChatCompletionResponse(
         choices=[
             ChatChoice(
                 message=ChatChoiceMessage(content=text),
-                finish_reason="stop",
+                finish_reason=finish_reason,
             )
         ],
         model=model_id,
@@ -270,7 +285,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
 async def _generate_mlx_lm(
     model, tokenizer, messages: list[dict], max_tokens: int, temp: float
-) -> tuple[str, int, int]:
+) -> tuple[str, int, int, str]:
     """Generate text using mlx-lm (text-only LLMs)."""
     from mlx_lm import generate
     from mlx_lm.sample_utils import make_sampler
@@ -295,18 +310,24 @@ async def _generate_mlx_lm(
     text = _strip_thinking(text)
     prompt_tokens = len(tokenizer.encode(prompt))
     completion_tokens = len(tokenizer.encode(text))
-    return text, prompt_tokens, completion_tokens
+    return (
+        text,
+        prompt_tokens,
+        completion_tokens,
+        _infer_finish_reason(text, completion_tokens, max_tokens),
+    )
 
 
 async def _generate_mlx_vlm(
     model, processor, messages: list[dict], max_tokens: int, temp: float
-) -> tuple[str, int, int]:
+) -> tuple[str, int, int, str]:
     """Generate text using mlx-vlm (vision-language models like gemma-4)."""
     from mlx_vlm import generate
     from mlx_vlm.prompt_utils import apply_chat_template
 
-    prompt = apply_chat_template(
-        processor, model.config, messages, enable_thinking=False
+    prompt = cast(
+        str,
+        apply_chat_template(processor, model.config, messages, enable_thinking=False),
     )
 
     result = await asyncio.to_thread(
@@ -319,7 +340,22 @@ async def _generate_mlx_vlm(
         enable_thinking=False,
     )
 
-    return _strip_thinking(result.text), result.prompt_tokens, result.generation_tokens
+    text = _strip_thinking(result.text)
+    return (
+        text,
+        result.prompt_tokens,
+        result.generation_tokens,
+        _infer_finish_reason(text, result.generation_tokens, max_tokens),
+    )
+
+
+def _infer_finish_reason(text: str, completion_tokens: int, max_tokens: int) -> str:
+    """Best-effort OpenAI-style finish reason for MLX backends."""
+    if completion_tokens >= max_tokens:
+        return "length"
+    if not text:
+        return "length"
+    return "stop"
 
 
 def _strip_thinking(text: str) -> str:

@@ -289,19 +289,10 @@ impl App {
             return;
         };
 
-        // Derive max_tokens from the model's context_length (OpenRouter models)
-        // or use a sensible default for local MLX models.
-        let max_tokens: Option<u32> = self
-            .text_models
-            .iter()
-            .find(|m| m.id == model)
-            .and_then(|m| m.context_length)
-            .map(|ctx| (ctx / 2).clamp(1024, 131072) as u32)
-            .or(Some(131072));
-        let sender = self.events.sender();
-
         // Build the prompt: collect up to 8 representative tweets per cluster.
         let num_clusters = result.num_clusters();
+        let max_tokens = Some(cluster_topic_max_tokens(num_clusters));
+        let sender = self.events.sender();
         let mut user_content = String::new();
         for c in 0..num_clusters {
             user_content.push_str(&format!("## Cluster {c}\n"));
@@ -690,6 +681,13 @@ impl App {
             model_id.clone(),
         ))
     }
+}
+
+fn cluster_topic_max_tokens(num_clusters: usize) -> u32 {
+    // Labels are only 3-5 words, but leave room for punctuation, occasional
+    // extra tokens per word, and a little drift before we cut the model off.
+    let per_cluster_budget = (num_clusters as u32).saturating_mul(16);
+    per_cluster_budget.clamp(32, 256)
 }
 
 // ---------------------------------------------------------------------------
