@@ -6,6 +6,11 @@ impl App {
     // -- App event handling -------------------------------------------------
 
     pub(super) fn handle_app_event(&mut self, event: AppEvent) {
+        self.handle_app_event_inner(event);
+        self.check_loading_finished();
+    }
+
+    fn handle_app_event_inner(&mut self, event: AppEvent) {
         match event {
             // Navigation
             AppEvent::Quit => {
@@ -45,6 +50,19 @@ impl App {
             | AppEvent::FetchFollowers { .. }
             | AppEvent::FetchFollowing { .. }) => {
                 self.loading = true;
+                self.mark_loading_started();
+                // Set per-timeline loading flags so UI widgets know to show
+                // skeleton / loading indicators.
+                match evt {
+                    AppEvent::FetchHomeTimeline { .. } => self.home_timeline.loading = true,
+                    AppEvent::FetchMentions { .. } => self.mentions.loading = true,
+                    AppEvent::FetchBookmarks { .. } => self.bookmarks.loading = true,
+                    AppEvent::FetchSearch { .. } => self.search_results.loading = true,
+                    AppEvent::FetchUserTimeline { .. } => {
+                        self.viewed_user_timeline.loading = true;
+                    }
+                    _ => {}
+                }
                 self.dispatch_api_request(evt.clone());
             }
 
@@ -248,6 +266,7 @@ impl App {
             // OpenRouter models
             AppEvent::FetchOpenRouterModels => {
                 self.models_loading = true;
+                self.mark_loading_started();
                 self.dispatch_openrouter_models();
             }
             AppEvent::OpenRouterModelsLoaded(result) => {
@@ -274,6 +293,7 @@ impl App {
             // Embeddings: semantic search re-ranking
             AppEvent::EmbedAndRankSearch { query, tweets } => {
                 self.loading = true;
+                self.mark_loading_started();
                 self.dispatch_embed_and_rank(query, tweets);
             }
             AppEvent::SearchRanked {
@@ -312,6 +332,7 @@ impl App {
                     return;
                 }
                 self.cluster_loading = true;
+                self.mark_loading_started();
                 self.selected_cluster = None;
                 self.push_view(ViewKind::Cluster);
                 self.dispatch_cluster_timeline();
@@ -338,6 +359,7 @@ impl App {
             // Text models (for chat/topic generation)
             AppEvent::FetchTextModels => {
                 self.text_models_loading = true;
+                self.mark_loading_started();
                 self.dispatch_text_models();
             }
             AppEvent::TextModelsLoaded(result) => {
@@ -383,6 +405,7 @@ impl App {
             // HuggingFace Hub models
             AppEvent::FetchHuggingFaceModels => {
                 self.hf_models_loading = true;
+                self.mark_loading_started();
                 self.dispatch_hf_models();
             }
             AppEvent::HuggingFaceModelsLoaded { query, result } => {
