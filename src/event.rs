@@ -151,6 +151,45 @@ pub enum AppEvent {
 /// API result type using `Arc<String>` so errors are `Clone`.
 pub type ApiResult<T> = Result<T, Arc<String>>;
 
+impl AppEvent {
+    /// Convert a `Fetch*` request into its corresponding `*Loaded(Err(..))` response.
+    ///
+    /// Returns `None` for non-`Fetch*` variants. This keeps the Fetch→Loaded
+    /// mapping in one place so callers don't need parallel match blocks.
+    pub fn into_error_response(self, err: Arc<String>) -> Option<AppEvent> {
+        Some(match self {
+            AppEvent::FetchHomeTimeline { .. } => AppEvent::HomeTimelineLoaded(Err(err)),
+            AppEvent::FetchUserTimeline { user_id, .. } => AppEvent::UserTimelineLoaded {
+                user_id,
+                result: Err(err),
+            },
+            AppEvent::FetchTweet { .. } => AppEvent::TweetLoaded(Box::new(Err(err))),
+            AppEvent::FetchThread {
+                conversation_id, ..
+            } => AppEvent::ThreadLoaded {
+                conversation_id,
+                result: Err(err),
+            },
+            AppEvent::FetchUser { .. } => AppEvent::UserLoaded(Err(err)),
+            AppEvent::FetchSearch { query, .. } => AppEvent::SearchLoaded {
+                query,
+                result: Err(err),
+            },
+            AppEvent::FetchMentions { .. } => AppEvent::MentionsLoaded(Err(err)),
+            AppEvent::FetchBookmarks { .. } => AppEvent::BookmarksLoaded(Err(err)),
+            AppEvent::FetchFollowers { user_id, .. } => AppEvent::FollowersLoaded {
+                user_id,
+                result: Err(err),
+            },
+            AppEvent::FetchFollowing { user_id, .. } => AppEvent::FollowingLoaded {
+                user_id,
+                result: Err(err),
+            },
+            _ => return None,
+        })
+    }
+}
+
 /// Identifies a view for the view-stack navigation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ViewKind {

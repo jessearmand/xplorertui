@@ -249,16 +249,16 @@ impl App {
     pub(super) fn dispatch_hf_models(&self) {
         let sender = self.events.sender();
         let search = self.hf_search.clone();
-        let api_query = if search.is_empty() {
-            None
-        } else {
-            Some(search.clone())
-        };
 
         tokio::spawn(async move {
             let client = crate::huggingface::client::HfHubClient::new();
+            let api_query = if search.is_empty() {
+                None
+            } else {
+                Some(search.as_str())
+            };
             let result = client
-                .search_mlx_models(api_query.as_deref(), 50)
+                .search_mlx_models(api_query, 50)
                 .await
                 .map_err(|e| Arc::new(e.to_string()));
             let _ = sender.send(Event::App(Box::new(AppEvent::HuggingFaceModelsLoaded {
@@ -423,7 +423,12 @@ impl App {
 
     pub(super) fn dispatch_api_request(&self, event: AppEvent) {
         let Some(ref client) = self.api_client else {
-            // No API client configured -- nothing to dispatch.
+            // No API client -- emit the matching *Loaded(Err) so loading
+            // flags get cleared through the normal response path.
+            let err: Arc<String> = Arc::new("No API client configured. Use :auth first.".into());
+            if let Some(response) = event.into_error_response(err) {
+                self.events.send(response);
+            }
             return;
         };
         let client = Arc::clone(client);
@@ -431,14 +436,23 @@ impl App {
         let max_results = self.config.default_max_results;
 
         tokio::spawn(async move {
+            /// Map an API result to an `AppEvent` and send it through the channel.
+            fn send_result<T: Send + 'static>(
+                sender: &tokio::sync::mpsc::UnboundedSender<Event>,
+                result: Result<T, impl std::fmt::Display>,
+                wrap: impl FnOnce(ApiResult<T>) -> AppEvent,
+            ) {
+                let mapped = result.map_err(|e| Arc::new(e.to_string()));
+                let _ = sender.send(Event::App(Box::new(wrap(mapped))));
+            }
+
             match event {
                 AppEvent::FetchHomeTimeline { pagination_token } => {
                     let mut api = client.lock().await;
                     let result = api
                         .get_home_timeline(max_results, pagination_token.as_deref())
                         .await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::HomeTimelineLoaded(mapped))));
+                    send_result(&sender, result, AppEvent::HomeTimelineLoaded);
                 }
                 AppEvent::FetchUserTimeline {
                     user_id,
@@ -448,19 +462,15 @@ impl App {
                     let result = api
                         .get_timeline(&user_id, max_results, pagination_token.as_deref())
                         .await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::UserTimelineLoaded {
+                    send_result(&sender, result, |r| AppEvent::UserTimelineLoaded {
                         user_id,
-                        result: mapped,
-                    })));
+                        result: r,
+                    });
                 }
                 AppEvent::FetchTweet { tweet_id } => {
                     let api = client.lock().await;
                     let result = api.get_tweet(&tweet_id).await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::TweetLoaded(Box::new(
-                        mapped,
-                    )))));
+                    send_result(&sender, result, |r| AppEvent::TweetLoaded(Box::new(r)));
                 }
                 AppEvent::FetchThread {
                     conversation_id,
@@ -474,17 +484,15 @@ impl App {
                             pagination_token.as_deref(),
                         )
                         .await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::ThreadLoaded {
+                    send_result(&sender, result, |r| AppEvent::ThreadLoaded {
                         conversation_id,
-                        result: mapped,
-                    })));
+                        result: r,
+                    });
                 }
                 AppEvent::FetchUser { username } => {
                     let api = client.lock().await;
                     let result = api.get_user(&username).await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::UserLoaded(mapped))));
+                    send_result(&sender, result, AppEvent::UserLoaded);
                 }
                 AppEvent::FetchSearch {
                     query,
@@ -494,27 +502,24 @@ impl App {
                     let result = api
                         .search_tweets(&query, max_results, pagination_token.as_deref())
                         .await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::SearchLoaded {
+                    send_result(&sender, result, |r| AppEvent::SearchLoaded {
                         query,
-                        result: mapped,
-                    })));
+                        result: r,
+                    });
                 }
                 AppEvent::FetchMentions { pagination_token } => {
                     let mut api = client.lock().await;
                     let result = api
                         .get_mentions(max_results, pagination_token.as_deref())
                         .await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::MentionsLoaded(mapped))));
+                    send_result(&sender, result, AppEvent::MentionsLoaded);
                 }
                 AppEvent::FetchBookmarks { pagination_token } => {
                     let mut api = client.lock().await;
                     let result = api
                         .get_bookmarks(max_results, pagination_token.as_deref())
                         .await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::BookmarksLoaded(mapped))));
+                    send_result(&sender, result, AppEvent::BookmarksLoaded);
                 }
                 AppEvent::FetchFollowers {
                     user_id,
@@ -524,11 +529,10 @@ impl App {
                     let result = api
                         .get_followers(&user_id, max_results, pagination_token.as_deref())
                         .await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::FollowersLoaded {
+                    send_result(&sender, result, |r| AppEvent::FollowersLoaded {
                         user_id,
-                        result: mapped,
-                    })));
+                        result: r,
+                    });
                 }
                 AppEvent::FetchFollowing {
                     user_id,
@@ -538,15 +542,12 @@ impl App {
                     let result = api
                         .get_following(&user_id, max_results, pagination_token.as_deref())
                         .await;
-                    let mapped: ApiResult<_> = result.map_err(|e| Arc::new(e.to_string()));
-                    let _ = sender.send(Event::App(Box::new(AppEvent::FollowingLoaded {
+                    send_result(&sender, result, |r| AppEvent::FollowingLoaded {
                         user_id,
-                        result: mapped,
-                    })));
+                        result: r,
+                    });
                 }
-                _ => {
-                    // Not an API request event -- ignore.
-                }
+                _ => unreachable!("dispatch_api_request called with non-Fetch variant"),
             }
         });
     }
@@ -589,10 +590,6 @@ impl App {
         self.users_cache.get(user_id)
     }
 
-    /// Resolve which embedding provider to use.
-    ///
-    /// Priority: MLX server (if configured) > OpenRouter (if authenticated
-    /// and a model is selected).  Returns `None` if neither is available.
     /// Returns `true` if any embedding provider (MLX or OpenRouter) is available.
     pub(super) fn has_embed_provider(&self) -> bool {
         self.resolve_embed_provider().is_some()
