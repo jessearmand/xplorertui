@@ -59,6 +59,9 @@ linfa-reduction = "0.8"
 
 # Plotting
 kuva = "0.1"
+
+# Skeleton loading animations
+tui-skeleton = "0.3"
 ansi-to-tui = "8"
 urlencoding = "2.1.3"
 
