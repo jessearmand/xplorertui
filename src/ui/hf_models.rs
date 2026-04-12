@@ -90,15 +90,22 @@ impl Widget for HfModelsView<'_> {
                 let quant = model.quant_tag().unwrap_or("fp");
                 let pipeline = model.pipeline_tag.as_deref().unwrap_or("");
                 let downloads = format_downloads(model.downloads);
+                let name_style = if model.is_discouraged_for_cluster_labels() {
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD)
+                };
+                let warning = if model.is_discouraged_for_cluster_labels() {
+                    "  topic-labeling: use -it"
+                } else {
+                    ""
+                };
 
                 items.push(ListItem::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
-                    Span::styled(
-                        model.short_name(),
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    ),
+                    Span::styled(model.short_name(), name_style),
                     Span::styled(format!("  [{quant}]"), Style::default().fg(Color::Yellow)),
                     Span::styled(
                         format!("  {pipeline}"),
@@ -108,6 +115,7 @@ impl Widget for HfModelsView<'_> {
                         format!("  ⬇ {downloads}"),
                         Style::default().fg(Color::DarkGray),
                     ),
+                    Span::styled(warning, Style::default().fg(Color::Red)),
                 ])));
             }
 

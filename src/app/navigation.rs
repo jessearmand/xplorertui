@@ -227,6 +227,14 @@ impl App {
                         ));
                         return;
                     }
+                    if model.is_discouraged_for_cluster_labels() {
+                        self.set_error(format!(
+                            "Model {} is a Gemma 4 base checkpoint. For cluster topic labeling, \
+                             select an instruction-tuned Gemma 4 `-it` variant instead.",
+                            model.id
+                        ));
+                        return;
+                    }
                     let model_id = model.id.clone();
                     self.config.mlx_chat_model = Some(model_id.clone());
                     self.status_message = Some(format!("MLX chat model set to: {model_id}"));

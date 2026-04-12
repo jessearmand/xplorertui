@@ -15,12 +15,12 @@ pub fn extract_provider(model_id: &str) -> &str {
 ///
 /// Handles multiple formats used by different model families:
 /// - `<think>...</think>` (Qwen, DeepSeek)
-/// - `<channel|>...<|channel>` (Gemma 4)
+/// - `<channel|>...<|channel>` and `<|channel>...<channel|>` (Gemma 4)
 ///
 /// Handles missing close tags gracefully by truncating at the open tag.
 pub fn strip_think_tags(text: &str) -> String {
     let mut result = strip_tag_pair(text, "<think>", "</think>");
-    result = strip_tag_pair(&result, "<channel|>", "<|channel>");
+    result = strip_gemma_channel_tags(&result);
     result
 }
 
@@ -43,6 +43,36 @@ fn strip_tag_pair(text: &str, open: &str, close: &str) -> String {
             return result;
         }
     }
+    result.push_str(rest);
+    result
+}
+
+fn strip_gemma_channel_tags(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut rest = text;
+
+    loop {
+        let normal = rest.find("<channel|>");
+        let reversed = rest.find("<|channel>");
+
+        let (start, open, close) = match (normal, reversed) {
+            (Some(a), Some(b)) if a <= b => (a, "<channel|>", "<|channel>"),
+            (Some(_), Some(b)) => (b, "<|channel>", "<channel|>"),
+            (Some(a), None) => (a, "<channel|>", "<|channel>"),
+            (None, Some(b)) => (b, "<|channel>", "<channel|>"),
+            (None, None) => break,
+        };
+
+        result.push_str(&rest[..start]);
+        rest = &rest[start + open.len()..];
+
+        if let Some(end) = rest.find(close) {
+            rest = &rest[end + close.len()..];
+        } else {
+            return result;
+        }
+    }
+
     result.push_str(rest);
     result
 }

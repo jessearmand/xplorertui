@@ -363,7 +363,7 @@ def _strip_thinking(text: str) -> str:
 
     Handles multiple formats:
     - <think>...</think> (Qwen, DeepSeek)
-    - <channel|>...<|channel> (Gemma 4)
+    - <channel|>...<|channel> and <|channel>...<channel|> (Gemma 4)
     """
     import re
 
@@ -372,11 +372,37 @@ def _strip_thinking(text: str) -> str:
     # Unclosed <think> at the start — strip everything from <think> onward
     if "<think>" in text:
         text = text[: text.index("<think>")]
-    # <channel|>...<|channel> (Gemma 4 thinking format)
-    text = re.sub(r"<channel\|>.*?<\|channel>", "", text, flags=re.DOTALL)
-    if "<channel|>" in text:
-        text = text[: text.index("<channel|>")]
+    text = _strip_gemma_channel_blocks(text)
     return text.strip()
+
+
+def _strip_gemma_channel_blocks(text: str) -> str:
+    """Strip Gemma 4 reasoning blocks in either channel-token order."""
+    result: list[str] = []
+    rest = text
+
+    while True:
+        normal = rest.find("<channel|>")
+        reversed_ = rest.find("<|channel>")
+
+        if normal == -1 and reversed_ == -1:
+            break
+
+        if normal != -1 and (reversed_ == -1 or normal <= reversed_):
+            start, open_tag, close_tag = normal, "<channel|>", "<|channel>"
+        else:
+            start, open_tag, close_tag = reversed_, "<|channel>", "<channel|>"
+
+        result.append(rest[:start])
+        rest = rest[start + len(open_tag) :]
+
+        end = rest.find(close_tag)
+        if end == -1:
+            return "".join(result)
+        rest = rest[end + len(close_tag) :]
+
+    result.append(rest)
+    return "".join(result)
 
 
 @app.get("/health")

@@ -432,6 +432,12 @@ mod tests {
     }
 
     #[test]
+    fn strip_think_tags_handles_gemma_channel_variants() {
+        let input = "<|channel>reasoning<channel|>\nAnswer";
+        assert_eq!(openrouter::strip_think_tags(input), "\nAnswer");
+    }
+
+    #[test]
     fn extract_provider_splits_correctly() {
         assert_eq!(openrouter::extract_provider("openai/gpt-4o"), "openai");
         assert_eq!(
