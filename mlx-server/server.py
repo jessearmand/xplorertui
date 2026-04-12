@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import cast
+from typing import Any, cast
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -49,6 +49,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("mlx-server")
+_OPTIQ_ATTENTION_PATCHED = False
 
 registry = ModelRegistry(default_model=DEFAULT_MODEL)
 
@@ -245,7 +246,14 @@ async def chat_completions(request: ChatCompletionRequest):
                 prompt_tokens,
                 completion_tokens,
                 finish_reason,
-            ) = await _generate_mlx_lm(model, tokenizer, messages, max_tokens, temp)
+            ) = await _generate_mlx_lm(
+                model,
+                tokenizer,
+                messages,
+                max_tokens,
+                temp,
+                model_id,
+            )
         else:
             (
                 text,
@@ -284,7 +292,12 @@ async def chat_completions(request: ChatCompletionRequest):
 
 
 async def _generate_mlx_lm(
-    model, tokenizer, messages: list[dict], max_tokens: int, temp: float
+    model,
+    tokenizer,
+    messages: list[dict],
+    max_tokens: int,
+    temp: float,
+    model_id: str,
 ) -> tuple[str, int, int, str]:
     """Generate text using mlx-lm (text-only LLMs)."""
     from mlx_lm import generate
@@ -297,14 +310,21 @@ async def _generate_mlx_lm(
         enable_thinking=False,
     )
     sampler = make_sampler(temp=temp)
+    generate_kwargs = {
+        "prompt": prompt,
+        "max_tokens": max_tokens,
+        "sampler": sampler,
+    }
+    prompt_cache = _maybe_build_optiq_prompt_cache(model, model_id)
+    if prompt_cache is not None:
+        generate_kwargs["prompt_cache"] = prompt_cache
 
+    generate_fn = cast(Any, generate)
     text = await asyncio.to_thread(
-        generate,
+        generate_fn,
         model,
         tokenizer,
-        prompt=prompt,
-        max_tokens=max_tokens,
-        sampler=sampler,
+        **generate_kwargs,
     )
 
     text = _strip_thinking(text)
@@ -356,6 +376,72 @@ def _infer_finish_reason(text: str, completion_tokens: int, max_tokens: int) -> 
     if not text:
         return "length"
     return "stop"
+
+
+def _maybe_build_optiq_prompt_cache(model, model_id: str):
+    """Create a TurboQuant prompt cache for OptiQ mlx-lm models when possible."""
+    if "optiq" not in model_id.lower():
+        return None
+
+    try:
+        from optiq.core.turbo_kv_cache import TurboQuantKVCache, patch_attention
+    except ImportError:
+        logger.warning(
+            "OptiQ model %s selected but mlx-optiq is unavailable; using standard cache",
+            model_id,
+        )
+        return None
+
+    try:
+        global _OPTIQ_ATTENTION_PATCHED
+        if not _OPTIQ_ATTENTION_PATCHED:
+            patch_attention()
+            _OPTIQ_ATTENTION_PATCHED = True
+
+        cache = model.make_cache()
+        patched_layers = 0
+        for i, layer in enumerate(_iter_attention_layers(model)):
+            attn = getattr(layer, "self_attn", None)
+            head_dim = getattr(attn, "head_dim", None)
+            if head_dim is None:
+                continue
+            cache[i] = TurboQuantKVCache(head_dim=head_dim, bits=4, seed=42 + i)
+            patched_layers += 1
+
+        if patched_layers == 0:
+            logger.warning(
+                "OptiQ model %s exposed no self-attention layers for TurboQuant cache",
+                model_id,
+            )
+            return None
+
+        logger.info(
+            "Enabled mlx-optiq TurboQuant cache for %s across %d layers",
+            model_id,
+            patched_layers,
+        )
+        return cache
+    except Exception:
+        logger.warning(
+            "Failed to enable mlx-optiq cache for %s; falling back to standard cache",
+            model_id,
+            exc_info=True,
+        )
+        return None
+
+
+def _iter_attention_layers(model):
+    """Return the model layer sequence used to build prompt caches."""
+    direct_layers = getattr(model, "layers", None)
+    if direct_layers is not None:
+        return direct_layers
+
+    nested_model = getattr(model, "model", None)
+    nested_layers = getattr(nested_model, "layers", None)
+    if nested_layers is not None:
+        return nested_layers
+
+    return []
 
 
 def _strip_thinking(text: str) -> str:

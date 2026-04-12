@@ -227,6 +227,16 @@ impl App {
                         ));
                         return;
                     }
+                    if model.is_unsupported_for_cluster_labels() {
+                        self.set_error(format!(
+                            "Model {} is a Gemma 4 OptiQ checkpoint. Gemma 4 support exists in \
+                             newer mlx-lm releases, but upstream quantized Gemma 4 behavior is \
+                             still unstable, so this family remains blocked here. Choose a \
+                             standard Gemma 4 `-it` variant instead.",
+                            model.id
+                        ));
+                        return;
+                    }
                     if model.is_discouraged_for_cluster_labels() {
                         self.set_error(format!(
                             "Model {} is a Gemma 4 base checkpoint. For cluster topic labeling, \
