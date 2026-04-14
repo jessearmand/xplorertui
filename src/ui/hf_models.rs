@@ -90,18 +90,14 @@ impl Widget for HfModelsView<'_> {
                 let quant = model.quant_tag().unwrap_or("fp");
                 let pipeline = model.pipeline_tag.as_deref().unwrap_or("");
                 let downloads = format_downloads(model.downloads);
-                let name_style = if model.is_unsupported_for_cluster_labels()
-                    || model.is_discouraged_for_cluster_labels()
-                {
+                let name_style = if model.is_discouraged_for_cluster_labels() {
                     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
                 } else {
                     Style::default()
                         .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD)
                 };
-                let warning = if model.is_unsupported_for_cluster_labels() {
-                    "  topic-labeling: gemma-4 OptiQ unsupported"
-                } else if model.is_discouraged_for_cluster_labels() {
+                let warning = if model.is_discouraged_for_cluster_labels() {
                     "  topic-labeling: use -it"
                 } else {
                     ""

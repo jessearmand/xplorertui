@@ -334,7 +334,7 @@ async def _generate_mlx_lm(
         text,
         prompt_tokens,
         completion_tokens,
-        _infer_finish_reason(text, completion_tokens, max_tokens),
+        _infer_finish_reason(completion_tokens, max_tokens),
     )
 
 
@@ -365,15 +365,13 @@ async def _generate_mlx_vlm(
         text,
         result.prompt_tokens,
         result.generation_tokens,
-        _infer_finish_reason(text, result.generation_tokens, max_tokens),
+        _infer_finish_reason(result.generation_tokens, max_tokens),
     )
 
 
-def _infer_finish_reason(text: str, completion_tokens: int, max_tokens: int) -> str:
+def _infer_finish_reason(completion_tokens: int, max_tokens: int) -> str:
     """Best-effort OpenAI-style finish reason for MLX backends."""
     if completion_tokens >= max_tokens:
-        return "length"
-    if not text:
         return "length"
     return "stop"
 
