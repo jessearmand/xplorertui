@@ -67,14 +67,17 @@ class ModelRegistry:
                 from mlx_lm import load
 
                 logger.info("Trying mlx_lm for: %s", model_id)
-                model, tokenizer = load(model_id, lazy=True)
+                loaded = load(model_id, lazy=True)
+                model = loaded[0]
+                tokenizer = loaded[1]
                 self._chat_models[model_id] = (ChatBackend.MLX_LM, model, tokenizer)
                 logger.info("Loaded %s via mlx_lm", model_id)
             except (ValueError, KeyError) as exc:
                 # Architecture not supported by mlx_lm — try mlx_vlm
                 logger.info(
                     "mlx_lm unsupported for %s (%s), falling back to mlx_vlm",
-                    model_id, exc,
+                    model_id,
+                    exc,
                 )
                 from mlx_vlm import load
 

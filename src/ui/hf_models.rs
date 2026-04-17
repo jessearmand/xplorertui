@@ -5,6 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, StatefulWidget, Widget};
 
 use crate::app::App;
+use crate::ui::skeleton::render_models_skeleton;
 
 /// View for browsing HuggingFace Hub models, grouped by organization.
 pub struct HfModelsView<'a> {
@@ -19,6 +20,13 @@ impl<'a> HfModelsView<'a> {
 
 impl Widget for HfModelsView<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        // Show skeleton immediately when loading (network-bound, always slow).
+        if self.app.hf_models_loading {
+            let elapsed_ms = self.app.skeleton_elapsed_ms_immediate();
+            render_models_skeleton(elapsed_ms, "HuggingFace MLX Models (loading...)", area, buf);
+            return;
+        }
+
         let filtered = self.app.filtered_hf_models();
 
         // Build title with filter/search hints
@@ -32,14 +40,10 @@ impl Widget for HfModelsView<'_> {
             format!(" search:\"{}\"", self.app.hf_search)
         };
 
-        let title = if self.app.hf_models_loading {
-            format!(" HuggingFace MLX Models (loading...){filter_hint}{search_hint} ")
-        } else {
-            format!(
-                " HuggingFace MLX Models ({}){filter_hint}{search_hint} [/]search [f]ilter ",
-                filtered.len()
-            )
-        };
+        let title = format!(
+            " HuggingFace MLX Models ({}){filter_hint}{search_hint} [/]search [f]ilter ",
+            filtered.len()
+        );
 
         let block = Block::default().title(title).borders(Borders::ALL);
         let inner = block.inner(area);
@@ -86,15 +90,22 @@ impl Widget for HfModelsView<'_> {
                 let quant = model.quant_tag().unwrap_or("fp");
                 let pipeline = model.pipeline_tag.as_deref().unwrap_or("");
                 let downloads = format_downloads(model.downloads);
+                let name_style = if model.is_discouraged_for_cluster_labels() {
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD)
+                };
+                let warning = if model.is_discouraged_for_cluster_labels() {
+                    "  topic-labeling: use -it"
+                } else {
+                    ""
+                };
 
                 items.push(ListItem::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
-                    Span::styled(
-                        model.short_name(),
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
-                    ),
+                    Span::styled(model.short_name(), name_style),
                     Span::styled(format!("  [{quant}]"), Style::default().fg(Color::Yellow)),
                     Span::styled(
                         format!("  {pipeline}"),
@@ -104,6 +115,7 @@ impl Widget for HfModelsView<'_> {
                         format!("  ⬇ {downloads}"),
                         Style::default().fg(Color::DarkGray),
                     ),
+                    Span::styled(warning, Style::default().fg(Color::Red)),
                 ])));
             }
 

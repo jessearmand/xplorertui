@@ -37,6 +37,19 @@ impl HfModel {
         )
     }
 
+    /// Gemma 4 base checkpoints are poor fits for the app's chat-style
+    /// cluster labeling flow; prefer instruction-tuned (`-it`) variants.
+    pub fn is_gemma4_base_model(&self) -> bool {
+        let short = self.short_name().to_ascii_lowercase();
+        short.starts_with("gemma-4-") && !short.contains("-it")
+    }
+
+    /// Whether this model should be blocked in the HF picker for cluster topic
+    /// labeling because it is likely to ignore the chat-style labeling prompt.
+    pub fn is_discouraged_for_cluster_labels(&self) -> bool {
+        self.is_gemma4_base_model()
+    }
+
     /// Extract the provider/org from the model ID (e.g. "mlx-community").
     pub fn org(&self) -> &str {
         self.id.split('/').next().unwrap_or(&self.id)

@@ -7,6 +7,7 @@ pub mod hf_models;
 pub mod input;
 pub mod models;
 pub mod search;
+pub mod skeleton;
 pub mod status_bar;
 pub mod thread;
 pub mod timeline;

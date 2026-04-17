@@ -10,6 +10,7 @@ use crate::app::App;
 use crate::event::ViewKind;
 use crate::openrouter::extract_provider;
 use crate::ui::input::TextInput;
+use crate::ui::skeleton::render_models_skeleton;
 
 /// Model selection list view for OpenRouter models (embedding or text),
 /// grouped by provider with an optional filter popup.
@@ -141,10 +142,10 @@ impl Widget for ModelsView<'_> {
         };
 
         if loading {
-            let block = Block::default()
-                .title(format!(" {kind} (loading...) "))
-                .borders(Borders::ALL);
-            block.render(area, buf);
+            // Model fetches are always network-bound — show skeleton immediately.
+            let elapsed_ms = self.app.skeleton_elapsed_ms_immediate();
+            let title = format!("{kind} (loading...)");
+            render_models_skeleton(elapsed_ms, &title, area, buf);
             return;
         }
 

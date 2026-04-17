@@ -7,6 +7,7 @@ mod navigation;
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::Mutex;
 
 use ratatui::DefaultTerminal;
@@ -157,6 +158,13 @@ pub struct App {
     pub status_message: Option<String>,
     pub error_detail: Option<String>,
     pub loading: bool,
+
+    // Skeleton loading animation
+    /// App-creation timestamp used to compute `elapsed_ms` for skeleton widgets.
+    pub epoch: Instant,
+    /// When any loading operation started. Skeleton animations only render after
+    /// a debounce threshold (200ms) to avoid flicker on fast responses.
+    pub loading_started_at: Option<Instant>,
 }
 
 impl App {
@@ -241,6 +249,57 @@ impl App {
             status_message: None,
             error_detail: None,
             loading: false,
+            epoch: Instant::now(),
+            loading_started_at: None,
+        }
+    }
+
+    /// Returns `Some(elapsed_ms)` for skeleton animation if any loading has been
+    /// active for longer than the debounce threshold (200ms). Returns `None` if
+    /// nothing is loading or loading just started (no skeleton should render yet).
+    ///
+    /// Use this for network fetches where fast responses shouldn't flicker.
+    pub fn skeleton_elapsed_ms(&self) -> Option<u64> {
+        const DEBOUNCE_MS: u128 = 200;
+        let started = self.loading_started_at?;
+        if started.elapsed().as_millis() < DEBOUNCE_MS {
+            return None;
+        }
+        Some(self.epoch.elapsed().as_millis() as u64)
+    }
+
+    /// Returns `elapsed_ms` for skeleton animation without debounce.
+    ///
+    /// Use this for operations known to be slow (clustering, model loading)
+    /// where the skeleton should appear immediately.
+    pub fn skeleton_elapsed_ms_immediate(&self) -> u64 {
+        self.epoch.elapsed().as_millis() as u64
+    }
+
+    /// Mark that a loading operation has started. Only records the timestamp
+    /// on the first call; subsequent calls while already loading are no-ops.
+    pub fn mark_loading_started(&mut self) {
+        if self.loading_started_at.is_none() {
+            self.loading_started_at = Some(Instant::now());
+        }
+    }
+
+    /// Check whether any loading flag is still active and clear
+    /// `loading_started_at` if everything has finished.
+    pub fn check_loading_finished(&mut self) {
+        let any_loading = self.loading
+            || self.home_timeline.loading
+            || self.mentions.loading
+            || self.bookmarks.loading
+            || self.search_results.loading
+            || self.viewed_user_timeline.loading
+            || self.cluster_loading
+            || self.cluster_topics_loading
+            || self.models_loading
+            || self.text_models_loading
+            || self.hf_models_loading;
+        if !any_loading {
+            self.loading_started_at = None;
         }
     }
 
@@ -370,6 +429,12 @@ mod tests {
     fn strip_think_tags_multiple() {
         let input = "<think>first</think>middle<think>second</think>end";
         assert_eq!(openrouter::strip_think_tags(input), "middleend");
+    }
+
+    #[test]
+    fn strip_think_tags_handles_gemma_channel_variants() {
+        let input = "<|channel>reasoning<channel|>\nAnswer";
+        assert_eq!(openrouter::strip_think_tags(input), "\nAnswer");
     }
 
     #[test]

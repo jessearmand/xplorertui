@@ -5,6 +5,7 @@ use ratatui::widgets::{Block, Borders, Widget};
 
 use crate::api::types::Tweet;
 use crate::app::App;
+use crate::ui::skeleton::render_timeline_skeleton;
 use crate::ui::tweet::{TweetCard, tweet_card_height};
 
 /// A scrollable list of tweets with selection highlight.
@@ -51,15 +52,26 @@ impl Widget for TimelineView<'_> {
         block.render(area, buf);
 
         if self.tweets.is_empty() {
-            let msg = if self.loading {
-                "Loading..."
-            } else {
-                "No tweets to display"
-            };
+            if self.loading {
+                // Show animated skeleton once debounce threshold (200ms) passes.
+                // During the debounce window, show simple "Loading..." text so
+                // the user always sees feedback — even on fast responses.
+                if let Some(elapsed_ms) = self.app.skeleton_elapsed_ms() {
+                    render_timeline_skeleton(elapsed_ms, self.title, area, buf);
+                } else {
+                    buf.set_string(
+                        inner.x + 1,
+                        inner.y,
+                        "Loading...",
+                        Style::default().fg(Color::DarkGray),
+                    );
+                }
+                return;
+            }
             buf.set_string(
                 inner.x + 1,
                 inner.y,
-                msg,
+                "No tweets to display",
                 Style::default().fg(Color::DarkGray),
             );
             return;

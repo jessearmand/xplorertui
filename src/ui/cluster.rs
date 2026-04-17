@@ -4,11 +4,12 @@ use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
-    Block, Borders, Clear, List, ListItem, ListState, Paragraph, StatefulWidget, Widget, Wrap,
+    Block, Borders, List, ListItem, ListState, Paragraph, StatefulWidget, Widget, Wrap,
 };
 
 use crate::app::App;
 use crate::embeddings::cluster::ClusterResult;
+use crate::ui::skeleton::render_cluster_skeleton;
 
 // Bright colors chosen for visibility on dark terminal backgrounds.
 // Each entry is (hex for kuva, ratatui Color) so both renderers stay in sync.
@@ -66,36 +67,6 @@ impl<'a> ClusterView<'a> {
 
         let scene = render_multiple(plots, layout);
         TerminalBackend::new(cols, rows).render_scene(&scene)
-    }
-
-    fn render_loading_popup(area: Rect, buf: &mut Buffer) {
-        let width = 40u16.min(area.width.saturating_sub(4));
-        let height = 5u16.min(area.height.saturating_sub(2));
-        let x = area.x + (area.width.saturating_sub(width)) / 2;
-        let y = area.y + (area.height.saturating_sub(height)) / 2;
-        let popup = Rect::new(x, y, width, height);
-
-        Clear.render(popup, buf);
-
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Computing Clusters ")
-            .title_style(
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .border_style(Style::default().fg(Color::Cyan));
-
-        let inner = block.inner(popup);
-        block.render(popup, buf);
-
-        let text = Paragraph::new(Line::from(vec![Span::styled(
-            "Embedding tweets and clustering...",
-            Style::default().fg(Color::Yellow),
-        )]))
-        .centered();
-        text.render(inner, buf);
     }
 
     /// Render cluster list mode: scatter plot on top, selectable cluster list on bottom.
@@ -255,7 +226,9 @@ impl Widget for ClusterView<'_> {
                 .title(" Topic Clusters ")
                 .borders(Borders::ALL);
             block.render(area, buf);
-            Self::render_loading_popup(area, buf);
+            // Clustering is always slow — show skeleton immediately (no debounce).
+            let elapsed_ms = self.app.skeleton_elapsed_ms_immediate();
+            render_cluster_skeleton(elapsed_ms, area, buf);
             return;
         }
 

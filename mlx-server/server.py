@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import cast
+from typing import Any, cast
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -49,6 +49,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("mlx-server")
+_OPTIQ_ATTENTION_PATCHED = False
 
 registry = ModelRegistry(default_model=DEFAULT_MODEL)
 
@@ -125,7 +126,9 @@ async def create_embeddings(request: EmbeddingRequest):
         elapsed = time.perf_counter() - t0
         logger.info(
             "Embedding complete: %d texts, %.2fs, model=%s",
-            len(request.input), elapsed, model_id,
+            len(request.input),
+            elapsed,
+            model_id,
         )
     except Exception as e:
         logger.error("Embedding failed for model %s: %s", model_id, e)
@@ -228,19 +231,36 @@ async def chat_completions(request: ChatCompletionRequest):
 
     logger.info(
         "Generating: model=%s, backend=%s, messages=%d, max_tokens=%d, temp=%.2f",
-        model_id, backend.value, len(messages), max_tokens, temp,
+        model_id,
+        backend.value,
+        len(messages),
+        max_tokens,
+        temp,
     )
     t0 = time.perf_counter()
 
     try:
         if backend == ChatBackend.MLX_LM:
-            text, prompt_tokens, completion_tokens = await _generate_mlx_lm(
-                model, tokenizer, messages, max_tokens, temp
+            (
+                text,
+                prompt_tokens,
+                completion_tokens,
+                finish_reason,
+            ) = await _generate_mlx_lm(
+                model,
+                tokenizer,
+                messages,
+                max_tokens,
+                temp,
+                model_id,
             )
         else:
-            text, prompt_tokens, completion_tokens = await _generate_mlx_vlm(
-                model, tokenizer, messages, max_tokens, temp
-            )
+            (
+                text,
+                prompt_tokens,
+                completion_tokens,
+                finish_reason,
+            ) = await _generate_mlx_vlm(model, tokenizer, messages, max_tokens, temp)
     except Exception as e:
         logger.error("Generation failed for %s: %s", model_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
@@ -249,14 +269,17 @@ async def chat_completions(request: ChatCompletionRequest):
     tps = completion_tokens / elapsed if elapsed > 0 else 0
     logger.info(
         "Generation complete: %d prompt + %d completion tokens, %.2fs (%.1f tok/s)",
-        prompt_tokens, completion_tokens, elapsed, tps,
+        prompt_tokens,
+        completion_tokens,
+        elapsed,
+        tps,
     )
 
     return ChatCompletionResponse(
         choices=[
             ChatChoice(
                 message=ChatChoiceMessage(content=text),
-                finish_reason="stop",
+                finish_reason=finish_reason,
             )
         ],
         model=model_id,
@@ -269,8 +292,13 @@ async def chat_completions(request: ChatCompletionRequest):
 
 
 async def _generate_mlx_lm(
-    model, tokenizer, messages: list[dict], max_tokens: int, temp: float
-) -> tuple[str, int, int]:
+    model,
+    tokenizer,
+    messages: list[dict],
+    max_tokens: int,
+    temp: float,
+    model_id: str,
+) -> tuple[str, int, int, str]:
     """Generate text using mlx-lm (text-only LLMs)."""
     from mlx_lm import generate
     from mlx_lm.sample_utils import make_sampler
@@ -282,31 +310,44 @@ async def _generate_mlx_lm(
         enable_thinking=False,
     )
     sampler = make_sampler(temp=temp)
+    generate_kwargs = {
+        "prompt": prompt,
+        "max_tokens": max_tokens,
+        "sampler": sampler,
+    }
+    prompt_cache = _maybe_build_optiq_prompt_cache(model, model_id)
+    if prompt_cache is not None:
+        generate_kwargs["prompt_cache"] = prompt_cache
 
+    generate_fn = cast(Any, generate)
     text = await asyncio.to_thread(
-        generate,
+        generate_fn,
         model,
         tokenizer,
-        prompt=prompt,
-        max_tokens=max_tokens,
-        sampler=sampler,
+        **generate_kwargs,
     )
 
     text = _strip_thinking(text)
     prompt_tokens = len(tokenizer.encode(prompt))
     completion_tokens = len(tokenizer.encode(text))
-    return text, prompt_tokens, completion_tokens
+    return (
+        text,
+        prompt_tokens,
+        completion_tokens,
+        _infer_finish_reason(completion_tokens, max_tokens),
+    )
 
 
 async def _generate_mlx_vlm(
     model, processor, messages: list[dict], max_tokens: int, temp: float
-) -> tuple[str, int, int]:
+) -> tuple[str, int, int, str]:
     """Generate text using mlx-vlm (vision-language models like gemma-4)."""
     from mlx_vlm import generate
     from mlx_vlm.prompt_utils import apply_chat_template
 
-    prompt = apply_chat_template(
-        processor, model.config, messages, enable_thinking=False
+    prompt = cast(
+        str,
+        apply_chat_template(processor, model.config, messages, enable_thinking=False),
     )
 
     result = await asyncio.to_thread(
@@ -319,7 +360,86 @@ async def _generate_mlx_vlm(
         enable_thinking=False,
     )
 
-    return _strip_thinking(result.text), result.prompt_tokens, result.generation_tokens
+    text = _strip_thinking(result.text)
+    return (
+        text,
+        result.prompt_tokens,
+        result.generation_tokens,
+        _infer_finish_reason(result.generation_tokens, max_tokens),
+    )
+
+
+def _infer_finish_reason(completion_tokens: int, max_tokens: int) -> str:
+    """Best-effort OpenAI-style finish reason for MLX backends."""
+    if completion_tokens >= max_tokens:
+        return "length"
+    return "stop"
+
+
+def _maybe_build_optiq_prompt_cache(model, model_id: str):
+    """Create a TurboQuant prompt cache for OptiQ mlx-lm models when possible."""
+    if "optiq" not in model_id.lower():
+        return None
+
+    try:
+        from optiq.core.turbo_kv_cache import TurboQuantKVCache, patch_attention
+    except ImportError:
+        logger.warning(
+            "OptiQ model %s selected but mlx-optiq is unavailable; using standard cache",
+            model_id,
+        )
+        return None
+
+    try:
+        global _OPTIQ_ATTENTION_PATCHED
+        if not _OPTIQ_ATTENTION_PATCHED:
+            patch_attention()
+            _OPTIQ_ATTENTION_PATCHED = True
+
+        cache = model.make_cache()
+        patched_layers = 0
+        for i, layer in enumerate(_iter_attention_layers(model)):
+            attn = getattr(layer, "self_attn", None)
+            head_dim = getattr(attn, "head_dim", None)
+            if head_dim is None:
+                continue
+            cache[i] = TurboQuantKVCache(head_dim=head_dim, bits=4, seed=42 + i)
+            patched_layers += 1
+
+        if patched_layers == 0:
+            logger.warning(
+                "OptiQ model %s exposed no self-attention layers for TurboQuant cache",
+                model_id,
+            )
+            return None
+
+        logger.info(
+            "Enabled mlx-optiq TurboQuant cache for %s across %d layers",
+            model_id,
+            patched_layers,
+        )
+        return cache
+    except Exception:
+        logger.warning(
+            "Failed to enable mlx-optiq cache for %s; falling back to standard cache",
+            model_id,
+            exc_info=True,
+        )
+        return None
+
+
+def _iter_attention_layers(model):
+    """Return the model layer sequence used to build prompt caches."""
+    direct_layers = getattr(model, "layers", None)
+    if direct_layers is not None:
+        return direct_layers
+
+    nested_model = getattr(model, "model", None)
+    nested_layers = getattr(nested_model, "layers", None)
+    if nested_layers is not None:
+        return nested_layers
+
+    return []
 
 
 def _strip_thinking(text: str) -> str:
@@ -327,7 +447,7 @@ def _strip_thinking(text: str) -> str:
 
     Handles multiple formats:
     - <think>...</think> (Qwen, DeepSeek)
-    - <channel|>...<|channel> (Gemma 4)
+    - <channel|>...<|channel> and <|channel>...<channel|> (Gemma 4)
     """
     import re
 
@@ -336,11 +456,37 @@ def _strip_thinking(text: str) -> str:
     # Unclosed <think> at the start — strip everything from <think> onward
     if "<think>" in text:
         text = text[: text.index("<think>")]
-    # <channel|>...<|channel> (Gemma 4 thinking format)
-    text = re.sub(r"<channel\|>.*?<\|channel>", "", text, flags=re.DOTALL)
-    if "<channel|>" in text:
-        text = text[: text.index("<channel|>")]
+    text = _strip_gemma_channel_blocks(text)
     return text.strip()
+
+
+def _strip_gemma_channel_blocks(text: str) -> str:
+    """Strip Gemma 4 reasoning blocks in either channel-token order."""
+    result: list[str] = []
+    rest = text
+
+    while True:
+        normal = rest.find("<channel|>")
+        reversed_ = rest.find("<|channel>")
+
+        if normal == -1 and reversed_ == -1:
+            break
+
+        if normal != -1 and (reversed_ == -1 or normal <= reversed_):
+            start, open_tag, close_tag = normal, "<channel|>", "<|channel>"
+        else:
+            start, open_tag, close_tag = reversed_, "<|channel>", "<channel|>"
+
+        result.append(rest[:start])
+        rest = rest[start + len(open_tag) :]
+
+        end = rest.find(close_tag)
+        if end == -1:
+            return "".join(result)
+        rest = rest[end + len(close_tag) :]
+
+    result.append(rest)
+    return "".join(result)
 
 
 @app.get("/health")
