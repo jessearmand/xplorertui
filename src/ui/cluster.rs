@@ -10,6 +10,7 @@ use ratatui::widgets::{
 use crate::app::App;
 use crate::embeddings::cluster::ClusterResult;
 use crate::ui::skeleton::render_cluster_skeleton;
+use crate::ui::text::truncate_for_width;
 
 // Bright colors chosen for visibility on dark terminal backgrounds.
 // Each entry is (hex for kuva, ratatui Color) so both renderers stay in sync.
@@ -127,11 +128,7 @@ impl<'a> ClusterView<'a> {
 
                 let count = result.tweet_indices_for_cluster(c).len();
                 let max_topic_len = list_area.width.saturating_sub(18) as usize;
-                let display_topic = if topic.len() > max_topic_len && max_topic_len > 3 {
-                    format!("{}...", &topic[..max_topic_len - 3])
-                } else {
-                    topic.to_string()
-                };
+                let display_topic = truncate_for_width(topic, max_topic_len);
 
                 ListItem::new(Line::from(vec![
                     Span::styled("█ ", Style::default().fg(color)),
@@ -179,11 +176,7 @@ impl<'a> ClusterView<'a> {
         };
 
         let max_title_len = area.width.saturating_sub(10) as usize;
-        let display_topic = if topic.len() > max_title_len && max_title_len > 3 {
-            format!("{}...", &topic[..max_title_len - 3])
-        } else {
-            topic.to_string()
-        };
+        let display_topic = truncate_for_width(topic, max_title_len);
 
         let block = Block::default()
             .title(format!(

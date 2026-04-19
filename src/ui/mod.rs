@@ -9,6 +9,7 @@ pub mod models;
 pub mod search;
 pub mod skeleton;
 pub mod status_bar;
+pub mod text;
 pub mod thread;
 pub mod timeline;
 pub mod tweet;
