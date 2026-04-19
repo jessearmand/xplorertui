@@ -309,9 +309,12 @@ impl App {
         let messages = vec![
             ChatMessage {
                 role: "system".into(),
-                content: "For each cluster of tweets, analyze a common topic, generate a short \
-                          descriptive topic label (3-5 words). Reply with one label per line, \
-                          in order, with no numbering or extra text."
+                content: "For each cluster of tweets, analyze a common topic and \
+                          generate a short descriptive topic label (3-5 words). \
+                          Reply with exactly one line per cluster in the format \
+                          `Cluster <index>: <label>`. Include every cluster 0 \
+                          through N-1. No numbering, no preamble, no trailing \
+                          explanations."
                     .into(),
             },
             ChatMessage {
@@ -369,36 +372,13 @@ impl App {
                     ));
                 }
 
-                // Parse labels: filter out lines that are too long to be
-                // a 3-5 word topic label (reasoning leakage, explanations).
-                let labels: Vec<String> = content
-                    .lines()
-                    .map(|l| {
-                        // Strip leading numbering like "1.", "1)", "- "
-                        let t = l.trim();
-                        let t = t.strip_prefix("- ").unwrap_or(t);
-                        let t = t.trim_start_matches(|c: char| {
-                            c.is_ascii_digit() || c == '.' || c == ')'
-                        });
-                        t.trim().to_string()
-                    })
-                    .filter(|l| !l.is_empty() && l.len() <= 80)
-                    .collect();
+                let labels = parse_cluster_topic_labels(&content, num_clusters);
 
-                if labels.is_empty() {
+                if labels.iter().all(|l| l.is_empty()) {
                     return Err(Arc::new(format!(
                         "No labels parsed from response: {content}"
                     )));
                 }
-
-                // If the model returned more lines than clusters
-                // (e.g. prefaced with explanatory text), take the
-                // last N lines which are most likely the actual labels.
-                let labels = if labels.len() > num_clusters {
-                    labels[labels.len() - num_clusters..].to_vec()
-                } else {
-                    labels
-                };
 
                 Ok(labels)
             }
@@ -747,5 +727,195 @@ impl ChatProvider {
                 .await
                 .map_err(|e| Arc::new(e.to_string())),
         }
+    }
+}
+
+/// Clean a raw label line: strip bullet/numbering prefixes and trim.
+/// Returns `None` for empty strings or lines that are too long to be a
+/// 3-5 word topic label (reasoning leakage, prose explanations).
+fn clean_label_line(line: &str) -> Option<String> {
+    let t = line.trim();
+    let t = t.strip_prefix("- ").unwrap_or(t);
+    let t = t.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == ')');
+    let t = t.trim();
+    if t.is_empty() || t.len() > 80 {
+        None
+    } else {
+        Some(t.to_string())
+    }
+}
+
+/// Extract a `(cluster_index, label)` pair from a line that starts with
+/// `Cluster <n>:` (case-insensitive). Returns `None` if the line has no
+/// such prefix or the label portion is empty/oversized.
+fn parse_prefixed_label(line: &str) -> Option<(usize, String)> {
+    let trimmed = line.trim();
+    let (head, rest) = trimmed.split_once(':')?;
+    let head = head.trim();
+    let (tag, index_str) = head.split_once(|c: char| c.is_whitespace())?;
+    if !tag.eq_ignore_ascii_case("cluster") {
+        return None;
+    }
+    let idx: usize = index_str.trim().parse().ok()?;
+    let label = clean_label_line(rest)?;
+    Some((idx, label))
+}
+
+/// Parse an LLM response into exactly `num_clusters` labels, indexed by
+/// cluster ID.
+///
+/// Pass 1: for every line matching `Cluster <n>: <label>`, place the
+/// label at index `n` (first match wins, ignoring extras beyond
+/// `num_clusters`).
+///
+/// Pass 2: for any still-empty slot, fall back to positional assignment
+/// over the **remaining** lines (those without a cluster prefix) in
+/// source order. This preserves the previous behaviour for models that
+/// ignore the instructed format.
+///
+/// Empty `String`s in the result indicate clusters the parser could not
+/// confidently label — the UI layer should keep its centroid-closest
+/// fallback in those slots.
+pub(crate) fn parse_cluster_topic_labels(content: &str, num_clusters: usize) -> Vec<String> {
+    let mut labels = vec![String::new(); num_clusters];
+    let mut leftover: Vec<String> = Vec::new();
+
+    for line in content.lines() {
+        match parse_prefixed_label(line) {
+            Some((idx, label)) if idx < num_clusters && labels[idx].is_empty() => {
+                labels[idx] = label;
+            }
+            Some(_) => {
+                // Index out of range or slot already filled — ignore.
+            }
+            None => {
+                if let Some(cleaned) = clean_label_line(line) {
+                    leftover.push(cleaned);
+                }
+            }
+        }
+    }
+
+    let mut leftover_iter = leftover.into_iter();
+    for slot in labels.iter_mut() {
+        if slot.is_empty()
+            && let Some(next) = leftover_iter.next()
+        {
+            *slot = next;
+        }
+    }
+
+    labels
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_well_formed_prefix_output() {
+        let content = "Cluster 0: AI news\nCluster 1: Rust tooling\nCluster 2: Market updates";
+        let labels = parse_cluster_topic_labels(content, 3);
+        assert_eq!(
+            labels,
+            vec!["AI news", "Rust tooling", "Market updates"]
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn binds_labels_by_index_when_out_of_order() {
+        let content = "Cluster 2: third topic\nCluster 0: first topic\nCluster 1: second topic";
+        let labels = parse_cluster_topic_labels(content, 3);
+        assert_eq!(labels[0], "first topic");
+        assert_eq!(labels[1], "second topic");
+        assert_eq!(labels[2], "third topic");
+    }
+
+    #[test]
+    fn ignores_preamble_and_still_binds_correctly() {
+        let content = "Sure! Here are the topic labels for each cluster:\n\n\
+                       Cluster 0: neural signals\n\
+                       Cluster 1: open source releases\n\
+                       Cluster 2: macroeconomic commentary\n";
+        let labels = parse_cluster_topic_labels(content, 3);
+        assert_eq!(labels[0], "neural signals");
+        assert_eq!(labels[1], "open source releases");
+        assert_eq!(labels[2], "macroeconomic commentary");
+    }
+
+    #[test]
+    fn missing_cluster_leaves_slot_empty_for_ui_fallback() {
+        // Model dropped cluster 1 — we must NOT shift cluster 2's label
+        // into slot 1 (that was the old bug).
+        let content = "Cluster 0: alpha\nCluster 2: gamma";
+        let labels = parse_cluster_topic_labels(content, 3);
+        assert_eq!(labels[0], "alpha");
+        assert_eq!(labels[1], "");
+        assert_eq!(labels[2], "gamma");
+    }
+
+    #[test]
+    fn legacy_positional_fallback_when_no_prefixes() {
+        let content = "alpha\nbeta\ngamma";
+        let labels = parse_cluster_topic_labels(content, 3);
+        assert_eq!(labels, vec!["alpha", "beta", "gamma"]);
+    }
+
+    #[test]
+    fn mixed_prefixed_and_bare_lines_use_leftover_for_empty_slots() {
+        // Cluster 0 gets a prefixed label; the bare "fallback" line goes
+        // into the empty slot at index 1.
+        let content = "Cluster 0: explicit\nfallback";
+        let labels = parse_cluster_topic_labels(content, 2);
+        assert_eq!(labels[0], "explicit");
+        assert_eq!(labels[1], "fallback");
+    }
+
+    #[test]
+    fn drops_overlong_lines() {
+        let long = "x".repeat(120);
+        let content = format!("Cluster 0: {long}\nCluster 1: ok");
+        let labels = parse_cluster_topic_labels(&content, 2);
+        assert_eq!(labels[0], "");
+        assert_eq!(labels[1], "ok");
+    }
+
+    #[test]
+    fn duplicate_index_keeps_first_match() {
+        let content = "Cluster 0: first\nCluster 0: second";
+        let labels = parse_cluster_topic_labels(content, 1);
+        assert_eq!(labels[0], "first");
+    }
+
+    #[test]
+    fn out_of_range_index_ignored() {
+        let content = "Cluster 5: ghost\nCluster 0: real";
+        let labels = parse_cluster_topic_labels(content, 2);
+        assert_eq!(labels[0], "real");
+        assert_eq!(labels[1], "");
+    }
+
+    #[test]
+    fn strips_bullet_and_numbering_prefixes() {
+        let content = "- 1. alpha\n2) beta\n- gamma";
+        let labels = parse_cluster_topic_labels(content, 3);
+        assert_eq!(labels, vec!["alpha", "beta", "gamma"]);
+    }
+
+    #[test]
+    fn entirely_empty_response_yields_all_empty_slots() {
+        let labels = parse_cluster_topic_labels("   \n\n   ", 3);
+        assert!(labels.iter().all(|s| s.is_empty()));
+    }
+
+    #[test]
+    fn case_insensitive_cluster_keyword() {
+        let content = "cluster 0: lower\nCLUSTER 1: upper";
+        let labels = parse_cluster_topic_labels(content, 2);
+        assert_eq!(labels[0], "lower");
+        assert_eq!(labels[1], "upper");
     }
 }

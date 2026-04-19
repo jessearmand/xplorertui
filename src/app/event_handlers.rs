@@ -452,17 +452,18 @@ impl App {
                 self.cluster_topics_loading = false;
                 match result {
                     Ok(labels) => {
-                        let label_count = labels.len();
                         if let Some(ref mut cr) = self.cluster_result {
                             let cluster_count = cr.cluster_topics.len();
+                            let mut applied = 0usize;
                             for (i, label) in labels.into_iter().enumerate() {
-                                if i < cluster_count {
+                                if i < cluster_count && !label.is_empty() {
                                     cr.cluster_topics[i] = label;
+                                    applied += 1;
                                 }
                             }
                             let provider = self.resolved_chat_provider_name().unwrap_or("LLM");
                             self.status_message = Some(format!(
-                                "{provider} generated {label_count}/{cluster_count} topic labels"
+                                "{provider} generated {applied}/{cluster_count} topic labels"
                             ));
                         }
                     }
