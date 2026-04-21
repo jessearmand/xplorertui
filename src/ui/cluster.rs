@@ -37,7 +37,12 @@ impl<'a> ClusterView<'a> {
         Self { app }
     }
 
-    fn render_scatter(result: &ClusterResult, cols: usize, rows: usize) -> String {
+    fn render_scatter(
+        result: &ClusterResult,
+        source_label: Option<&str>,
+        cols: usize,
+        rows: usize,
+    ) -> String {
         use kuva::prelude::*;
 
         let num_clusters = result.num_clusters();
@@ -60,8 +65,12 @@ impl<'a> ClusterView<'a> {
             return String::from("No data to plot");
         }
 
+        let title = match source_label {
+            Some(label) => format!("Topic Clusters — {label}"),
+            None => "Topic Clusters".to_string(),
+        };
         let layout = Layout::auto_from_plots(&plots)
-            .with_title("Topic Clusters")
+            .with_title(&title)
             .with_x_label("PC1")
             .with_y_label("PC2")
             .with_theme(Theme::dark());
@@ -76,16 +85,21 @@ impl<'a> ClusterView<'a> {
         selected_index: usize,
         topics_loading: bool,
         chat_provider_name: Option<&str>,
+        source_label: Option<&str>,
         area: Rect,
         buf: &mut Buffer,
     ) {
+        let source_suffix = match source_label {
+            Some(label) => format!(" — {label}"),
+            None => String::new(),
+        };
         let title = if topics_loading {
             format!(
-                " Topic Clusters (generating labels via {}...) ",
+                " Topic Clusters{source_suffix} (generating labels via {}...) ",
                 chat_provider_name.unwrap_or("…"),
             )
         } else {
-            " Topic Clusters (Enter to browse, Esc to go back) ".to_string()
+            format!(" Topic Clusters{source_suffix} (Enter to browse, Esc to go back) ")
         };
         let block = Block::default().title(title).borders(Borders::ALL);
 
@@ -108,6 +122,7 @@ impl<'a> ClusterView<'a> {
         // Render scatter plot
         let ansi_output = Self::render_scatter(
             result,
+            source_label,
             chart_area.width as usize,
             chart_area.height as usize,
         );
@@ -214,10 +229,15 @@ impl<'a> ClusterView<'a> {
 
 impl Widget for ClusterView<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        let source_label_owned = self.app.cluster_source.map(|s| s.to_string());
+        let source_label = source_label_owned.as_deref();
+        let title = match source_label {
+            Some(label) => format!(" Topic Clusters — {label} "),
+            None => " Topic Clusters ".to_string(),
+        };
+
         if self.app.cluster_loading {
-            let block = Block::default()
-                .title(" Topic Clusters ")
-                .borders(Borders::ALL);
+            let block = Block::default().title(title).borders(Borders::ALL);
             block.render(area, buf);
             // Clustering is always slow — show skeleton immediately (no debounce).
             let elapsed_ms = self.app.skeleton_elapsed_ms_immediate();
@@ -226,9 +246,7 @@ impl Widget for ClusterView<'_> {
         }
 
         let Some(ref result) = self.app.cluster_result else {
-            let block = Block::default()
-                .title(" Topic Clusters ")
-                .borders(Borders::ALL);
+            let block = Block::default().title(title).borders(Borders::ALL);
             let empty = Paragraph::new("No cluster data. Use :cluster to compute.").block(block);
             empty.render(area, buf);
             return;
@@ -244,6 +262,7 @@ impl Widget for ClusterView<'_> {
                 selected_index,
                 self.app.cluster_topics_loading,
                 self.app.resolved_chat_provider_name(),
+                source_label,
                 area,
                 buf,
             );

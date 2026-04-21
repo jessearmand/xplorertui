@@ -52,7 +52,7 @@ impl Widget for StatusBar<'_> {
 
         // Current view
         let view_name = match self.app.current_view() {
-            Some(ViewKind::Home) => "Home".to_string(),
+            Some(ViewKind::Home) => "Following".to_string(),
             Some(ViewKind::UserTimeline(id)) => format!("Timeline: {id}"),
             Some(ViewKind::Thread(id)) => format!("Thread: {id}"),
             Some(ViewKind::UserProfile(name)) => format!("@{name}"),
@@ -67,7 +67,10 @@ impl Widget for StatusBar<'_> {
             Some(ViewKind::Bookmarks) => "Bookmarks".to_string(),
             Some(ViewKind::OpenRouterModels) => "Embedding Models".to_string(),
             Some(ViewKind::TextModels) => "Text Models".to_string(),
-            Some(ViewKind::Cluster) => "Clusters".to_string(),
+            Some(ViewKind::Cluster) => match self.app.cluster_source {
+                Some(src) => format!("Clusters ({src})"),
+                None => "Clusters".to_string(),
+            },
             Some(ViewKind::HuggingFaceModels) => "HuggingFace Models".to_string(),
             Some(ViewKind::Help) => "Help".to_string(),
             None => "xplorertui".to_string(),

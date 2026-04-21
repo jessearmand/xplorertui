@@ -56,7 +56,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     match app.current_view() {
         Some(ViewKind::Home) => {
             frame.render_widget(
-                TimelineView::new("Home", &app.home_timeline.tweets, app)
+                TimelineView::new("Following", &app.home_timeline.tweets, app)
                     .loading(app.home_timeline.loading),
                 main_area,
             );
@@ -134,7 +134,7 @@ fn render_previous_view(frame: &mut Frame, app: &App, area: ratatui::layout::Rec
     match &prev_view.kind {
         ViewKind::Home => {
             frame.render_widget(
-                TimelineView::new("Home", &app.home_timeline.tweets, app),
+                TimelineView::new("Following", &app.home_timeline.tweets, app),
                 area,
             );
         }

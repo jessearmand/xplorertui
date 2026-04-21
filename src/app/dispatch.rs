@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::App;
+use super::{App, ClusterSource};
 use crate::api::types::{Includes, Tweet, User};
 use crate::event::{ApiResult, AppEvent, Event, ViewKind};
 use crate::mlx::client::MlxClient;
@@ -130,7 +130,18 @@ impl App {
         }
 
         let sender = self.events.sender();
-        let tweets = self.home_timeline.tweets.clone();
+        let Some(source) = self.cluster_source else {
+            self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
+                "Internal error: cluster_source not set before dispatch.".into(),
+            ))));
+            return;
+        };
+        let tweets = match source {
+            ClusterSource::Home => self.home_timeline.tweets.clone(),
+            ClusterSource::Mentions => self.mentions.tweets.clone(),
+            ClusterSource::Search => self.search_results.tweets.clone(),
+            ClusterSource::Bookmarks => self.bookmarks.tweets.clone(),
+        };
 
         tokio::spawn(async move {
             // If we had a resolved provider, use it. Otherwise try MLX

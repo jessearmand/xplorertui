@@ -1,4 +1,4 @@
-use super::{App, TimelineState, tweet_url};
+use super::{App, ClusterSource, TimelineState, tweet_url};
 use crate::api::types::Tweet;
 use crate::event::{AppEvent, ViewKind};
 use crate::openrouter;
@@ -420,13 +420,50 @@ impl App {
                 });
             }
             Some(ViewKind::Cluster) => {
-                self.reset_timeline(&mut Self::home_timeline_ref);
+                let Some(source) = self.cluster_source else {
+                    self.status_message =
+                        Some("No cluster source to refresh. Run :cluster again.".into());
+                    return;
+                };
                 self.cluster_result = None;
                 self.selected_cluster = None;
                 self.refresh_then_cluster = true;
-                self.events.send(AppEvent::FetchHomeTimeline {
-                    pagination_token: None,
-                });
+                match source {
+                    ClusterSource::Home => {
+                        self.reset_timeline(&mut Self::home_timeline_ref);
+                        self.events.send(AppEvent::FetchHomeTimeline {
+                            pagination_token: None,
+                        });
+                    }
+                    ClusterSource::Mentions => {
+                        self.reset_timeline(&mut Self::mentions_ref);
+                        self.events.send(AppEvent::FetchMentions {
+                            pagination_token: None,
+                        });
+                    }
+                    ClusterSource::Bookmarks => {
+                        self.reset_timeline(&mut Self::bookmarks_ref);
+                        self.events.send(AppEvent::FetchBookmarks {
+                            pagination_token: None,
+                        });
+                    }
+                    ClusterSource::Search => {
+                        let query = self.search_query.clone();
+                        if query.is_empty() {
+                            self.status_message = Some(
+                                "No search query to re-run. Go to Search view and try again."
+                                    .into(),
+                            );
+                            self.refresh_then_cluster = false;
+                            return;
+                        }
+                        self.reset_timeline(&mut Self::search_results_ref);
+                        self.events.send(AppEvent::FetchSearch {
+                            query,
+                            pagination_token: None,
+                        });
+                    }
+                }
             }
             _ => {
                 self.status_message = Some("Refresh not supported for this view".into());
@@ -458,5 +495,9 @@ impl App {
 
     fn bookmarks_ref(&mut self) -> &mut TimelineState {
         &mut self.bookmarks
+    }
+
+    fn search_results_ref(&mut self) -> &mut TimelineState {
+        &mut self.search_results
     }
 }
