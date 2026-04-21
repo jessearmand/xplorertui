@@ -768,10 +768,15 @@ fn parse_prefixed_label(line: &str) -> Option<(usize, String)> {
 /// label at index `n` (first match wins, ignoring extras beyond
 /// `num_clusters`).
 ///
-/// Pass 2: for any still-empty slot, fall back to positional assignment
-/// over the **remaining** lines (those without a cluster prefix) in
-/// source order. This preserves the previous behaviour for models that
-/// ignore the instructed format.
+/// Pass 2 (pure-legacy only): if Pass 1 parsed **zero** prefixed labels,
+/// fall back to positional assignment over the bare lines. This keeps
+/// older models that emit unprefixed output working.
+///
+/// As soon as any `Cluster <n>:` prefix is parsed we treat the response
+/// as structured and refuse to fill missing slots from bare lines —
+/// those are almost always preamble ("Sure! Here are the labels:") or
+/// explanation, and letting them land in a missing cluster's slot would
+/// reintroduce the exact mislabeling this parser was built to prevent.
 ///
 /// Empty `String`s in the result indicate clusters the parser could not
 /// confidently label — the UI layer should keep its centroid-closest
@@ -779,14 +784,16 @@ fn parse_prefixed_label(line: &str) -> Option<(usize, String)> {
 pub(crate) fn parse_cluster_topic_labels(content: &str, num_clusters: usize) -> Vec<String> {
     let mut labels = vec![String::new(); num_clusters];
     let mut leftover: Vec<String> = Vec::new();
+    let mut any_prefixed = false;
 
     for line in content.lines() {
         match parse_prefixed_label(line) {
-            Some((idx, label)) if idx < num_clusters && labels[idx].is_empty() => {
-                labels[idx] = label;
-            }
-            Some(_) => {
-                // Index out of range or slot already filled — ignore.
+            Some((idx, label)) => {
+                any_prefixed = true;
+                if idx < num_clusters && labels[idx].is_empty() {
+                    labels[idx] = label;
+                }
+                // Out-of-range index or slot already filled — ignore.
             }
             None => {
                 if let Some(cleaned) = clean_label_line(line) {
@@ -796,12 +803,14 @@ pub(crate) fn parse_cluster_topic_labels(content: &str, num_clusters: usize) -> 
         }
     }
 
-    let mut leftover_iter = leftover.into_iter();
-    for slot in labels.iter_mut() {
-        if slot.is_empty()
-            && let Some(next) = leftover_iter.next()
-        {
-            *slot = next;
+    if !any_prefixed {
+        let mut leftover_iter = leftover.into_iter();
+        for slot in labels.iter_mut() {
+            if slot.is_empty()
+                && let Some(next) = leftover_iter.next()
+            {
+                *slot = next;
+            }
         }
     }
 
@@ -865,13 +874,32 @@ mod tests {
     }
 
     #[test]
-    fn mixed_prefixed_and_bare_lines_use_leftover_for_empty_slots() {
-        // Cluster 0 gets a prefixed label; the bare "fallback" line goes
-        // into the empty slot at index 1.
+    fn bare_lines_do_not_leak_into_missing_slot_once_any_prefix_seen() {
+        // When the model emits at least one structured `Cluster N:` line,
+        // we must NOT pull bare lines into missing slots — those are
+        // almost always preamble or explanation, and letting them land
+        // on a dropped cluster reintroduces the mislabel bug.
         let content = "Cluster 0: explicit\nfallback";
         let labels = parse_cluster_topic_labels(content, 2);
         assert_eq!(labels[0], "explicit");
-        assert_eq!(labels[1], "fallback");
+        assert_eq!(labels[1], "");
+    }
+
+    #[test]
+    fn preamble_plus_dropped_cluster_leaves_slot_empty() {
+        // Regression: Codex review flagged that a response containing
+        // preamble prose AND partial `Cluster N:` labels would slot the
+        // preamble into the missing cluster's position. The missing
+        // cluster must stay empty so the centroid-closest tweet
+        // fallback in the UI can kick in.
+        let content = "Sure! Here are the topic labels for each cluster:\n\
+                       \n\
+                       Cluster 0: alpha\n\
+                       Cluster 2: gamma\n";
+        let labels = parse_cluster_topic_labels(content, 3);
+        assert_eq!(labels[0], "alpha");
+        assert_eq!(labels[1], "");
+        assert_eq!(labels[2], "gamma");
     }
 
     #[test]
