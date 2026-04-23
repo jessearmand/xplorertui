@@ -6,6 +6,7 @@ use ratatui::widgets::Widget;
 
 use crate::app::{App, AppMode};
 use crate::event::ViewKind;
+use crate::ui::text::truncate_for_width;
 
 /// Bottom status bar showing mode, current view, and status messages.
 pub struct StatusBar<'a> {
@@ -51,7 +52,7 @@ impl Widget for StatusBar<'_> {
 
         // Current view
         let view_name = match self.app.current_view() {
-            Some(ViewKind::Home) => "Home".to_string(),
+            Some(ViewKind::Home) => "Following".to_string(),
             Some(ViewKind::UserTimeline(id)) => format!("Timeline: {id}"),
             Some(ViewKind::Thread(id)) => format!("Thread: {id}"),
             Some(ViewKind::UserProfile(name)) => format!("@{name}"),
@@ -66,7 +67,10 @@ impl Widget for StatusBar<'_> {
             Some(ViewKind::Bookmarks) => "Bookmarks".to_string(),
             Some(ViewKind::OpenRouterModels) => "Embedding Models".to_string(),
             Some(ViewKind::TextModels) => "Text Models".to_string(),
-            Some(ViewKind::Cluster) => "Clusters".to_string(),
+            Some(ViewKind::Cluster) => match self.app.cluster_source {
+                Some(src) => format!("Clusters ({src})"),
+                None => "Clusters".to_string(),
+            },
             Some(ViewKind::HuggingFaceModels) => "HuggingFace Models".to_string(),
             Some(ViewKind::Help) => "Help".to_string(),
             None => "xplorertui".to_string(),
@@ -84,13 +88,15 @@ impl Widget for StatusBar<'_> {
         // Status message (right-aligned)
         if let Some(ref msg) = self.app.status_message {
             let left_width: usize = spans.iter().map(|s| s.width()).sum();
-            let msg_width = msg.len().min(area.width as usize);
-            let padding = (area.width as usize).saturating_sub(left_width + msg_width);
+            let available = (area.width as usize).saturating_sub(left_width);
+            let display = truncate_for_width(msg, available);
+            let display_width = Span::raw(&display).width();
+            let padding = available.saturating_sub(display_width);
             if padding > 0 {
                 spans.push(Span::styled(" ".repeat(padding), bg_style));
             }
             spans.push(Span::styled(
-                &msg[..msg_width],
+                display,
                 Style::default().bg(Color::DarkGray).fg(Color::Cyan),
             ));
         }

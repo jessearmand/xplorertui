@@ -37,7 +37,7 @@ pub fn parse_command(input: &str) -> Option<Command> {
         "user" if !args.is_empty() => Some(Command::User(strip_at(args).to_owned())),
         "search" if !args.is_empty() => Some(Command::Search(args.to_owned())),
         "open" if !args.is_empty() => Some(Command::Open(args.to_owned())),
-        "home" => Some(Command::Home),
+        "home" | "following" => Some(Command::Home),
         "mentions" | "m" => Some(Command::Mentions),
         "bookmarks" | "b" => Some(Command::Bookmarks),
         "help" | "h" => Some(Command::Help),
@@ -128,6 +128,19 @@ mod tests {
     fn test_parse_command_empty() {
         assert_eq!(parse_command(""), None);
         assert_eq!(parse_command(":"), None);
+    }
+
+    #[test]
+    fn test_parse_command_cluster() {
+        assert_eq!(parse_command(":cluster"), Some(Command::Cluster));
+        assert_eq!(parse_command("cluster"), Some(Command::Cluster));
+        assert_eq!(parse_command(":home"), Some(Command::Home));
+    }
+
+    #[test]
+    fn test_parse_command_following_alias() {
+        assert_eq!(parse_command(":following"), Some(Command::Home));
+        assert_eq!(parse_command("following"), Some(Command::Home));
     }
 
     #[test]

@@ -58,7 +58,7 @@ impl Widget for HelpView {
             binding_line("o", "Open tweet in browser", key_style, desc_style),
             Line::from(""),
             Line::from(Span::styled("Views", section_style)),
-            binding_line("1", "Home timeline", key_style, desc_style),
+            binding_line("1", "Following timeline", key_style, desc_style),
             binding_line("2", "Mentions", key_style, desc_style),
             binding_line("3", "Bookmarks", key_style, desc_style),
             binding_line("4", "Search", key_style, desc_style),
@@ -104,7 +104,7 @@ impl Widget for HelpView {
             ),
             binding_line(
                 ":cluster",
-                "Cluster home timeline topics",
+                "Cluster current view (following/mentions/search/bookmarks)",
                 key_style,
                 desc_style,
             ),
