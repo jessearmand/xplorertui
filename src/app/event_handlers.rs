@@ -1,4 +1,4 @@
-use super::{App, TimelineState};
+use super::{App, ClusterSource, TimelineState};
 use crate::api::types::Tweet;
 use crate::event::{AppEvent, ViewKind};
 
@@ -84,9 +84,9 @@ impl App {
                         self.set_error(format!("Error loading timeline: {e}"));
                     }
                 }
-                if self.refresh_then_cluster {
+                if self.refresh_then_cluster && self.cluster_source == Some(ClusterSource::Home) {
                     self.refresh_then_cluster = false;
-                    self.events.send(AppEvent::ClusterTimeline);
+                    self.start_cluster(ClusterSource::Home);
                 }
             }
             AppEvent::UserTimelineLoaded { user_id: _, result } => {
@@ -191,6 +191,10 @@ impl App {
                         self.set_error(format!("Error searching: {e}"));
                     }
                 }
+                if self.refresh_then_cluster && self.cluster_source == Some(ClusterSource::Search) {
+                    self.refresh_then_cluster = false;
+                    self.start_cluster(ClusterSource::Search);
+                }
             }
             AppEvent::MentionsLoaded(result) => {
                 self.loading = false;
@@ -207,6 +211,11 @@ impl App {
                         self.set_error(format!("Error loading mentions: {e}"));
                     }
                 }
+                if self.refresh_then_cluster && self.cluster_source == Some(ClusterSource::Mentions)
+                {
+                    self.refresh_then_cluster = false;
+                    self.start_cluster(ClusterSource::Mentions);
+                }
             }
             AppEvent::BookmarksLoaded(result) => {
                 self.loading = false;
@@ -222,6 +231,12 @@ impl App {
                     Err(e) => {
                         self.set_error(format!("Error loading bookmarks: {e}"));
                     }
+                }
+                if self.refresh_then_cluster
+                    && self.cluster_source == Some(ClusterSource::Bookmarks)
+                {
+                    self.refresh_then_cluster = false;
+                    self.start_cluster(ClusterSource::Bookmarks);
                 }
             }
             AppEvent::FollowersLoaded { user_id: _, result } => {
@@ -326,16 +341,22 @@ impl App {
 
             // Clustering
             AppEvent::ClusterTimeline => {
-                if self.home_timeline.tweets.is_empty() {
-                    self.status_message =
-                        Some("No tweets to cluster. Load home timeline first.".into());
+                // Resolve source from the current view. If invoked from within
+                // the Cluster view itself (re-cluster), reuse the previously
+                // stored source so the user doesn't lose their context.
+                let source = match self.current_view() {
+                    Some(ViewKind::Cluster) => self.cluster_source,
+                    Some(view) => ClusterSource::from_view(view),
+                    None => None,
+                };
+                let Some(source) = source else {
+                    self.status_message = Some(
+                        "Cluster only supported from Home, Mentions, Search, or Bookmarks views."
+                            .into(),
+                    );
                     return;
-                }
-                self.cluster_loading = true;
-                self.mark_loading_started();
-                self.selected_cluster = None;
-                self.push_view(ViewKind::Cluster);
-                self.dispatch_cluster_timeline();
+                };
+                self.start_cluster(source);
             }
             AppEvent::ClusteringComplete(result) => {
                 self.cluster_loading = false;
@@ -473,5 +494,39 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Kick off a clustering run for the given source. Shared by `:cluster`
+    /// (view-resolved source) and the refresh-then-cluster gates (stored
+    /// source), so both paths converge on the same setup.
+    ///
+    /// Always clears `refresh_then_cluster` so a fresh `:cluster` invocation
+    /// cancels any in-flight refresh-cluster promise left over from an earlier
+    /// `R` in the Cluster view. Without this, a user could press `R` on
+    /// Cluster-Mentions, navigate away before the response arrives, run
+    /// `:cluster` on a different source, and later get yanked back into the
+    /// Cluster view when an unrelated fetch for the new source (pagination,
+    /// manual refresh, etc.) completes. Clearing here is a no-op for the
+    /// refresh-gate callers — they already clear the flag before calling.
+    fn start_cluster(&mut self, source: ClusterSource) {
+        self.refresh_then_cluster = false;
+        let tweets_empty = match source {
+            ClusterSource::Home => self.home_timeline.tweets.is_empty(),
+            ClusterSource::Mentions => self.mentions.tweets.is_empty(),
+            ClusterSource::Search => self.search_results.tweets.is_empty(),
+            ClusterSource::Bookmarks => self.bookmarks.tweets.is_empty(),
+        };
+        if tweets_empty {
+            self.status_message = Some(format!("No tweets to cluster in {source}. Load it first."));
+            return;
+        }
+        self.cluster_source = Some(source);
+        self.cluster_loading = true;
+        self.mark_loading_started();
+        self.selected_cluster = None;
+        if self.current_view() != Some(&ViewKind::Cluster) {
+            self.push_view(ViewKind::Cluster);
+        }
+        self.dispatch_cluster_timeline();
     }
 }

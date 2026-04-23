@@ -25,7 +25,9 @@ pub enum CliCommand {
     Tui,
     /// Run the OAuth 2.0 PKCE authentication flow
     Auth,
-    /// Fetch your home timeline (JSONL)
+    /// Fetch your Following feed — reverse-chronological posts from accounts
+    /// you follow (JSONL). Does not include the algorithmic "For You" feed,
+    /// which isn't exposed by the X API v2.
     Home,
     /// Fetch your mentions (JSONL)
     Mentions,

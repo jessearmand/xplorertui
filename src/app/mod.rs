@@ -49,6 +49,47 @@ pub enum AppMode {
 }
 
 // ---------------------------------------------------------------------------
+// Cluster source
+// ---------------------------------------------------------------------------
+
+/// Which timeline the current cluster result was computed from.
+///
+/// `Home` maps to `reverse_chronological` at the API level — the Following
+/// feed. Its `Display` impl renders `"following"` so the UI doesn't overload
+/// the X app's "Home" tab (which defaults to the algorithmic "For You" feed).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusterSource {
+    Home,
+    Mentions,
+    Search,
+    Bookmarks,
+}
+
+impl ClusterSource {
+    pub fn from_view(view: &ViewKind) -> Option<Self> {
+        match view {
+            ViewKind::Home => Some(Self::Home),
+            ViewKind::Mentions => Some(Self::Mentions),
+            ViewKind::Search => Some(Self::Search),
+            ViewKind::Bookmarks => Some(Self::Bookmarks),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ClusterSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = match self {
+            Self::Home => "following",
+            Self::Mentions => "mentions",
+            Self::Search => "search",
+            Self::Bookmarks => "bookmarks",
+        };
+        f.write_str(label)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // View state
 // ---------------------------------------------------------------------------
 
@@ -151,7 +192,12 @@ pub struct App {
     pub cluster_generation: u64,
     /// `None` = cluster list mode, `Some(c)` = viewing tweets in cluster c.
     pub selected_cluster: Option<usize>,
-    /// When true, a cluster operation will be triggered after the home timeline refresh completes.
+    /// Which timeline the current cluster result was derived from. Set at
+    /// `:cluster` time, consumed by the dispatcher, the UI labels, and the
+    /// refresh flow in the Cluster view.
+    pub cluster_source: Option<ClusterSource>,
+    /// When true, a cluster operation will be triggered after the source
+    /// timeline (determined by `cluster_source`) finishes refreshing.
     pub refresh_then_cluster: bool,
 
     // Status
@@ -245,6 +291,7 @@ impl App {
             cluster_topics_loading: false,
             cluster_generation: 0,
             selected_cluster: None,
+            cluster_source: None,
             refresh_then_cluster: false,
             status_message: None,
             error_detail: None,
