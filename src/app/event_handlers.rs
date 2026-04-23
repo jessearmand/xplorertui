@@ -499,7 +499,17 @@ impl App {
     /// Kick off a clustering run for the given source. Shared by `:cluster`
     /// (view-resolved source) and the refresh-then-cluster gates (stored
     /// source), so both paths converge on the same setup.
+    ///
+    /// Always clears `refresh_then_cluster` so a fresh `:cluster` invocation
+    /// cancels any in-flight refresh-cluster promise left over from an earlier
+    /// `R` in the Cluster view. Without this, a user could press `R` on
+    /// Cluster-Mentions, navigate away before the response arrives, run
+    /// `:cluster` on a different source, and later get yanked back into the
+    /// Cluster view when an unrelated fetch for the new source (pagination,
+    /// manual refresh, etc.) completes. Clearing here is a no-op for the
+    /// refresh-gate callers — they already clear the flag before calling.
     fn start_cluster(&mut self, source: ClusterSource) {
+        self.refresh_then_cluster = false;
         let tweets_empty = match source {
             ClusterSource::Home => self.home_timeline.tweets.is_empty(),
             ClusterSource::Mentions => self.mentions.tweets.is_empty(),
