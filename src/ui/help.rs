@@ -83,10 +83,15 @@ impl Widget for HelpView {
                 key_style,
                 desc_style,
             ),
-            binding_line(":models", "Select embedding model", key_style, desc_style),
             binding_line(
-                ":text-models",
-                "Select chat model for topic labels",
+                ":embeddings",
+                "Select embedding model",
+                key_style,
+                desc_style,
+            ),
+            binding_line(
+                ":openrouter-models",
+                "Select OpenRouter chat model (alias :openrouter)",
                 key_style,
                 desc_style,
             ),

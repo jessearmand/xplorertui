@@ -110,7 +110,7 @@ You can also set the `OPENROUTER_API_KEY` environment variable directly in your 
 
 Before using embedding features, select a model:
 
-1. Type `:models` in the TUI to open the model selection list
+1. Type `:embeddings` in the TUI to open the model selection list
 2. Browse available embedding models with `j`/`k`
 3. Press `Enter` to select one (e.g. `openai/text-embedding-3-small`)
 
@@ -215,7 +215,8 @@ Type `:` to enter command mode, then:
 | `:bookmarks` / `:b` | Switch to bookmarks |
 | `:auth` / `:login` | Authenticate with X OAuth 2.0 PKCE |
 | `:openrouter-auth` / `:or-auth` | Authenticate with OpenRouter |
-| `:models` | Select an embedding model |
+| `:embeddings` | Select an embedding model |
+| `:openrouter-models` / `:openrouter` | Select an OpenRouter chat model |
 | `:cluster` | Cluster home timeline by topic |
 | `:help` / `:h` | Show help |
 | `:quit` / `:q` | Quit |

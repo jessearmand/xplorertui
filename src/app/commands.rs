@@ -45,7 +45,7 @@ impl App {
             Some(Command::OpenRouterAuth) => {
                 self.events.send(AppEvent::StartOpenRouterAuth);
             }
-            Some(Command::Models) => {
+            Some(Command::Embeddings) => {
                 self.model_filter = None;
                 self.model_filter_open = false;
                 self.model_search.clear();
@@ -56,7 +56,7 @@ impl App {
                 self.events
                     .send(AppEvent::PushView(ViewKind::OpenRouterModels));
             }
-            Some(Command::TextModels) => {
+            Some(Command::OpenRouter) => {
                 self.model_filter = None;
                 self.model_filter_open = false;
                 self.model_search.clear();
@@ -96,7 +96,7 @@ impl App {
                     } else {
                         self.status_message = Some(
                             "OpenRouter chat not available. Use :openrouter-auth \
-                                 and :text-models first."
+                                 and :openrouter-models first."
                                 .into(),
                         );
                     }

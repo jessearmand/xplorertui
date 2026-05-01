@@ -11,8 +11,8 @@ pub enum Command {
     Help,
     Auth,
     OpenRouterAuth,
-    Models,
-    TextModels,
+    Embeddings,
+    OpenRouter,
     HuggingFaceModels,
     Cluster,
     Topics,
@@ -43,8 +43,8 @@ pub fn parse_command(input: &str) -> Option<Command> {
         "help" | "h" => Some(Command::Help),
         "auth" | "login" => Some(Command::Auth),
         "openrouter-auth" | "or-auth" => Some(Command::OpenRouterAuth),
-        "models" => Some(Command::Models),
-        "text-models" | "tm" => Some(Command::TextModels),
+        "embeddings" => Some(Command::Embeddings),
+        "openrouter-models" | "openrouter" => Some(Command::OpenRouter),
         "hf-models" | "hf" => Some(Command::HuggingFaceModels),
         "cluster" => Some(Command::Cluster),
         "topics" => Some(Command::Topics),
@@ -119,8 +119,12 @@ mod tests {
         assert_eq!(parse_command(":login"), Some(Command::Auth));
         assert_eq!(parse_command(":refresh"), Some(Command::Refresh));
         assert_eq!(parse_command(":r"), Some(Command::Refresh));
-        assert_eq!(parse_command(":text-models"), Some(Command::TextModels));
-        assert_eq!(parse_command(":tm"), Some(Command::TextModels));
+        assert_eq!(parse_command(":embeddings"), Some(Command::Embeddings));
+        assert_eq!(
+            parse_command(":openrouter-models"),
+            Some(Command::OpenRouter)
+        );
+        assert_eq!(parse_command(":openrouter"), Some(Command::OpenRouter));
         assert_eq!(parse_command(":topics"), Some(Command::Topics));
     }
 
