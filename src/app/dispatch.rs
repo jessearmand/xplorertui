@@ -123,7 +123,7 @@ impl App {
         if embed_provider.is_none() && mlx_fallback.is_none() && openrouter_fallback.is_none() {
             self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
                 "No embedding provider configured. Set mlx_server_url in config \
-                 or use :openrouter-auth + :models."
+                 or use :openrouter-auth + :embeddings."
                     .into(),
             ))));
             return;
@@ -286,7 +286,7 @@ impl App {
                 generation,
                 Err(Arc::new(
                     "No chat provider configured. Set mlx_server_url in config \
-                     or use :openrouter-auth + :text-models."
+                     or use :openrouter-auth + :openrouter-models."
                         .into(),
                 )),
             ));
