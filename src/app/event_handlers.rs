@@ -456,7 +456,7 @@ impl App {
                 if !self.has_chat_provider() {
                     self.status_message = Some(
                         "No chat provider configured. Set mlx_server_url in config \
-                         or use :openrouter-auth + :text-models."
+                         or use :openrouter-auth + :openrouter-models."
                             .into(),
                     );
                     return;
