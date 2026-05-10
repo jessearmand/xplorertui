@@ -6,10 +6,11 @@
 #   1. `xplorertui mentions` to list recent mentions (newest first)
 #   2. `xplorertui open <id>` to fetch the full conversation thread
 #
-# Output: JSONL on stdout. The first line is the root tweet of the conversation
-# (which may or may not be the mention itself — a mention is usually a reply, so
-# the root is whatever started the thread). Subsequent lines are replies in the
-# order returned by the X API conversation_id search.
+# Output: JSONL on stdout. The first line is the queried tweet: the selected
+# mention when using -n, or the tweet passed with -i. Subsequent lines are other
+# tweets in the same conversation, in the order returned by the X API
+# conversation_id search. To find the conversation root, filter for the tweet
+# whose id equals its conversation_id.
 #
 # Each line has shape: {"tweet": {...}, "author": {...}, "media": [...]}
 #
