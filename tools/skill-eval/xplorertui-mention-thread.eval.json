@@ -1,0 +1,42 @@
+[
+  {
+    "query": "ok alice just replied to me on x — pull the whole thread that mention sits in, output to mention-thread.jsonl so i can grep through it",
+    "should_trigger": true
+  },
+  {
+    "query": "give me the thread context for my third most recent mention. xplorertui has it",
+    "should_trigger": true
+  },
+  {
+    "query": "what's the conversation around the last person who mentioned me on twitter? want it as jsonl so i can pipe to jq -r .tweet.text",
+    "should_trigger": true
+  },
+  {
+    "query": "expand my newest @mention into the full thread - need the surrounding conversation, not just the reply",
+    "should_trigger": true
+  },
+  {
+    "query": "i got pinged in some thread on x earlier, find my latest mention and dump the whole convo as one jsonl",
+    "should_trigger": true
+  },
+  {
+    "query": "show me my latest 10 mentions as jsonl, just the list — no need to expand any threads, I just want to see who tagged me recently",
+    "should_trigger": false
+  },
+  {
+    "query": "open https://x.com/example/status/1234567890 with xplorertui and give me the replies",
+    "should_trigger": true
+  },
+  {
+    "query": "search xplorertui for 'ratatui async loading' and dump the top 10 tweets as jsonl, sorted by likes",
+    "should_trigger": false
+  },
+  {
+    "query": "look up @alice's profile on xplorertui — i need their follower count and bio",
+    "should_trigger": false
+  },
+  {
+    "query": "fetch my home timeline jsonl from xplorertui, last 50 tweets — i want the chronological feed not mentions",
+    "should_trigger": false
+  }
+]
