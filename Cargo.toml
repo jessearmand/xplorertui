@@ -58,7 +58,7 @@ linfa-clustering = "0.8"
 linfa-reduction = "0.8"
 
 # Plotting
-kuva = "0.1"
+kuva = "0.2"
 
 # Skeleton loading animations
 tui-skeleton = "0.3"
