@@ -1,0 +1,8 @@
+default_provider = "xAI"
+
+[providers.xAI]
+type = "keychain"
+service = "xai"
+
+[secrets]
+X_CLIENT_ID= { provider = "xAI", value = "X_CLIENT_ID" }

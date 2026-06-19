@@ -86,6 +86,14 @@ User-context endpoints (home timeline, mentions, bookmarks) use `oauth_get`; rea
 
 `App.users_cache: HashMap<String, User>` caches user objects from API `includes` fields. Used by UI widgets for author lookup on tweets via `app.lookup_user(author_id)`.
 
+## Scratchpad
+
+When saving intermediate artifacts (JSONL, logs, captured output, etc.) during a session, use the `scratchpad/` directory in the repository root rather than `/tmp`. This keeps all work self-contained within the workspace. Create the directory if it does not exist:
+
+```bash
+mkdir -p scratchpad
+```
+
 ## CI
 
 GitHub Actions runs: `fmt`, `clippy`, `doc` (nightly), and `test` on macOS + Windows.
