@@ -5,8 +5,8 @@ embeddings via mlx-vlm, and chat completions via mlx-lm.
 Designed to be called from the xplorertui Rust TUI.
 
 Usage:
-    uv run uvicorn server:app --host 0.0.0.0 --port 8678
-    MLX_DEFAULT_MODEL=my-model uv run uvicorn server:app --host 0.0.0.0 --port 8678
+    uv run uvicorn server:app --host 127.0.0.1 --port 8678
+    MLX_DEFAULT_MODEL=my-model uv run uvicorn server:app --host 127.0.0.1 --port 8678
 """
 
 from __future__ import annotations
@@ -19,13 +19,13 @@ from typing import Any, cast
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from image_security import UnsafeImage, decode_images
 
 from registry import (
     ChatBackend,
     DEFAULT_CHAT_MODEL,
     DEFAULT_MODEL,
     ModelRegistry,
-    decode_images,
     mx_to_list,
 )
 from schemas import (
@@ -68,7 +68,12 @@ async def lifespan(app: FastAPI):
         logger.info("Default model loaded.")
 
     # Shared httpx client for image downloads (connection pooling).
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(15.0, connect=5.0),
+        limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
+        follow_redirects=False,
+        trust_env=False,
+    ) as client:
         app.state.http_client = client
         yield
 
@@ -155,6 +160,12 @@ async def create_multimodal_embeddings(request: MultimodalEmbeddingRequest):
         raise HTTPException(status_code=400, detail="No model specified")
 
     try:
+        http_client: httpx.AsyncClient = app.state.http_client
+        decoded_images = await decode_images(request.images, http_client)
+    except UnsafeImage as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    try:
         model, processor = registry.get_vl_model(model_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load VL model: {e}")
@@ -162,9 +173,6 @@ async def create_multimodal_embeddings(request: MultimodalEmbeddingRequest):
     try:
         from mlx_embeddings import generate
         from mlx_embeddings.models.base import ViTModelOutput
-
-        http_client: httpx.AsyncClient = app.state.http_client
-        decoded_images = await decode_images(request.images, http_client)
 
         # texts must be a non-empty list per generate() signature.
         texts: list[str] = request.texts if request.texts else [""]
@@ -501,4 +509,4 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("server:app", host="0.0.0.0", port=8678)
+    uvicorn.run("server:app", host="127.0.0.1", port=8678)

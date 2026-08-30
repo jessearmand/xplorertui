@@ -6,13 +6,13 @@ Local MLX server exposing OpenAI-compatible REST endpoints for text embeddings, 
 
 ```bash
 cd mlx-server
-uv run uvicorn server:app --host 0.0.0.0 --port 8678
+uv run uvicorn server:app --host 127.0.0.1 --port 8678
 ```
 
 Override the default model via environment variable:
 
 ```bash
-MLX_DEFAULT_MODEL=mlx-community/Qwen3-Embedding-0.6B-mxfp8 uv run uvicorn server:app --host 0.0.0.0 --port 8678
+MLX_DEFAULT_MODEL=mlx-community/Qwen3-Embedding-0.6B-mxfp8 uv run uvicorn server:app --host 127.0.0.1 --port 8678
 ```
 
 The server pre-loads the default embedding model at startup. Chat and additional models are lazy-loaded on first request.
@@ -35,6 +35,7 @@ Interactive API docs are available at `/docs` when the server is running.
 |---|---|---|
 | `MLX_DEFAULT_MODEL` | `mlx-community/Qwen3-Embedding-0.6B-mxfp8` | Embedding model to pre-load at startup |
 | `MLX_DEFAULT_CHAT_MODEL` | `mlx-community/Qwen3.5-0.8B-OptiQ-4bit` | Chat model (lazy-loaded on first request) |
+| `MLX_ALLOW_REMOTE_IMAGES` | unset | Opt in to public HTTPS image downloads; redirects and private addresses remain blocked |
 
 The xplorertui Rust client connects to this server when `mlx_server_url` is set in `~/.config/xplorertui/config.toml`:
 

@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
-import base64
 import enum
-import io
 import os
 from typing import Any
 
 import logging
 
-import httpx
 import mlx.core as mx
 import numpy as np
 
@@ -110,35 +106,3 @@ class ModelRegistry:
 def mx_to_list(arr: mx.array) -> list[list[float]]:
     """Convert MLX array to a list of float lists."""
     return np.array(arr).tolist()
-
-
-async def decode_image(image_str: str, client: httpx.AsyncClient) -> Any:
-    """Decode an image from a URL or base64 string.
-
-    Uses the provided shared httpx client for URL fetches to benefit
-    from connection pooling.
-    """
-    from PIL import Image
-
-    if image_str.startswith("data:"):
-        # data:image/...;base64,<data>
-        _, encoded = image_str.split(",", 1)
-        image_bytes = base64.b64decode(encoded)
-        return Image.open(io.BytesIO(image_bytes))
-    elif image_str.startswith("http://") or image_str.startswith("https://"):
-        resp = await client.get(image_str)
-        resp.raise_for_status()
-        return Image.open(io.BytesIO(resp.content))
-    else:
-        # Assume raw base64
-        image_bytes = base64.b64decode(image_str)
-        return Image.open(io.BytesIO(image_bytes))
-
-
-async def decode_images(image_strs: list[str], client: httpx.AsyncClient) -> list[Any]:
-    """Decode multiple images concurrently."""
-    if not image_strs:
-        return []
-    return list(
-        await asyncio.gather(*[decode_image(img, client) for img in image_strs])
-    )
