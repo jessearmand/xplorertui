@@ -9,8 +9,12 @@ import ipaddress
 import multiprocessing
 import os
 import socket
+from collections.abc import Iterable
 from io import BytesIO
+from typing import cast
 from urllib.parse import urlsplit
+
+import httpcore
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
@@ -25,7 +29,7 @@ class UnsafeImage(ValueError):
 
 
 def _validate_public_url(value: str) -> tuple[str, int]:
-    """Validate URL syntax before passing it to HTTPX/IDNA."""
+    """Validate URL syntax before passing it to the HTTP transport and IDNA."""
     if len(value) > 2048 or any(ord(char) < 0x20 for char in value):
         raise UnsafeImage("invalid image URL")
     try:
@@ -45,7 +49,7 @@ def _validate_public_url(value: str) -> tuple[str, int]:
     return ascii_host, port or 443
 
 
-async def _reject_non_public_addresses(host: str, port: int) -> None:
+async def _resolve_public_addresses(host: str, port: int) -> tuple[str, ...]:
     try:
         records = await asyncio.get_running_loop().getaddrinfo(
             host, port, type=socket.SOCK_STREAM
@@ -54,31 +58,168 @@ async def _reject_non_public_addresses(host: str, port: int) -> None:
         raise UnsafeImage("image URL hostname could not be resolved") from exc
     if not records:
         raise UnsafeImage("image URL hostname could not be resolved")
+    addresses: list[str] = []
     for record in records:
         address = ipaddress.ip_address(record[4][0])
         if not address.is_global:
             raise UnsafeImage("image URL resolves to a non-public address")
+        normalized = str(address)
+        if normalized not in addresses:
+            addresses.append(normalized)
+    return tuple(addresses)
 
 
-async def _download_image(value: str, client: object) -> bytes:
+class _PinnedNetworkBackend(httpcore.AsyncNetworkBackend):
+    """Connect an HTTP origin only to addresses from its validated DNS result."""
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        addresses: tuple[str, ...],
+        backend: httpcore.AsyncNetworkBackend | None = None,
+    ) -> None:
+        self._host = host
+        self._port = port
+        self._addresses = addresses
+        self._backend = (
+            backend
+            if backend is not None
+            else cast(httpcore.AsyncNetworkBackend, httpcore.AnyIOBackend())
+        )
+
+    async def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Iterable[httpcore.SOCKET_OPTION] | None = None,
+    ) -> httpcore.AsyncNetworkStream:
+        if host != self._host or port != self._port:
+            raise httpcore.ConnectError(
+                "connection target differs from validated origin"
+            )
+
+        deadline = None
+        if timeout is not None:
+            deadline = asyncio.get_running_loop().time() + timeout
+        last_error: Exception | None = None
+
+        for address in self._addresses:
+            remaining = timeout
+            if deadline is not None:
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    break
+            try:
+                return await self._backend.connect_tcp(
+                    address,
+                    port,
+                    timeout=remaining,
+                    local_address=local_address,
+                    socket_options=socket_options,
+                )
+            except (httpcore.ConnectError, httpcore.ConnectTimeout) as exc:
+                last_error = exc
+
+        if isinstance(last_error, httpcore.ConnectTimeout):
+            raise httpcore.ConnectTimeout(
+                "validated image addresses timed out"
+            ) from last_error
+        raise httpcore.ConnectError(
+            "validated image addresses could not be reached"
+        ) from last_error
+
+    async def connect_unix_socket(
+        self,
+        path: str,
+        timeout: float | None = None,
+        socket_options: Iterable[httpcore.SOCKET_OPTION] | None = None,
+    ) -> httpcore.AsyncNetworkStream:
+        raise httpcore.ConnectError("Unix sockets are not allowed for image downloads")
+
+    async def sleep(self, seconds: float) -> None:
+        await self._backend.sleep(seconds)
+
+
+def _pinned_connection_pool(
+    host: str,
+    port: int,
+    addresses: tuple[str, ...],
+    backend: httpcore.AsyncNetworkBackend | None = None,
+) -> httpcore.AsyncConnectionPool:
+    return httpcore.AsyncConnectionPool(
+        network_backend=_PinnedNetworkBackend(
+            host,
+            port,
+            addresses,
+            backend=backend,
+        ),
+        max_connections=1,
+        max_keepalive_connections=0,
+    )
+
+
+def _header_value(headers: list[tuple[bytes, bytes]], name: bytes) -> bytes | None:
+    values = [value for key, value in headers if key.lower() == name]
+    if not values:
+        return None
+    if len(set(values)) != 1:
+        raise UnsafeImage("image response has conflicting headers")
+    return values[0]
+
+
+async def _download_image(value: str) -> bytes:
     host, port = _validate_public_url(value)
     if os.environ.get("MLX_ALLOW_REMOTE_IMAGES", "").lower() not in {"1", "true"}:
         raise UnsafeImage("remote image URLs are disabled")
-    await _reject_non_public_addresses(host, port)
+    addresses = await _resolve_public_addresses(host, port)
     chunks: list[bytes] = []
     size = 0
-    async with client.stream(  # type: ignore[attr-defined]
-        "GET", value, follow_redirects=False
-    ) as response:
-        response.raise_for_status()
-        content_length = response.headers.get("content-length")
-        if content_length and int(content_length) > MAX_IMAGE_BYTES:
-            raise UnsafeImage("image exceeds byte limit")
-        async for chunk in response.aiter_bytes():
-            size += len(chunk)
-            if size > MAX_IMAGE_BYTES:
-                raise UnsafeImage("image exceeds byte limit")
-            chunks.append(chunk)
+    timeouts = {"connect": 5.0, "read": 15.0, "write": 15.0, "pool": 5.0}
+    try:
+        async with (
+            _pinned_connection_pool(host, port, addresses) as pool,
+            pool.stream(
+                "GET",
+                value,
+                headers={
+                    "Accept-Encoding": "identity",
+                    "User-Agent": "xplorertui-mlx/0.1",
+                },
+                extensions={"timeout": timeouts},
+            ) as response,
+        ):
+            if not 200 <= response.status < 300:
+                raise UnsafeImage(f"image download returned HTTP {response.status}")
+            content_encoding = _header_value(response.headers, b"content-encoding")
+            if (
+                content_encoding is not None
+                and content_encoding.strip().lower() != b"identity"
+            ):
+                raise UnsafeImage("compressed image responses are not allowed")
+            content_length = _header_value(response.headers, b"content-length")
+            if content_length is not None:
+                try:
+                    declared_size = int(content_length)
+                except ValueError as exc:
+                    raise UnsafeImage(
+                        "image response has invalid content length"
+                    ) from exc
+                if declared_size < 0 or declared_size > MAX_IMAGE_BYTES:
+                    raise UnsafeImage("image exceeds byte limit")
+            async for chunk in response.aiter_stream():
+                size += len(chunk)
+                if size > MAX_IMAGE_BYTES:
+                    raise UnsafeImage("image exceeds byte limit")
+                chunks.append(chunk)
+    except (
+        httpcore.NetworkError,
+        httpcore.ProtocolError,
+        httpcore.TimeoutException,
+    ) as exc:
+        raise UnsafeImage("image download failed") from exc
     return b"".join(chunks)
 
 
@@ -161,16 +302,16 @@ def _decode_isolated(data: bytes):
     return Image.frombytes("RGB", size, pixels)
 
 
-async def decode_image(value: str, client: object):
+async def decode_image(value: str):
     if value.startswith(("http://", "https://")):
-        data = await _download_image(value, client)
+        data = await _download_image(value)
     else:
         data = _decode_base64(value)
     return await asyncio.to_thread(_decode_isolated, data)
 
 
-async def decode_images(values: list[str], client: object) -> list[object]:
+async def decode_images(values: list[str]) -> list[object]:
     if len(values) > MAX_IMAGES:
         raise UnsafeImage(f"at most {MAX_IMAGES} images are allowed")
     # Decode sequentially so one request cannot multiply the resource limits.
-    return [await decode_image(value, client) for value in values]
+    return [await decode_image(value) for value in values]

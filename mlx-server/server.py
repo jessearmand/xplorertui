@@ -17,14 +17,13 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, cast
 
-import httpx
 from fastapi import FastAPI, HTTPException
-from image_security import UnsafeImage, decode_images
 
+from image_security import UnsafeImage, decode_images
 from registry import (
-    ChatBackend,
     DEFAULT_CHAT_MODEL,
     DEFAULT_MODEL,
+    ChatBackend,
     ModelRegistry,
     mx_to_list,
 )
@@ -67,15 +66,7 @@ async def lifespan(app: FastAPI):
         registry.get_text_model(registry.default_model)
         logger.info("Default model loaded.")
 
-    # Shared httpx client for image downloads (connection pooling).
-    async with httpx.AsyncClient(
-        timeout=httpx.Timeout(15.0, connect=5.0),
-        limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
-        follow_redirects=False,
-        trust_env=False,
-    ) as client:
-        app.state.http_client = client
-        yield
+    yield
 
 
 app = FastAPI(
@@ -160,8 +151,7 @@ async def create_multimodal_embeddings(request: MultimodalEmbeddingRequest):
         raise HTTPException(status_code=400, detail="No model specified")
 
     try:
-        http_client: httpx.AsyncClient = app.state.http_client
-        decoded_images = await decode_images(request.images, http_client)
+        decoded_images = await decode_images(request.images)
     except UnsafeImage as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 

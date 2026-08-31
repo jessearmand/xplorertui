@@ -375,11 +375,9 @@ dependencies = [
     { name = "filelock" },
     { name = "fsspec", extra = ["http"] },
     { name = "httpx" },
-    { name = "idna" },
     { name = "huggingface-hub" },
     { name = "multiprocess" },
     { name = "numpy" },
-    { name = "pillow" },
     { name = "packaging" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -1024,20 +1022,22 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
-    { name = "httpx" },
+    { name = "httpcore" },
+    { name = "idna" },
     { name = "mlx" },
     { name = "mlx-embeddings" },
     { name = "mlx-lm" },
     { name = "mlx-optiq" },
     { name = "mlx-vlm" },
     { name = "numpy" },
+    { name = "pillow" },
     { name = "transformers" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.0" },
-    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "httpcore", specifier = ">=1.0.9,<2" },
     { name = "idna", specifier = ">=3.10" },
     { name = "mlx", specifier = ">=0.31.0" },
     { name = "mlx-embeddings", git = "https://github.com/Blaizzy/mlx-embeddings.git?rev=v0.1.0" },
