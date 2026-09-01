@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints
 
 
 # ---------------------------------------------------------------------------
@@ -80,11 +82,15 @@ class ChatCompletionResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+ImageInput = Annotated[str, StringConstraints(max_length=14_000_000)]
+
+
 class MultimodalEmbeddingRequest(BaseModel):
     model: str
     texts: list[str]
-    images: list[str] = Field(
+    images: list[ImageInput] = Field(
         default_factory=list,
+        max_length=8,
         description="Image URLs or base64-encoded image data",
     )
 
