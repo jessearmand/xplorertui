@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import unittest
 
-from grouping import group_alerts, normalize_name, version_key
+from grouping import group_alerts, normalize_name
 from policy import classify
+from ranges import parse_range
+from versions import version_key
 
 
 def alert(number: int, package: str, severity: str, patched: str | None, **extra) -> dict:
@@ -48,6 +50,17 @@ class VersionKeyTest(unittest.TestCase):
         self.assertLess(version_key("unknown"), version_key("0.0.1"))
 
 
+class ParseRangeTest(unittest.TestCase):
+    def test_touching_bounds_overlap_only_when_both_inclusive(self):
+        self.assertFalse(parse_range("< 1.0").overlaps(parse_range(">= 1.0")))
+        self.assertTrue(parse_range("<= 1.0").overlaps(parse_range(">= 1.0")))
+        self.assertTrue(parse_range("= 1.0").overlaps(parse_range(">= 0.5, < 2.0")))
+
+    def test_missing_or_garbled_range_is_unbounded(self):
+        self.assertTrue(parse_range(None).overlaps(parse_range("= 9.9")))
+        self.assertTrue(parse_range("see advisory").overlaps(parse_range("< 0.1")))
+
+
 class GroupAlertsTest(unittest.TestCase):
     def test_case_variants_share_a_group_with_highest_target(self):
         rows = classify([
@@ -83,6 +96,23 @@ class GroupAlertsTest(unittest.TestCase):
         (group,) = group_alerts(classify([alert(1, "idna", "critical", None)]))
         self.assertEqual(group.decision, "Blocked")
         self.assertIsNone(group.target_version)
+
+    def test_disjoint_ranges_split_into_release_lines(self):
+        rows = classify([
+            alert(1, "rand", "low", "0.8.6", range=">= 0.7.0, < 0.8.6"),
+            alert(2, "rand", "low", "0.9.3", range=">= 0.9.0, < 0.9.3"),
+            alert(3, "rand", "low", "0.10.1", range="= 0.10.0"),
+        ])
+        self.assertEqual([g.target_version for g in group_alerts(rows)], ["0.8.6", "0.9.3", "0.10.1"])
+
+    def test_overlap_is_transitive_regardless_of_input_order(self):
+        rows = classify([
+            alert(1, "openssl", "high", "0.10.80", range=">= 0.10.50, < 0.10.80"),
+            alert(2, "openssl", "high", "0.10.10", range=">= 0.9.0, < 0.10.10"),
+            alert(3, "openssl", "high", "0.10.78", range=">= 0.10.5, < 0.10.78"),
+        ])
+        (group,) = group_alerts(rows)
+        self.assertEqual(group.target_version, "0.10.80")
 
     def test_groups_sorted_most_urgent_first(self):
         rows = classify([

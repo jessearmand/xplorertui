@@ -25,13 +25,14 @@ def is_direct_manifest(path: str | None) -> bool:
     return any(path.endswith(s) for s in DIRECT_SUFFIXES)
 
 
-def decide(alert: dict) -> str:
+def decide(alert: dict, always_fix: frozenset[str] | set[str] | None = None) -> str:
+    always_fix = ALWAYS_FIX if always_fix is None else always_fix
     sev = (alert.get("severity") or "").lower()
     patched = alert.get("patched")
     pkg = alert.get("package") or ""
     manifest = alert.get("manifest") or ""
 
-    if pkg in ALWAYS_FIX and patched:
+    if pkg in always_fix and patched:
         return "MustMerge"
 
     if sev in ("critical", "high"):

@@ -30,8 +30,11 @@ Dependabot files one alert per advisory; the work is one bump per package per ma
 - key: ecosystem + normalized package name (`Pillow` = `pillow`, PEP 503) + manifest
 - **Bump to**: the highest `first_patched_version` in the group, compared numerically
 - decision: the most urgent of MustMerge > Review > Defer among its alerts; unpatched alerts never stop a bump and are listed as *still unpatched*; a group with no patch at all is Blocked
+- packages locked at several versions are split into release lines: advisories with disjoint vulnerable ranges get separate bumps (`ranges.py`)
 
-Modules: `policy.py` (rules), `grouping.py`, `report.py`, `classify.py` (CLI). Tests: `python3 -m unittest discover -s security-policy`.
+Modules: `policy.py` (rules), `grouping.py`, `ranges.py`, `versions.py`, `report.py`, `classify.py` (CLI).
+
+Reference for the Bend port: `fixtures/decision-table.json` (all 40 input combinations, checked by `python3 security-policy/reference.py`) and `EVALUATION.md`. Tests: `python3 -m unittest discover -s security-policy`.
 
 ## Offline run
 

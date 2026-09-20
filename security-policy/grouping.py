@@ -1,7 +1,7 @@
 """Collapse classified alerts into update groups.
 
 Dependabot files one alert per advisory, but the unit of work is one version
-bump per package per manifest. A group is that bump: every alert it closes,
+bump per package release line per manifest. A group is that bump: every alert it closes,
 the version that closes all of them, and the most urgent decision among them.
 """
 from __future__ import annotations
@@ -10,14 +10,12 @@ import re
 from dataclasses import dataclass, field
 
 from policy import DECISION_ORDER, severity_rank
+from ranges import parse_range, partition_by_overlap
+from versions import version_key
 
 # Decisions that a version bump can act on, most urgent first. Blocked alerts
 # have no patch, so they never drive a bump; they are carried on the group.
 ACTIONABLE_ORDER = tuple(d for d in DECISION_ORDER if d != "Blocked")
-
-_VERSION_RE = re.compile(r"v?(\d+(?:\.\d+)*)(.*)", re.IGNORECASE)
-_PRE_RELEASE_RE = re.compile(r"[-._]?(a|b|c|rc|alpha|beta|pre|preview|dev)", re.IGNORECASE)
-_PRE, _FINAL, _POST = 0, 1, 2
 
 
 def normalize_name(package: str, ecosystem: str | None) -> str:
@@ -28,28 +26,6 @@ def normalize_name(package: str, ecosystem: str | None) -> str:
     if (ecosystem or "").lower() == "rust":
         return name.replace("_", "-")  # crates.io treats - and _ as equal
     return name
-
-
-def version_key(version: str) -> tuple:
-    """Sort key for release versions across ecosystems (semver, PEP 440).
-
-    Compares the numeric release first (`3.15` == `3.15.0`), then orders
-    pre-release < final < post/build. Unparseable strings sort lowest.
-    """
-    match = _VERSION_RE.fullmatch(version.strip())
-    if not match:
-        return ((), _PRE, version)
-    release = [int(part) for part in match.group(1).split(".")]
-    while len(release) > 1 and release[-1] == 0:
-        release.pop()
-    suffix = match.group(2)
-    if not suffix:
-        phase = _FINAL
-    elif _PRE_RELEASE_RE.match(suffix):
-        phase = _PRE
-    else:
-        phase = _POST
-    return (tuple(release), phase, suffix)
 
 
 @dataclass
@@ -103,22 +79,29 @@ class UpdateGroup:
 
 
 def group_alerts(rows: list[dict]) -> list[UpdateGroup]:
-    """Group classified rows by (ecosystem, package, manifest), most urgent first."""
-    groups: dict[tuple[str, str, str], UpdateGroup] = {}
+    """Group classified rows into updates, most urgent first.
+
+    Rows sharing (ecosystem, package, manifest) are split further into release
+    lines: advisories with disjoint vulnerable ranges need separate bumps.
+    """
+    by_package: dict[tuple[str, str, str], list[dict]] = {}
     for row in rows:
         ecosystem = row.get("ecosystem") or ""
-        manifest = row.get("manifest") or ""
         package = normalize_name(row.get("package") or "", ecosystem)
-        key = (ecosystem, package, manifest)
-        if key not in groups:
-            groups[key] = UpdateGroup(package, ecosystem, manifest)
-        groups[key].alerts.append(row)
+        by_package.setdefault((ecosystem, package, row.get("manifest") or ""), []).append(row)
+
+    groups = [
+        UpdateGroup(package, ecosystem, manifest, line)
+        for (ecosystem, package, manifest), members in by_package.items()
+        for line in partition_by_overlap(members, lambda row: parse_range(row.get("range")))
+    ]
     return sorted(
-        groups.values(),
+        groups,
         key=lambda g: (
             DECISION_ORDER.index(g.decision),
             severity_rank(g.max_severity),
             g.manifest,
             g.package,
+            version_key(g.target_version or ""),
         ),
     )

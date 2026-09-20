@@ -11,9 +11,9 @@ most urgent decision of the alerts it closes.
 |---|---:|---:|
 | MustMerge | 11 | 31 |
 | Review | 3 | 29 |
-| Defer | 2 | 21 |
+| Defer | 4 | 21 |
 | Blocked | 0 | 0 |
-| **Total** | **16** | **81** |
+| **Total** | **18** | **81** |
 
 ## MustMerge (fix and merge) (11)
 
@@ -39,11 +39,13 @@ most urgent decision of the alerts it closes.
 | `pydantic-settings` | `mlx-server/uv.lock` | `2.14.2` | medium | #61 | — |
 | `requests` | `mlx-server/uv.lock` | `2.33.0` | medium | #4 | — |
 
-## Defer (low) (2)
+## Defer (low) (4)
 
 | Package | Manifest | Bump to | Max sev | Alerts closed | Still unpatched |
 |---|---|---|---|---|---|
-| `rand` | `Cargo.lock` | `0.10.1` | low | #17, #22, #28 | — |
+| `rand` | `Cargo.lock` | `0.8.6` | low | #28 | — |
+| `rand` | `Cargo.lock` | `0.9.3` | low | #22 | — |
+| `rand` | `Cargo.lock` | `0.10.1` | low | #17 | — |
 | `pygments` | `mlx-server/uv.lock` | `2.20.0` | low | #5 | — |
 
 ## Blocked (no patch) (0)
@@ -131,7 +133,7 @@ _None._
 | 39 | medium | `idna` | `3.15` | Review | Internationalized Domain Names in Applications (IDNA): Specially crafted inputs  |
 | 61 | medium | `pydantic-settings` | `2.14.2` | Review | pydantic-settings: NestedSecretsSettingsSource follows symlinks outside secrets_ |
 | 4 | medium | `requests` | `2.33.0` | Review | Requests has Insecure Temp File Reuse in its extract_zipped_paths() utility func |
-| 17 | low | `rand` | `0.10.1` | Defer | Rand is unsound with a custom logger using rand::rng() |
-| 22 | low | `rand` | `0.9.3` | Defer | Rand is unsound with a custom logger using rand::rng() |
 | 28 | low | `rand` | `0.8.6` | Defer | Rand is unsound with a custom logger using rand::rng() |
+| 22 | low | `rand` | `0.9.3` | Defer | Rand is unsound with a custom logger using rand::rng() |
+| 17 | low | `rand` | `0.10.1` | Defer | Rand is unsound with a custom logger using rand::rng() |
 | 5 | low | `pygments` | `2.20.0` | Defer | Pygments has Regular Expression Denial of Service (ReDoS) due to Inefficient Reg |
