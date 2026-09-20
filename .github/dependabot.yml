@@ -10,6 +10,17 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+  # Maintain dependencies for the optional MLX server (pyproject.toml + uv.lock)
+  - package-ecosystem: "uv"
+    directory: "/mlx-server"
+    schedule:
+      interval: "weekly"
+    groups:
+      # One PR for all security fixes instead of one per advisory
+      mlx-server-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
   # Maintain dependencies for GitHub Actions
   - package-ecosystem: github-actions
     directory: "/"

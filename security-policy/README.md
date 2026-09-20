@@ -23,6 +23,16 @@ Keep `classify.py` aligned with `LAWS.bend`. When `bend` can check `PROOF.bend`,
 | **Defer** | low severity (unless allowlisted) |
 | **Blocked** | critical/high/medium with **no** patched version |
 
+## Grouping
+
+Dependabot files one alert per advisory; the work is one bump per package per manifest. After per-alert classification, `grouping.py` collapses alerts into *updates*:
+
+- key: ecosystem + normalized package name (`Pillow` = `pillow`, PEP 503) + manifest
+- **Bump to**: the highest `first_patched_version` in the group, compared numerically
+- decision: the most urgent of MustMerge > Review > Defer among its alerts; unpatched alerts never stop a bump and are listed as *still unpatched*; a group with no patch at all is Blocked
+
+Modules: `policy.py` (rules), `grouping.py`, `report.py`, `classify.py` (CLI). Tests: `python3 -m unittest discover -s security-policy`.
+
 ## Offline run
 
 ```bash
