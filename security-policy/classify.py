@@ -14,6 +14,7 @@ from pathlib import Path
 
 from grouping import UpdateGroup
 from report import render_md
+from resolver import OfflineProbe
 from triage import triage
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -44,6 +45,7 @@ def main() -> int:
     p.add_argument("--json-out", help="Write classified per-alert JSON path")
     p.add_argument("--groups-out", help="Write grouped updates JSON path")
     p.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Checkout whose manifests and lockfiles are inspected for holds")
+    p.add_argument("--offline", action="store_true", help="Skip resolver dry runs; unchecked fixes are Held as unverified")
     args = p.parse_args()
 
     path = resolve_alerts_path(args.alerts_json)
@@ -51,7 +53,7 @@ def main() -> int:
         print(f"missing alerts file: {args.alerts_json}", file=sys.stderr)
         return 1
 
-    rows, groups = triage(json.loads(path.read_text()), args.repo_root)
+    rows, groups = triage(json.loads(path.read_text()), args.repo_root, OfflineProbe() if args.offline else None)
     print_summary(rows, groups)
 
     report_path = Path(args.report) if args.report else FIXTURES / "classification-report.md"

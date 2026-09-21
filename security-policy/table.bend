@@ -22,8 +22,12 @@ def hold_name(hold: P.Hold) -> String:
       "none"
     case P.Pinned{}:
       "pinned"
+    case P.Constrained{}:
+      "constrained"
     case P.MajorJump{}:
       "major_jump"
+    case P.Unverified{}:
+      "unverified"
 
 def decision_name(decision: P.Decision) -> String:
   match decision:
@@ -45,7 +49,7 @@ def row(+severity: P.Severity, +patched: Bool, +hold: P.Hold) -> String:
   severity_name(severity) ++ " " ++ bool_name(patched) ++ " " ++ hold_name(hold) ++ " " ++ decision_name(P.decide(P.Alert{severity, patched, hold})) ++ "\n"
 
 def rows_patched(+severity: P.Severity, +patched: Bool) -> String:
-  row(severity, patched, P.NoHold{}) ++ row(severity, patched, P.Pinned{}) ++ row(severity, patched, P.MajorJump{})
+  row(severity, patched, P.NoHold{}) ++ row(severity, patched, P.Pinned{}) ++ row(severity, patched, P.Constrained{}) ++ row(severity, patched, P.MajorJump{}) ++ row(severity, patched, P.Unverified{})
 
 def rows_severity(+severity: P.Severity) -> String:
   rows_patched(severity, True{}) ++ rows_patched(severity, False{})

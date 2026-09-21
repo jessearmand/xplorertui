@@ -11,7 +11,7 @@ from __future__ import annotations
 DECISION_ORDER = ("MustMerge", "Held", "Blocked")
 
 # Why a patched fix cannot simply be merged. "none" means nothing holds it.
-HOLD_KINDS = ("none", "pinned", "major_jump")
+HOLD_KINDS = ("none", "pinned", "constrained", "major_jump", "unverified")
 
 SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 UNKNOWN_SEVERITY_RANK = len(SEVERITY_RANK)

@@ -13,7 +13,8 @@ law patched_unheld_must_merge:
   for severity: P.Severity
   {P.decide(P.Alert{severity, True{}, P.NoHold{}}) == P.MustMerge{} : P.Decision}
 
-# LAW: a patched vulnerability that something holds (a pin, a breaking upgrade) is Held.
+# LAW: a patched vulnerability that anything holds is Held: a pin, another package's
+# constraint, a breaking upgrade, or simply not having checked that the fix is reachable.
 law patched_held_is_held:
   for severity: P.Severity
   for hold: P.Hold
@@ -33,6 +34,12 @@ law must_merge_needs_patch:
   for patched: Bool
   for hold: P.Hold
   {P.decide(P.Alert{severity, patched, hold}) == P.MustMerge{} : P.Decision} -> {patched == True{} : Bool}
+
+# LAW: a fix nobody verified as reachable is never MustMerge.
+law unverified_never_must_merge:
+  for severity: P.Severity
+  for patched: Bool
+  {P.decide(P.Alert{severity, patched, P.Unverified{}}) != P.MustMerge{} : P.Decision}
 
 # LAW: MustMerge is only ever said about something nothing holds.
 law must_merge_needs_no_hold:

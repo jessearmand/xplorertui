@@ -1,7 +1,9 @@
 """Find what holds a patched fix back from a plain merge.
 
-pinned      the project's own requirement excludes the fixed version
-major_jump  the fixed version is a breaking upgrade from the locked one
+pinned       the project's own requirement excludes the fixed version
+constrained  the resolver cannot reach the fixed version (some other package's constraint)
+major_jump   the fixed version is a breaking upgrade from the locked one
+unverified   reachability could not be checked; unknown is never MustMerge
 """
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ from pathlib import Path
 from lockfiles import locked_versions
 from manifests import DECLARING_MANIFESTS, LOCKFILE_MANIFESTS, ManifestIndex
 from ranges import parse_range
+from resolver import Reach
 from specifiers import caret_compatible, requirement_allows
 from versions import version_key
 
@@ -50,6 +53,15 @@ class HoldResolver:
             return [self.repo_root / path.parent / lock for lock in siblings]
         return []
 
+    def lockfile_for(self, group) -> Path | None:
+        """The lockfile that pins this group's package, if one is present."""
+        for lockfile in self._lockfiles_for(group.manifest):
+            if lockfile not in self._locked:
+                self._locked[lockfile] = locked_versions(lockfile)
+            if group.package in self._locked[lockfile]:
+                return lockfile
+        return None
+
     def locked_version(self, group) -> str | None:
         """The locked version this group's advisories apply to (highest, if several)."""
         intervals = [parse_range(a.get("range")) for a in group.alerts]
@@ -73,14 +85,19 @@ class HoldResolver:
             return specifiers
         return [s for s in specifiers if requirement_allows(s, locked, group.ecosystem) is not False]
 
-    def hold_for(self, group) -> Hold:
+    def hold_for(self, group, reach: Reach) -> Hold:
+        """Known reasons first; an unchecked fix is held as unverified, never waved through."""
         target = group.target_version
         if target is None:
             return NO_HOLD
-        locked = self.locked_version(group)
+        locked = group.locked_version
         for specifier in self._declared_specifiers(group, locked):
             if requirement_allows(specifier, target, group.ecosystem) is False:
                 return Hold("pinned", f"declared `{specifier}` excludes {target}")
+        if reach.version is not None and version_key(reach.version) < version_key(target):
+            return Hold("constrained", f"resolver only reaches {reach.version}; the fix needs {target}")
         if locked and is_breaking(locked, target, group.ecosystem):
             return Hold("major_jump", f"{locked} -> {target} is a breaking upgrade")
+        if reach.version is None and not reach.removed:
+            return Hold("unverified", reach.reason or "reachability not checked")
         return NO_HOLD

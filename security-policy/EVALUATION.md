@@ -5,6 +5,9 @@ Fixture: 81 open alerts exported 2026-09-20. Every bump target was compared with
 
 ## Result under the current rule
 
+Reachability verified by resolver dry runs on 2026-09-22: all 15 MustMerge updates are reachable.
+`--offline` gives 18 Held (`unverified`), by design.
+
 | Decision | Updates | Alerts |
 |---|---:|---:|
 | MustMerge | 15 | 72 |
@@ -28,11 +31,13 @@ Running it against the repo showed severity was standing in for the real questio
 | One bump target for a package locked at several versions | `rand` locked at 0.8.5, 0.9.2, 0.10.0, each with its own advisory | groups split by disjoint vulnerable range |
 | Direct dependency classed as lockfile noise | `idna` is declared in `pyproject.toml`, but GitHub names `uv.lock` | declared manifests are read |
 | MustMerge that cannot merge | `transformers==5.3.0` pin; `starlette` major jump | the Held decision, with detected reasons |
+| A fix assumed reachable because nothing said otherwise | lockfiles do not record parent constraints | resolver dry runs; unknown is Held as `unverified` |
 | Review/Defer with nothing actually in the way | `pydantic-settings`, `requests`, `pygments`, `rand` | MustMerge, ordered after the severe ones |
 
 ## Known gaps
 
-- Parent constraints are not detected (needs a resolver dry run such as `uv lock --upgrade-package`).
+- Results now depend on the registry state at run time; the committed report is a snapshot.
+- `starlette` is reachable (the resolver goes to 1.6.0, so `fastapi` allows 1.x); it stays Held only as a breaking upgrade.
 - `transformers` appears twice, for `pyproject.toml` and `uv.lock`; it is one bump.
-- Only TOML lockfiles are read (`uv.lock`, `poetry.lock`, `Cargo.lock`); npm requirement syntax is not evaluated. Both fail open: no evidence, no hold.
+- Resolvers exist for `Cargo.lock` and `uv.lock` only; `poetry.lock` and npm lockfiles end up `unverified`. npm requirement syntax is not evaluated for pins.
 - Severity is the only ordering signal; EPSS, attack vector and runtime-vs-dev scope are not used.

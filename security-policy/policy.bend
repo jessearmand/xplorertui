@@ -10,10 +10,13 @@ type Severity is Data:
   Unknown{}
 
 # Why a patched fix cannot simply be merged.
+# Unverified: nobody checked that the fix is reachable. Unknown is not "fine".
 type Hold is Data:
   NoHold{}
   Pinned{}
+  Constrained{}
   MajorJump{}
+  Unverified{}
 
 type Decision is Data:
   MustMerge{}
@@ -31,7 +34,11 @@ def decide_fields(patched: Bool, hold: Hold) -> Decision:
       MustMerge{}
     case True{} Pinned{}:
       Held{}
+    case True{} Constrained{}:
+      Held{}
     case True{} MajorJump{}:
+      Held{}
+    case True{} Unverified{}:
       Held{}
 
 def decide(a: Alert) -> Decision:

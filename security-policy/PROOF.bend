@@ -34,7 +34,11 @@ def Laws.patched_held_is_held(severity, hold):
       differs => exfalso({P.MustMerge{} == P.Held{} : P.Decision}, differs({==}))
     case P.Pinned{}:
       differs => {==}
+    case P.Constrained{}:
+      differs => {==}
     case P.MajorJump{}:
+      differs => {==}
+    case P.Unverified{}:
       differs => {==}
 
 def Laws.unpatched_blocked(severity, hold):
@@ -53,14 +57,29 @@ def Laws.must_merge_needs_no_hold(severity, patched, hold):
       e => {==}
     case False{} P.Pinned{}:
       e => exfalso({P.Pinned{} == P.NoHold{} : P.Hold}, blocked_clash(e))
+    case False{} P.Constrained{}:
+      e => exfalso({P.Constrained{} == P.NoHold{} : P.Hold}, blocked_clash(e))
     case False{} P.MajorJump{}:
       e => exfalso({P.MajorJump{} == P.NoHold{} : P.Hold}, blocked_clash(e))
+    case False{} P.Unverified{}:
+      e => exfalso({P.Unverified{} == P.NoHold{} : P.Hold}, blocked_clash(e))
     case True{} P.NoHold{}:
       e => {==}
     case True{} P.Pinned{}:
       e => exfalso({P.Pinned{} == P.NoHold{} : P.Hold}, held_clash(e))
+    case True{} P.Constrained{}:
+      e => exfalso({P.Constrained{} == P.NoHold{} : P.Hold}, held_clash(e))
     case True{} P.MajorJump{}:
       e => exfalso({P.MajorJump{} == P.NoHold{} : P.Hold}, held_clash(e))
+    case True{} P.Unverified{}:
+      e => exfalso({P.Unverified{} == P.NoHold{} : P.Hold}, held_clash(e))
+
+def Laws.unverified_never_must_merge(severity, patched):
+  match patched:
+    case False{}:
+      e => blocked_clash(e)
+    case True{}:
+      e => held_clash(e)
 
 def Laws.severity_never_changes_decision(one, other, patched, hold):
   {==}
