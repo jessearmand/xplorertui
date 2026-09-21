@@ -18,10 +18,14 @@ Keep `classify.py` aligned with `LAWS.bend`. When `bend` can check `PROOF.bend`,
 
 | Decision | When |
 |---|---|
-| **MustMerge** | critical/high with a patched version; medium in a *direct* manifest (`pyproject.toml` / `Cargo.toml`) with a patch; or package on `ALWAYS_FIX` |
-| **Review** | medium with a patch, but only appearing in a lockfile |
+| **MustMerge** | critical/high with a patched version; medium in a *direct* dependency (declared in `pyproject.toml` / `Cargo.toml` / `package.json`) with a patch; or package on `ALWAYS_FIX` |
+| **Review** | medium with a patch, in a transitive dependency |
 | **Defer** | low severity (unless allowlisted) |
 | **Blocked** | critical/high/medium with **no** patched version |
+
+## Direct vs transitive
+
+GitHub files alerts against the lockfile even for direct dependencies, so the alert's manifest path says nothing. `manifests.py` reads the manifest next to the lockfile (`uv.lock` -> `pyproject.toml`, `Cargo.lock` -> `Cargo.toml`, ...) and marks each alert `direct` when its package is declared there. `decide` only sees that boolean. Results therefore depend on the checkout: pass `--repo-root` to classify against another one.
 
 ## Grouping
 
@@ -32,7 +36,7 @@ Dependabot files one alert per advisory; the work is one bump per package per ma
 - decision: the most urgent of MustMerge > Review > Defer among its alerts; unpatched alerts never stop a bump and are listed as *still unpatched*; a group with no patch at all is Blocked
 - packages locked at several versions are split into release lines: advisories with disjoint vulnerable ranges get separate bumps (`ranges.py`)
 
-Modules: `policy.py` (rules), `grouping.py`, `ranges.py`, `versions.py`, `report.py`, `classify.py` (CLI).
+Modules: `policy.py` (rules), `manifests.py`, `grouping.py`, `ranges.py`, `versions.py`, `report.py`, `classify.py` (CLI).
 
 Reference for the Bend port: `fixtures/decision-table.json` (all 40 input combinations, checked by `python3 security-policy/reference.py`) and `EVALUATION.md`. Tests: `python3 -m unittest discover -s security-policy`.
 

@@ -13,10 +13,12 @@ from collections import Counter
 from pathlib import Path
 
 from grouping import UpdateGroup, group_alerts
+from manifests import DirectDependencyResolver
 from policy import classify
 from report import render_md
 
 FIXTURES = Path(__file__).parent / "fixtures"
+REPO_ROOT = Path(__file__).parent.parent
 
 
 def resolve_alerts_path(arg: str) -> Path | None:
@@ -43,6 +45,7 @@ def main() -> int:
     p.add_argument("-o", "--report", help="Write markdown report path")
     p.add_argument("--json-out", help="Write classified per-alert JSON path")
     p.add_argument("--groups-out", help="Write grouped updates JSON path")
+    p.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Checkout whose manifests decide direct vs transitive")
     args = p.parse_args()
 
     path = resolve_alerts_path(args.alerts_json)
@@ -50,7 +53,7 @@ def main() -> int:
         print(f"missing alerts file: {args.alerts_json}", file=sys.stderr)
         return 1
 
-    rows = classify(json.loads(path.read_text()))
+    rows = classify(json.loads(path.read_text()), DirectDependencyResolver(args.repo_root))
     groups = group_alerts(rows)
     print_summary(rows, groups)
 

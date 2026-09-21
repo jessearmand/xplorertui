@@ -24,7 +24,7 @@ All 18 updates are real: each locked version is below its bump target. No alert 
 
 | Finding | Evidence | Rule gap |
 |---|---|---|
-| Direct dependency classed as lockfile noise | `idna` is declared in `mlx-server/pyproject.toml` but its alert names `uv.lock`, so it gets Review, not MustMerge | `is_direct_manifest` looks at the alert's manifest path; GitHub reports the lockfile even for direct deps. Needs the declared dependency list as an input. |
+| **Fixed.** Direct dependency classed as lockfile noise | `idna` is declared in `mlx-server/pyproject.toml` but its alert names `uv.lock`, so it gets Review, not MustMerge | `is_direct_manifest` looks at the alert's manifest path; GitHub reports the lockfile even for direct deps. Now resolved by `manifests.py`: `idna` and the 6 medium `pillow` alerts move to MustMerge (12 / 2 / 4 updates, 38 / 22 / 21 alerts). |
 | MustMerge that cannot simply merge | `transformers` is pinned `==5.3.0` on purpose (Gemma 4 loader regression); target is 5.10.0 | No notion of a deliberate pin. Candidate decision: Blocked-by-pin, or a `PINNED` list parallel to `ALWAYS_FIX`. |
 | Major-version jump treated like a patch bump | `starlette` 0.52.1 -> 1.3.1 (transitive via `fastapi`) | No upgrade-risk input. Compare locked and target major versions. |
 | Same bump counted twice | `transformers` appears for `pyproject.toml` and `uv.lock` | Manifests in one directory could share a group. |
@@ -33,7 +33,7 @@ All 18 updates are real: each locked version is below its bump target. No alert 
 ## Precedence, as Python resolves it
 
 `fixtures/decision-table.json` enumerates all 40 input combinations
-(severity x patched x direct manifest x allowlisted). It settles the overlaps in `LAWS.bend`:
+(severity x patched x direct x allowlisted). It settles the overlaps in `LAWS.bend`:
 
 - allowlisted and unpatched: the allowlist has no effect (Blocked for critical/high/medium)
 - low and unpatched: Defer, allowlisted or not

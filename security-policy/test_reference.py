@@ -22,7 +22,7 @@ class DecisionTableTest(unittest.TestCase):
 
     def test_allowlisting_never_lowers_urgency(self):
         urgency = {"Defer": 0, "Review": 1, "Blocked": 2, "MustMerge": 3}
-        by_inputs = {(r["severity"], r["patched"], r["direct_manifest"], r["allowlisted"]): r["decision"] for r in self.table}
+        by_inputs = {(r["severity"], r["patched"], r["direct"], r["allowlisted"]): r["decision"] for r in self.table}
         for (severity, patched, direct, allowlisted), decision in by_inputs.items():
             if allowlisted:
                 plain = by_inputs[(severity, patched, direct, False)]

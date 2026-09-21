@@ -3,7 +3,7 @@
 # Run `bend PROOF.bend` when Bend is installed; until then classify.py enforces these rules.
 
 # Types (informal model of a Dependabot alert)
-# Alert { number, severity, package, ecosystem, manifest, range, patched, summary }
+# Alert { number, severity, package, ecosystem, manifest, range, patched, summary, direct }
 
 # Decision: MustMerge | Review | Defer | Blocked
 
@@ -19,17 +19,19 @@ law blocked_unpatched_severe:
   (a.severity == "critical" or a.severity == "high") and a.patched == None
   implies decision(a) == Blocked
 
-# LAW: medium in a direct-declare manifest must merge when patched.
-# Direct manifests: pyproject.toml, Cargo.toml (not lockfiles alone).
+# LAW: medium in a direct dependency must merge when patched.
+# a.direct: the package is declared in pyproject.toml / Cargo.toml / package.json.
+# GitHub reports the lockfile even for direct deps, so this is resolved from the
+# repo's manifests (manifests.py), not from a.manifest.
 law must_merge_medium_direct:
   for a: Alert
-  a.severity == "medium" and a.patched != None and is_direct_manifest(a.manifest)
+  a.severity == "medium" and a.patched != None and a.direct
   implies decision(a) == MustMerge
 
-# LAW: medium only in lockfiles needs human review (transitive noise).
+# LAW: medium in a transitive dependency needs human review.
 law review_medium_lockfile:
   for a: Alert
-  a.severity == "medium" and a.patched != None and not is_direct_manifest(a.manifest)
+  a.severity == "medium" and a.patched != None and not a.direct
   implies decision(a) == Review
 
 # LAW: medium with no patch is blocked from auto-merge.
@@ -49,10 +51,6 @@ law must_merge_allowlist:
   for a: Alert
   a.package in ALWAYS_FIX and a.patched != None
   implies decision(a) == MustMerge
-
-# Helpers
-def is_direct_manifest(path: String) -> Bool:
-  path.ends_with("pyproject.toml") or path.ends_with("Cargo.toml") or path.ends_with("package.json")
 
 # ALWAYS_FIX starts empty — add package names here when low-severity deps are still must-fix.
 ALWAYS_FIX = []

@@ -9,13 +9,13 @@ most urgent decision of the alerts it closes.
 
 | Decision | Updates | Alerts |
 |---|---:|---:|
-| MustMerge | 11 | 31 |
-| Review | 3 | 29 |
+| MustMerge | 12 | 38 |
+| Review | 2 | 22 |
 | Defer | 4 | 21 |
 | Blocked | 0 | 0 |
 | **Total** | **18** | **81** |
 
-## MustMerge (fix and merge) (11)
+## MustMerge (fix and merge) (12)
 
 | Package | Manifest | Bump to | Max sev | Alerts closed | Still unpatched |
 |---|---|---|---|---|---|
@@ -30,12 +30,12 @@ most urgent decision of the alerts it closes.
 | `starlette` | `mlx-server/uv.lock` | `1.3.1` | high | #43, #57, #58, #59, #60 | — |
 | `transformers` | `mlx-server/uv.lock` | `5.10.0` | high | #62, #81 | — |
 | `urllib3` | `mlx-server/uv.lock` | `2.7.0` | high | #37, #38 | — |
+| `idna` | `mlx-server/uv.lock` | `3.15` | medium | #39 | — |
 
-## Review (medium in lockfiles) (3)
+## Review (medium, transitive) (2)
 
 | Package | Manifest | Bump to | Max sev | Alerts closed | Still unpatched |
 |---|---|---|---|---|---|
-| `idna` | `mlx-server/uv.lock` | `3.15` | medium | #39 | — |
 | `pydantic-settings` | `mlx-server/uv.lock` | `2.14.2` | medium | #61 | — |
 | `requests` | `mlx-server/uv.lock` | `2.33.0` | medium | #4 | — |
 
@@ -98,22 +98,22 @@ _None._
 | 78 | medium | `aiohttp` | `3.14.2` | Review | AIOHTTP: HTTP request smuggling via WebSocket upgrade |
 | 79 | high | `aiohttp` | `3.14.3` | MustMerge | AIOHTTP: Out-of-bounds heap read in C HTTP response parser error path (malformed |
 | 16 | high | `pillow` | `12.2.0` | MustMerge | FITS GZIP decompression bomb in Pillow |
-| 30 | medium | `pillow` | `12.2.0` | Review | Pillow has a heap buffer overflow with nested list coordinates |
+| 30 | medium | `pillow` | `12.2.0` | MustMerge | Pillow has a heap buffer overflow with nested list coordinates |
 | 31 | high | `pillow` | `12.2.0` | MustMerge | Pillow has an OOB Write with Invalid PSD Tile Extents (Integer Overflow) |
-| 32 | medium | `pillow` | `12.2.0` | Review | Pillow has an integer overflow when processing fonts |
-| 33 | medium | `pillow` | `12.2.0` | Review | Pillow has a PDF Parsing Trailer Infinite Loop (DoS) |
-| 63 | medium | `pillow` | `12.3.0` | Review | Pillow EpsImagePlugin negative %%BeginBinary byte count causes infinite loop den |
+| 32 | medium | `pillow` | `12.2.0` | MustMerge | Pillow has an integer overflow when processing fonts |
+| 33 | medium | `pillow` | `12.2.0` | MustMerge | Pillow has a PDF Parsing Trailer Infinite Loop (DoS) |
+| 63 | medium | `pillow` | `12.3.0` | MustMerge | Pillow EpsImagePlugin negative %%BeginBinary byte count causes infinite loop den |
 | 64 | high | `pillow` | `12.3.0` | MustMerge | Pillow: Out-of-bounds read via attacker-controlled row stride on Pillow's mmap p |
 | 65 | high | `pillow` | `12.3.0` | MustMerge | Pillow: `FontFile.compile()`: `Image.new()` called without `_decompression_bomb_ |
 | 66 | high | `pillow` | `12.3.0` | MustMerge | Pillow `PcfFontFile._load_bitmaps()`: `Image.frombytes()` called without `_decom |
 | 67 | high | `pillow` | `12.3.0` | MustMerge | Pillow `BdfFontFile`: `Image.new()` called without `_decompression_bomb_check()` |
 | 68 | high | `pillow` | `12.3.0` | MustMerge | Pillow `GdImageFile._open()`: image dimensions accepted without `_decompression_ |
-| 69 | medium | `pillow` | `12.3.0` | Review | Pillow: WindowsViewer.get_command() OS command injection via unescaped shell pat |
+| 69 | medium | `pillow` | `12.3.0` | MustMerge | Pillow: WindowsViewer.get_command() OS command injection via unescaped shell pat |
 | 70 | high | `pillow` | `12.3.0` | MustMerge | Pillow: Heap out-of-bounds write `Image.paste()` / `Image.crop()` via signed coo |
 | 71 | high | `pillow` | `12.3.0` | MustMerge | Pillow: Heap out-of-bounds write in `ImageFilter.RankFilter` via integer overflo |
 | 72 | high | `pillow` | `12.3.0` | MustMerge | Pillow: Controlled heap out-of-bounds write in Pillow `ImageCmsTransform.apply() |
 | 73 | high | `pillow` | `12.3.0` | MustMerge | Pillow JPEG2000 tiled decode retains a growing scratch buffer and can be used fo |
-| 74 | medium | `pillow` | `12.3.0` | Review | Pillow TGA RLE encoder can serialize up to ~57 KB of adjacent heap data into gen |
+| 74 | medium | `pillow` | `12.3.0` | MustMerge | Pillow TGA RLE encoder can serialize up to ~57 KB of adjacent heap data into gen |
 | 75 | high | `pillow` | `12.3.0` | MustMerge | Pillow: Decompression Bomb DoS via PdfParser.PdfStream.decode() |
 | 19 | medium | `python-multipart` | `0.0.26` | Review | python-multipart affected by Denial of Service via large multipart preamble or e |
 | 35 | high | `python-multipart` | `0.0.27` | MustMerge | python-multipart has Denial of Service via unbounded multipart part headers |
@@ -130,7 +130,7 @@ _None._
 | 81 | high | `transformers` | `5.10.0` | MustMerge | Transformers save_pretrained path traversal allows arbitrary file writes through |
 | 37 | high | `urllib3` | `2.7.0` | MustMerge | urllib3: Decompression-bomb safeguards bypassed in parts of the streaming API |
 | 38 | high | `urllib3` | `2.7.0` | MustMerge | urllib3: Sensitive headers forwarded across origins in proxied low-level redirec |
-| 39 | medium | `idna` | `3.15` | Review | Internationalized Domain Names in Applications (IDNA): Specially crafted inputs  |
+| 39 | medium | `idna` | `3.15` | MustMerge | Internationalized Domain Names in Applications (IDNA): Specially crafted inputs  |
 | 61 | medium | `pydantic-settings` | `2.14.2` | Review | pydantic-settings: NestedSecretsSettingsSource follows symlinks outside secrets_ |
 | 4 | medium | `requests` | `2.33.0` | Review | Requests has Insecure Temp File Reuse in its extract_zipped_paths() utility func |
 | 28 | low | `rand` | `0.8.6` | Defer | Rand is unsound with a custom logger using rand::rng() |

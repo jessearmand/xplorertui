@@ -21,7 +21,6 @@ TABLE_PATH = Path(__file__).parent / "fixtures" / "decision-table.json"
 
 SEVERITIES = (*SEVERITY_RANK, "unknown")
 _PACKAGE = "pkg"
-_MANIFESTS = {True: "Cargo.toml", False: "Cargo.lock"}
 
 
 def build_table() -> list[dict]:
@@ -31,12 +30,13 @@ def build_table() -> list[dict]:
             "severity": severity,
             "patched": "1.0.0" if patched else None,
             "package": _PACKAGE,
-            "manifest": _MANIFESTS[direct],
+            "manifest": "Cargo.lock",
+            "direct": direct,
         }
         rows.append({
             "severity": severity,
             "patched": patched,
-            "direct_manifest": direct,
+            "direct": direct,
             "allowlisted": allowlisted,
             "decision": decide(alert, always_fix={_PACKAGE} if allowlisted else set()),
         })

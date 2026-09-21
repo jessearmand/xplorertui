@@ -2,280 +2,280 @@
   {
     "severity": "critical",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "critical",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "MustMerge"
   },
   {
     "severity": "critical",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "critical",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "MustMerge"
   },
   {
     "severity": "critical",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "Blocked"
   },
   {
     "severity": "critical",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "Blocked"
   },
   {
     "severity": "critical",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "Blocked"
   },
   {
     "severity": "critical",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "Blocked"
   },
   {
     "severity": "high",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "high",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "MustMerge"
   },
   {
     "severity": "high",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "high",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "MustMerge"
   },
   {
     "severity": "high",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "Blocked"
   },
   {
     "severity": "high",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "Blocked"
   },
   {
     "severity": "high",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "Blocked"
   },
   {
     "severity": "high",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "Blocked"
   },
   {
     "severity": "medium",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "medium",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "MustMerge"
   },
   {
     "severity": "medium",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "medium",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "Review"
   },
   {
     "severity": "medium",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "Blocked"
   },
   {
     "severity": "medium",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "Blocked"
   },
   {
     "severity": "medium",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "Blocked"
   },
   {
     "severity": "medium",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "Blocked"
   },
   {
     "severity": "low",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "low",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "Defer"
   },
   {
     "severity": "low",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "low",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "Defer"
   },
   {
     "severity": "low",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "Defer"
   },
   {
     "severity": "low",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "Defer"
   },
   {
     "severity": "low",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "Defer"
   },
   {
     "severity": "low",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "Defer"
   },
   {
     "severity": "unknown",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "unknown",
     "patched": true,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "Review"
   },
   {
     "severity": "unknown",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "MustMerge"
   },
   {
     "severity": "unknown",
     "patched": true,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "Review"
   },
   {
     "severity": "unknown",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": true,
     "decision": "Review"
   },
   {
     "severity": "unknown",
     "patched": false,
-    "direct_manifest": true,
+    "direct": true,
     "allowlisted": false,
     "decision": "Review"
   },
   {
     "severity": "unknown",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": true,
     "decision": "Review"
   },
   {
     "severity": "unknown",
     "patched": false,
-    "direct_manifest": false,
+    "direct": false,
     "allowlisted": false,
     "decision": "Review"
   }

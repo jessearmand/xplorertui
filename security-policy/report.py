@@ -8,7 +8,7 @@ from policy import DECISION_ORDER
 
 SECTION_TITLES = {
     "MustMerge": "MustMerge (fix and merge)",
-    "Review": "Review (medium in lockfiles)",
+    "Review": "Review (medium, transitive)",
     "Defer": "Defer (low)",
     "Blocked": "Blocked (no patch)",
 }

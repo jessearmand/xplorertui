@@ -3,8 +3,12 @@
 **/.remember
 **/.claude/settings.local.json
 
+.firecrawl/
+output/
+scratchpad/
+
 .mcp.json
-mise.toml
+mise.local.toml
 
 /target
 
