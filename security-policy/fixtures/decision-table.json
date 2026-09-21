@@ -2,281 +2,181 @@
   {
     "severity": "critical",
     "patched": true,
-    "direct": true,
-    "allowlisted": true,
+    "hold": "none",
     "decision": "MustMerge"
   },
   {
     "severity": "critical",
     "patched": true,
-    "direct": true,
-    "allowlisted": false,
-    "decision": "MustMerge"
+    "hold": "pinned",
+    "decision": "Held"
   },
   {
     "severity": "critical",
     "patched": true,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "MustMerge"
-  },
-  {
-    "severity": "critical",
-    "patched": true,
-    "direct": false,
-    "allowlisted": false,
-    "decision": "MustMerge"
+    "hold": "major_jump",
+    "decision": "Held"
   },
   {
     "severity": "critical",
     "patched": false,
-    "direct": true,
-    "allowlisted": true,
+    "hold": "none",
     "decision": "Blocked"
   },
   {
     "severity": "critical",
     "patched": false,
-    "direct": true,
-    "allowlisted": false,
+    "hold": "pinned",
     "decision": "Blocked"
   },
   {
     "severity": "critical",
     "patched": false,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "Blocked"
-  },
-  {
-    "severity": "critical",
-    "patched": false,
-    "direct": false,
-    "allowlisted": false,
+    "hold": "major_jump",
     "decision": "Blocked"
   },
   {
     "severity": "high",
     "patched": true,
-    "direct": true,
-    "allowlisted": true,
+    "hold": "none",
     "decision": "MustMerge"
   },
   {
     "severity": "high",
     "patched": true,
-    "direct": true,
-    "allowlisted": false,
-    "decision": "MustMerge"
+    "hold": "pinned",
+    "decision": "Held"
   },
   {
     "severity": "high",
     "patched": true,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "MustMerge"
-  },
-  {
-    "severity": "high",
-    "patched": true,
-    "direct": false,
-    "allowlisted": false,
-    "decision": "MustMerge"
+    "hold": "major_jump",
+    "decision": "Held"
   },
   {
     "severity": "high",
     "patched": false,
-    "direct": true,
-    "allowlisted": true,
+    "hold": "none",
     "decision": "Blocked"
   },
   {
     "severity": "high",
     "patched": false,
-    "direct": true,
-    "allowlisted": false,
+    "hold": "pinned",
     "decision": "Blocked"
   },
   {
     "severity": "high",
     "patched": false,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "Blocked"
-  },
-  {
-    "severity": "high",
-    "patched": false,
-    "direct": false,
-    "allowlisted": false,
+    "hold": "major_jump",
     "decision": "Blocked"
   },
   {
     "severity": "medium",
     "patched": true,
-    "direct": true,
-    "allowlisted": true,
+    "hold": "none",
     "decision": "MustMerge"
   },
   {
     "severity": "medium",
     "patched": true,
-    "direct": true,
-    "allowlisted": false,
-    "decision": "MustMerge"
+    "hold": "pinned",
+    "decision": "Held"
   },
   {
     "severity": "medium",
     "patched": true,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "MustMerge"
-  },
-  {
-    "severity": "medium",
-    "patched": true,
-    "direct": false,
-    "allowlisted": false,
-    "decision": "Review"
+    "hold": "major_jump",
+    "decision": "Held"
   },
   {
     "severity": "medium",
     "patched": false,
-    "direct": true,
-    "allowlisted": true,
+    "hold": "none",
     "decision": "Blocked"
   },
   {
     "severity": "medium",
     "patched": false,
-    "direct": true,
-    "allowlisted": false,
+    "hold": "pinned",
     "decision": "Blocked"
   },
   {
     "severity": "medium",
     "patched": false,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "Blocked"
-  },
-  {
-    "severity": "medium",
-    "patched": false,
-    "direct": false,
-    "allowlisted": false,
+    "hold": "major_jump",
     "decision": "Blocked"
   },
   {
     "severity": "low",
     "patched": true,
-    "direct": true,
-    "allowlisted": true,
+    "hold": "none",
     "decision": "MustMerge"
   },
   {
     "severity": "low",
     "patched": true,
-    "direct": true,
-    "allowlisted": false,
-    "decision": "Defer"
+    "hold": "pinned",
+    "decision": "Held"
   },
   {
     "severity": "low",
     "patched": true,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "MustMerge"
-  },
-  {
-    "severity": "low",
-    "patched": true,
-    "direct": false,
-    "allowlisted": false,
-    "decision": "Defer"
+    "hold": "major_jump",
+    "decision": "Held"
   },
   {
     "severity": "low",
     "patched": false,
-    "direct": true,
-    "allowlisted": true,
-    "decision": "Defer"
+    "hold": "none",
+    "decision": "Blocked"
   },
   {
     "severity": "low",
     "patched": false,
-    "direct": true,
-    "allowlisted": false,
-    "decision": "Defer"
+    "hold": "pinned",
+    "decision": "Blocked"
   },
   {
     "severity": "low",
     "patched": false,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "Defer"
-  },
-  {
-    "severity": "low",
-    "patched": false,
-    "direct": false,
-    "allowlisted": false,
-    "decision": "Defer"
+    "hold": "major_jump",
+    "decision": "Blocked"
   },
   {
     "severity": "unknown",
     "patched": true,
-    "direct": true,
-    "allowlisted": true,
+    "hold": "none",
     "decision": "MustMerge"
   },
   {
     "severity": "unknown",
     "patched": true,
-    "direct": true,
-    "allowlisted": false,
-    "decision": "Review"
+    "hold": "pinned",
+    "decision": "Held"
   },
   {
     "severity": "unknown",
     "patched": true,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "MustMerge"
-  },
-  {
-    "severity": "unknown",
-    "patched": true,
-    "direct": false,
-    "allowlisted": false,
-    "decision": "Review"
+    "hold": "major_jump",
+    "decision": "Held"
   },
   {
     "severity": "unknown",
     "patched": false,
-    "direct": true,
-    "allowlisted": true,
-    "decision": "Review"
+    "hold": "none",
+    "decision": "Blocked"
   },
   {
     "severity": "unknown",
     "patched": false,
-    "direct": true,
-    "allowlisted": false,
-    "decision": "Review"
+    "hold": "pinned",
+    "decision": "Blocked"
   },
   {
     "severity": "unknown",
     "patched": false,
-    "direct": false,
-    "allowlisted": true,
-    "decision": "Review"
-  },
-  {
-    "severity": "unknown",
-    "patched": false,
-    "direct": false,
-    "allowlisted": false,
-    "decision": "Review"
+    "hold": "major_jump",
+    "decision": "Blocked"
   }
 ]

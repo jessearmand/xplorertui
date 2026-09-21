@@ -2,61 +2,67 @@
 
 Offline triage harness for Dependabot security alerts on **jessearmand/xplorertui**.
 
-**Intent:** encode “which vulns must be fixed and merged” as Bend laws (`LAWS.bend`), run them over the live alert list, and only later wire CI. This branch does **not** add a GitHub Actions workflow and does **not** auto-merge anything.
+**Intent:** a fix that exists gets merged unless something concrete holds it. Severity never changes the decision; it only sets the order of work. This branch does **not** add a GitHub Actions workflow and does **not** auto-merge anything.
 
-## Why Bend
-
-[Bend](https://bend-lang.com/) targets agent-written code with machine-checked laws. Here Bend is a **policy language**, not a rewrite of the app:
-
-- `LAWS.bend` — source of truth for MustMerge / Review / Defer / Blocked
-- `PROOF.bend` — stub for future `bend` proof-checking
-- `classify.py` — executable stand-in implementing the same rules (Bend is young; install may be unavailable)
-
-Keep `classify.py` aligned with `LAWS.bend`. When `bend` can check `PROOF.bend`, prefer that.
-
-## Rules (summary)
+## Rule
 
 | Decision | When |
 |---|---|
-| **MustMerge** | critical/high with a patched version; medium in a *direct* dependency (declared in `pyproject.toml` / `Cargo.toml` / `package.json`) with a patch; or package on `ALWAYS_FIX` |
-| **Review** | medium with a patch, in a transitive dependency |
-| **Defer** | low severity (unless allowlisted) |
-| **Blocked** | critical/high/medium with **no** patched version |
+| **MustMerge** | a patched version exists and nothing holds it, at any severity |
+| **Held** | a patched version exists, but a plain merge is not possible (see holds) |
+| **Blocked** | no patched version exists: nothing to merge. Replace, pin below the range, disable the feature, or dismiss with a reason |
 
-## Direct vs transitive
+Holds, detected from the checkout (`holds.py`):
 
-GitHub files alerts against the lockfile even for direct dependencies, so the alert's manifest path says nothing. `manifests.py` reads the manifest next to the lockfile (`uv.lock` -> `pyproject.toml`, `Cargo.lock` -> `Cargo.toml`, ...) and marks each alert `direct` when its package is declared there. `decide` only sees that boolean. Results therefore depend on the checkout: pass `--repo-root` to classify against another one.
+| Hold | Meaning | Example |
+|---|---|---|
+| `pinned` | the project's own requirement excludes the fixed version | `transformers==5.3.0`, fix is 5.10.0 |
+| `major_jump` | the fixed version is a breaking upgrade from the locked one (Cargo: outside the caret range; elsewhere: leading component changes) | `starlette` 0.52.1 -> 1.3.1 |
 
-## Grouping
+Not detected: a *parent* package whose constraint excludes the fix. Lockfiles do not record those constraints; it needs a resolver dry run.
 
-Dependabot files one alert per advisory; the work is one bump per package per manifest. After per-alert classification, `grouping.py` collapses alerts into *updates*:
+## Bend and Python: who does what
 
-- key: ecosystem + normalized package name (`Pillow` = `pillow`, PEP 503) + manifest
-- **Bump to**: the highest `first_patched_version` in the group, compared numerically
-- decision: the most urgent of MustMerge > Review > Defer among its alerts; unpatched alerts never stop a bump and are listed as *still unpatched*; a group with no patch at all is Blocked
-- packages locked at several versions are split into release lines: advisories with disjoint vulnerable ranges get separate bumps (`ranges.py`)
+[Bend](https://bend-lang.com/) proves laws about Bend code. The rule is small and pure, so it lives in Bend and is proven; everything that touches files, JSON or version strings stays in Python.
 
-Modules: `policy.py` (rules), `manifests.py`, `grouping.py`, `ranges.py`, `versions.py`, `report.py`, `classify.py` (CLI).
+- `policy.bend` — `decide`: severity x patched x hold -> MustMerge / Held / Blocked, and `rank` for work order
+- `LAWS.bend` — 3 rules and 4 invariants `decide` must obey. Humans edit this file.
+- `PROOF.bend` — proofs of every law. **Gate: `bend PROOF.bend` must print `All terms check.`**
+- `table.bend` — prints `decide` for all 30 inputs
+- `policy.py` — the same rule in Python. `test_bend_conformance.py` runs the proof gate and asserts that Bend and Python agree on all 30 inputs (skipped when `bend` is not installed).
 
-Reference for the Bend port: `fixtures/decision-table.json` (all 40 input combinations, checked by `python3 security-policy/reference.py`) and `EVALUATION.md`. Tests: `python3 -m unittest discover -s security-policy`.
+Changing the rule: edit `LAWS.bend` (intent), then `policy.bend` + `PROOF.bend` until the gate passes, then `policy.py`, then `python3 security-policy/reference.py --write`.
 
-## Offline run
+Install Bend: `curl -fsSL https://bend-lang.com/install.sh | sh` (macOS/Linux only), add `~/.bend/bin` to `PATH`.
+
+## Pipeline (`triage.py`)
+
+1. **Direct or transitive** (`manifests.py`): GitHub files alerts against the lockfile even for direct dependencies, so the manifest next to the lockfile is read (`uv.lock` -> `pyproject.toml`, `Cargo.lock` -> `Cargo.toml`, ...). Informational, and the source of declared requirements for pin detection.
+2. **Group into updates** (`grouping.py`, `ranges.py`): one bump per package release line per manifest. Names are normalized (`Pillow` = `pillow`, PEP 503). Advisories with disjoint vulnerable ranges are separate bumps (`rand` 0.8 / 0.9 / 0.10). **Bump to** is the highest `first_patched_version` in the group, compared numerically (`versions.py`).
+3. **Find holds** (`holds.py`, `lockfiles.py`, `specifiers.py`): the locked version the advisories apply to, the declared requirement governing it, and whether the bump crosses a breaking boundary. No evidence means no hold.
+4. **Decide** (`policy.py`): per update, and per alert. An unpatched alert never stops its siblings' bump; it stays Blocked on its own row.
+5. **Order**: MustMerge, Held, Blocked; within each, by severity.
+
+Results depend on the checkout: pass `--repo-root` to triage against another one.
+
+## Run
 
 ```bash
-# classify the committed fixture
-python3 security-policy/classify.py security-policy/fixtures/open-alerts.json
+# triage the committed fixture
+python3 security-policy/classify.py
 
-# refresh fixture (needs gh auth), then re-classify
+# refresh the fixture (needs gh auth), then triage again
 ./security-policy/export_alerts.sh
 python3 security-policy/classify.py
+
+# tests (includes the Bend gate when bend is installed)
+python3 -m unittest discover -s security-policy
 ```
 
-Writes `security-policy/fixtures/classification-report.md`.
+Writes `fixtures/classification-report.md`. `--json-out` and `--groups-out` write per-alert and per-update JSON.
 
-## Fixture snapshot
-
-`fixtures/open-alerts.json` was exported 2026-09-20 from open Dependabot alerts. Re-run `export_alerts.sh` before trusting counts for merge work.
+`fixtures/open-alerts.json` was exported 2026-09-20. Re-run `export_alerts.sh` before trusting counts for merge work. `EVALUATION.md` records what running the policy against the lockfiles showed.
 
 ## Next step (not in this PR)
 
-After the offline report looks right, gate Dependabot security PRs / a triage bot on these decisions in CI.
+Gate Dependabot security PRs / a triage bot on these decisions in CI.

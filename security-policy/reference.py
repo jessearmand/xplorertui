@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Reference decision table for porting the policy to Bend.
+"""Reference decision table shared by policy.py and policy.bend.
 
-Enumerates every combination of the inputs `decide` looks at and records the
-Python decision. A Bend `decide` must reproduce this table exactly; the laws
-in LAWS.bend should then hold over it by proof rather than by enumeration.
+Enumerates every input of the rule and records the Python decision. Severity
+is part of the table to show that it never changes the outcome. table.bend
+prints the same rows from the proven Bend rule; the two must match.
 
 Regenerate after an intentional rule change:
     python3 security-policy/reference.py --write
@@ -15,32 +15,18 @@ import json
 from itertools import product
 from pathlib import Path
 
-from policy import SEVERITY_RANK, decide
+from policy import HOLD_KINDS, SEVERITY_RANK, decide
 
 TABLE_PATH = Path(__file__).parent / "fixtures" / "decision-table.json"
 
 SEVERITIES = (*SEVERITY_RANK, "unknown")
-_PACKAGE = "pkg"
 
 
 def build_table() -> list[dict]:
-    rows = []
-    for severity, patched, direct, allowlisted in product(SEVERITIES, (True, False), (True, False), (True, False)):
-        alert = {
-            "severity": severity,
-            "patched": "1.0.0" if patched else None,
-            "package": _PACKAGE,
-            "manifest": "Cargo.lock",
-            "direct": direct,
-        }
-        rows.append({
-            "severity": severity,
-            "patched": patched,
-            "direct": direct,
-            "allowlisted": allowlisted,
-            "decision": decide(alert, always_fix={_PACKAGE} if allowlisted else set()),
-        })
-    return rows
+    return [
+        {"severity": severity, "patched": patched, "hold": hold, "decision": decide(patched, hold)}
+        for severity, patched, hold in product(SEVERITIES, (True, False), HOLD_KINDS)
+    ]
 
 
 def main() -> int:

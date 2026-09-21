@@ -1,47 +1,38 @@
-# Policy evaluation (Python reference run, 2026-09-20)
+# Policy evaluation
 
-Fixture refreshed with `export_alerts.sh`: 81 open alerts, unchanged from the committed snapshot.
-Every bump target was compared with the versions locked in `Cargo.lock` and `mlx-server/uv.lock`.
+Fixture: 81 open alerts exported 2026-09-20. Every bump target was compared with the versions locked in
+`Cargo.lock` and `mlx-server/uv.lock`; all 18 updates are real (each locked version is below its target).
 
-## Result
+## Result under the current rule
 
 | Decision | Updates | Alerts |
 |---|---:|---:|
-| MustMerge | 11 | 31 |
-| Review | 3 | 29 |
-| Defer | 4 | 21 |
+| MustMerge | 15 | 72 |
+| Held | 3 | 9 |
 | Blocked | 0 | 0 |
 
-All 18 updates are real: each locked version is below its bump target. No alert is already fixed.
+Held:
 
-## Where the policy is right
+| Update | Hold |
+|---|---|
+| `transformers` -> 5.10.0 (`pyproject.toml` and `uv.lock`) | pinned: declared `==5.3.0` on purpose (Gemma 4 loader regression) |
+| `starlette` 0.52.1 -> 1.3.1 | major jump; transitive via `fastapi`, which must allow 1.x first |
 
-- The critical (`anyio`) and all high alerts land in MustMerge, ordered first.
-- 81 alerts reduce to 18 bumps; `aiohttp` (24 alerts) and `pillow` (18) are one bump each.
-- `rand` is locked at 0.8.5, 0.9.2 and 0.10.0; its three advisories have disjoint ranges and are kept as three bumps.
+## How the rule got here
 
-## Where the policy is wrong or blind
+The first rule decided by severity: critical/high MustMerge, medium Review unless direct, low Defer.
+Running it against the repo showed severity was standing in for the real question, "can this be merged?":
 
-| Finding | Evidence | Rule gap |
+| Finding | Evidence | Outcome |
 |---|---|---|
-| **Fixed.** Direct dependency classed as lockfile noise | `idna` is declared in `mlx-server/pyproject.toml` but its alert names `uv.lock`, so it gets Review, not MustMerge | `is_direct_manifest` looks at the alert's manifest path; GitHub reports the lockfile even for direct deps. Now resolved by `manifests.py`: `idna` and the 6 medium `pillow` alerts move to MustMerge (12 / 2 / 4 updates, 38 / 22 / 21 alerts). |
-| MustMerge that cannot simply merge | `transformers` is pinned `==5.3.0` on purpose (Gemma 4 loader regression); target is 5.10.0 | No notion of a deliberate pin. Candidate decision: Blocked-by-pin, or a `PINNED` list parallel to `ALWAYS_FIX`. |
-| Major-version jump treated like a patch bump | `starlette` 0.52.1 -> 1.3.1 (transitive via `fastapi`) | No upgrade-risk input. Compare locked and target major versions. |
-| Same bump counted twice | `transformers` appears for `pyproject.toml` and `uv.lock` | Manifests in one directory could share a group. |
-| Severity is the only risk signal | 26 of the 29 Review alerts sit in packages that already have a MustMerge bump, which closes them too; only `idna`, `pydantic-settings` and `requests` need a separate look | Grouping already absorbs these; per-alert counts overstate the review load. |
+| One bump target for a package locked at several versions | `rand` locked at 0.8.5, 0.9.2, 0.10.0, each with its own advisory | groups split by disjoint vulnerable range |
+| Direct dependency classed as lockfile noise | `idna` is declared in `pyproject.toml`, but GitHub names `uv.lock` | declared manifests are read |
+| MustMerge that cannot merge | `transformers==5.3.0` pin; `starlette` major jump | the Held decision, with detected reasons |
+| Review/Defer with nothing actually in the way | `pydantic-settings`, `requests`, `pygments`, `rand` | MustMerge, ordered after the severe ones |
 
-## Precedence, as Python resolves it
+## Known gaps
 
-`fixtures/decision-table.json` enumerates all 40 input combinations
-(severity x patched x direct x allowlisted). It settles the overlaps in `LAWS.bend`:
-
-- allowlisted and unpatched: the allowlist has no effect (Blocked for critical/high/medium)
-- low and unpatched: Defer, allowlisted or not
-- unknown severity: Review, unless allowlisted and patched
-
-## Reference for the Bend port
-
-1. `decide` in Bend must reproduce `fixtures/decision-table.json` row for row (`python3 reference.py` checks the Python side).
-2. `test_reference.py` holds three invariants that pass by enumeration today and are the laws worth proving in Bend:
-   an unpatched alert is never MustMerge; critical/high is never Defer; allowlisting never lowers urgency.
-3. Grouping, version ordering and range overlap (`grouping.py`, `versions.py`, `ranges.py`) stay in Python unless the port needs them; `test_grouping.py` pins their behaviour.
+- Parent constraints are not detected (needs a resolver dry run such as `uv lock --upgrade-package`).
+- `transformers` appears twice, for `pyproject.toml` and `uv.lock`; it is one bump.
+- Only TOML lockfiles are read (`uv.lock`, `poetry.lock`, `Cargo.lock`); npm requirement syntax is not evaluated. Both fail open: no evidence, no hold.
+- Severity is the only ordering signal; EPSS, attack vector and runtime-vs-dev scope are not used.

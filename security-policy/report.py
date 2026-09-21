@@ -7,10 +7,9 @@ from grouping import UpdateGroup
 from policy import DECISION_ORDER
 
 SECTION_TITLES = {
-    "MustMerge": "MustMerge (fix and merge)",
-    "Review": "Review (medium, transitive)",
-    "Defer": "Defer (low)",
-    "Blocked": "Blocked (no patch)",
+    "MustMerge": "MustMerge (patched, nothing in the way)",
+    "Held": "Held (patched, but something blocks a plain merge)",
+    "Blocked": "Blocked (no patched version exists)",
 }
 
 
@@ -34,14 +33,17 @@ def _counts_table(rows: list[dict], groups: list[UpdateGroup]) -> list[str]:
 
 def _group_table(groups: list[UpdateGroup]) -> list[str]:
     lines = [
-        "| Package | Manifest | Bump to | Max sev | Alerts closed | Still unpatched |",
-        "|---|---|---|---|---|---|",
+        "| Package | Manifest | Locked | Bump to | Max sev | Dep | Held by | Alerts closed | Still unpatched |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for g in groups:
+        locked = f"`{g.locked_version}`" if g.locked_version else "—"
         target = f"`{g.target_version}`" if g.target_version else "—"
+        dep = "direct" if any(a.get("direct") for a in g.alerts) else "transitive"
         lines.append(
-            f"| `{_cell(g.package)}` | `{_cell(g.manifest)}` | {target} | {g.max_severity} "
-            f"| {_alert_links(g.patched_alerts) or '—'} | {_alert_links(g.blocked_alerts) or '—'} |"
+            f"| `{_cell(g.package)}` | `{_cell(g.manifest)}` | {locked} | {target} | {g.max_severity} | {dep} "
+            f"| {_cell(g.hold.detail) or '—'} | {_alert_links(g.patched_alerts) or '—'} "
+            f"| {_alert_links(g.blocked_alerts) or '—'} |"
         )
     return lines
 
@@ -64,8 +66,8 @@ def render_md(rows: list[dict], groups: list[UpdateGroup]) -> str:
         "",
         "Rules: `security-policy/LAWS.bend` (executable: `classify.py`).",
         "",
-        "An *update* is one version bump of one package in one manifest; it takes the",
-        "most urgent decision of the alerts it closes.",
+        "An *update* is one version bump of one package release line in one manifest.",
+        "A patched fix is MustMerge unless something holds it; severity only sets the order.",
         "",
         "## Counts",
         "",

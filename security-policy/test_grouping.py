@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import unittest
 
-from grouping import group_alerts, normalize_name
-from policy import classify
+from grouping import group_alerts, work_order
+from holds import Hold
+from names import normalize_name
 from ranges import parse_range
 from versions import version_key
 
@@ -63,65 +64,67 @@ class ParseRangeTest(unittest.TestCase):
 
 class GroupAlertsTest(unittest.TestCase):
     def test_case_variants_share_a_group_with_highest_target(self):
-        rows = classify([
+        rows = [
             alert(1, "pillow", "high", "12.2.0"),
             alert(2, "Pillow", "high", "12.3.0"),
             alert(3, "pillow", "low", "12.10.0"),
-        ])
+        ]
         (group,) = group_alerts(rows)
         self.assertEqual(group.package, "pillow")
         self.assertEqual(group.target_version, "12.10.0")
         self.assertEqual(group.numbers, [1, 2, 3])
-        self.assertEqual(group.decision, "MustMerge")
         self.assertEqual(group.max_severity, "high")
 
     def test_same_package_in_two_manifests_is_two_groups(self):
-        rows = classify([
+        rows = [
             alert(1, "transformers", "high", "5.5.0"),
             alert(2, "transformers", "high", "5.5.0", manifest="pyproject.toml"),
-        ])
+        ]
         self.assertEqual(len(group_alerts(rows)), 2)
 
     def test_unpatched_alert_does_not_block_a_patched_bump(self):
-        rows = classify([
-            alert(1, "aiohttp", "high", None),
-            alert(2, "aiohttp", "medium", "3.14.0"),
-        ])
-        (group,) = group_alerts(rows)
-        self.assertEqual(group.decision, "Review")
+        (group,) = group_alerts([alert(1, "aiohttp", "high", None), alert(2, "aiohttp", "medium", "3.14.0")])
+        self.assertEqual(group.decision, "MustMerge")
         self.assertEqual(group.target_version, "3.14.0")
         self.assertEqual([a["number"] for a in group.blocked_alerts], [1])
 
     def test_fully_unpatched_group_is_blocked(self):
-        (group,) = group_alerts(classify([alert(1, "idna", "critical", None)]))
+        (group,) = group_alerts([alert(1, "idna", "critical", None)])
         self.assertEqual(group.decision, "Blocked")
         self.assertIsNone(group.target_version)
 
+    def test_a_hold_turns_a_patched_group_into_held(self):
+        (group,) = group_alerts([alert(1, "starlette", "high", "1.3.1")])
+        group.hold = Hold("major_jump", "0.52.1 -> 1.3.1")
+        self.assertEqual(group.decision, "Held")
+
     def test_disjoint_ranges_split_into_release_lines(self):
-        rows = classify([
+        rows = [
             alert(1, "rand", "low", "0.8.6", range=">= 0.7.0, < 0.8.6"),
             alert(2, "rand", "low", "0.9.3", range=">= 0.9.0, < 0.9.3"),
             alert(3, "rand", "low", "0.10.1", range="= 0.10.0"),
-        ])
-        self.assertEqual([g.target_version for g in group_alerts(rows)], ["0.8.6", "0.9.3", "0.10.1"])
+        ]
+        self.assertEqual([g.target_version for g in work_order(group_alerts(rows))], ["0.8.6", "0.9.3", "0.10.1"])
 
     def test_overlap_is_transitive_regardless_of_input_order(self):
-        rows = classify([
+        rows = [
             alert(1, "openssl", "high", "0.10.80", range=">= 0.10.50, < 0.10.80"),
             alert(2, "openssl", "high", "0.10.10", range=">= 0.9.0, < 0.10.10"),
             alert(3, "openssl", "high", "0.10.78", range=">= 0.10.5, < 0.10.78"),
-        ])
+        ]
         (group,) = group_alerts(rows)
         self.assertEqual(group.target_version, "0.10.80")
 
-    def test_groups_sorted_most_urgent_first(self):
-        rows = classify([
+    def test_work_order_puts_actionable_first_then_severity(self):
+        groups = group_alerts([
             alert(1, "rand", "low", "0.9.3"),
             alert(2, "requests", "medium", "2.33.0"),
-            alert(3, "urllib3", "high", "2.7.0"),
+            alert(3, "urllib3", "high", None),
             alert(4, "anyio", "critical", "4.14.2"),
+            alert(5, "starlette", "critical", "1.3.1"),
         ])
-        self.assertEqual([g.package for g in group_alerts(rows)], ["anyio", "urllib3", "requests", "rand"])
+        next(g for g in groups if g.package == "starlette").hold = Hold("major_jump", "")
+        self.assertEqual([g.package for g in work_order(groups)], ["anyio", "requests", "rand", "starlette", "urllib3"])
 
 
 if __name__ == "__main__":

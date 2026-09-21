@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Classify Dependabot alerts using the same rules as LAWS.bend.
 
-Decisions: MustMerge | Review | Defer | Blocked
-Alerts are then grouped into updates (one bump per package per manifest).
+Decisions: MustMerge | Held | Blocked
+Alerts are grouped into updates (one bump per package release line per manifest).
 """
 from __future__ import annotations
 
@@ -12,10 +12,9 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from grouping import UpdateGroup, group_alerts
-from manifests import DirectDependencyResolver
-from policy import classify
+from grouping import UpdateGroup
 from report import render_md
+from triage import triage
 
 FIXTURES = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).parent.parent
@@ -34,9 +33,8 @@ def print_summary(rows: list[dict], groups: list[UpdateGroup]) -> None:
     print("alerts:", dict(Counter(r["decision"] for r in rows)), "total:", len(rows))
     print("updates:", dict(Counter(g.decision for g in groups)), "total:", len(groups))
     for g in groups:
-        if g.decision != "MustMerge":
-            continue
-        print(f"  MustMerge {g.package} -> {g.target_version} ({g.manifest}, {g.max_severity}, {len(g.alerts)} alerts)")
+        held = f" [{g.hold.detail}]" if g.hold.detail else ""
+        print(f"  {g.decision} {g.package} -> {g.target_version} ({g.manifest}, {g.max_severity}, {len(g.alerts)} alerts){held}")
 
 
 def main() -> int:
@@ -45,7 +43,7 @@ def main() -> int:
     p.add_argument("-o", "--report", help="Write markdown report path")
     p.add_argument("--json-out", help="Write classified per-alert JSON path")
     p.add_argument("--groups-out", help="Write grouped updates JSON path")
-    p.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Checkout whose manifests decide direct vs transitive")
+    p.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="Checkout whose manifests and lockfiles are inspected for holds")
     args = p.parse_args()
 
     path = resolve_alerts_path(args.alerts_json)
@@ -53,8 +51,7 @@ def main() -> int:
         print(f"missing alerts file: {args.alerts_json}", file=sys.stderr)
         return 1
 
-    rows = classify(json.loads(path.read_text()), DirectDependencyResolver(args.repo_root))
-    groups = group_alerts(rows)
+    rows, groups = triage(json.loads(path.read_text()), args.repo_root)
     print_summary(rows, groups)
 
     report_path = Path(args.report) if args.report else FIXTURES / "classification-report.md"

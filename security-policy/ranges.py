@@ -30,6 +30,9 @@ class Interval:
             return self.lo_inclusive and other.hi_inclusive
         return self.lo < other.hi
 
+    def contains(self, key: tuple) -> bool:
+        return Interval(key, key, True, True).overlaps(self)
+
     def overlaps(self, other: Interval) -> bool:
         return self.starts_before_end_of(other) and other.starts_before_end_of(self)
 
