@@ -91,6 +91,8 @@ class HoldResolver:
 
     def _hold_for_copy(self, group, locked: str, reach: Reach) -> Hold:
         target = group.target_version
+        if reach.removed:
+            return NO_HOLD  # the upgrade drops this copy, so nothing about it can hold
         for specifier in self._declared_specifiers(group, locked):
             if requirement_allows(specifier, target, group.ecosystem) is False:
                 return Hold("pinned", f"declared `{specifier}` excludes {target}")
