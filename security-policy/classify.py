@@ -21,13 +21,18 @@ FIXTURES = Path(__file__).parent / "fixtures"
 REPO_ROOT = Path(__file__).parent.parent
 
 
+DEFAULT_ALERTS = "fixtures/open-alerts.json"
+
+
 def resolve_alerts_path(arg: str) -> Path | None:
+    """Only the default spelling falls back to the bundled fixture, so running from
+    the repo root works; an explicitly named file that is missing is an error."""
     path = Path(arg)
     if path.is_file():
         return path
-    # allow running from repo root
-    alt = FIXTURES / "open-alerts.json"
-    return alt if alt.is_file() else None
+    if arg == DEFAULT_ALERTS and (FIXTURES / "open-alerts.json").is_file():
+        return FIXTURES / "open-alerts.json"
+    return None
 
 
 def print_summary(rows: list[dict], groups: list[UpdateGroup]) -> None:
@@ -40,7 +45,7 @@ def print_summary(rows: list[dict], groups: list[UpdateGroup]) -> None:
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("alerts_json", nargs="?", default="fixtures/open-alerts.json")
+    p.add_argument("alerts_json", nargs="?", default=DEFAULT_ALERTS)
     p.add_argument("-o", "--report", help="Write markdown report path")
     p.add_argument("--json-out", help="Write classified per-alert JSON path")
     p.add_argument("--groups-out", help="Write grouped updates JSON path")

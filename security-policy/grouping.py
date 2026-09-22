@@ -21,7 +21,7 @@ class UpdateGroup:
     manifest: str
     alerts: list[dict] = field(default_factory=list)
     hold: Hold = NO_HOLD
-    locked_version: str | None = None
+    locked_versions: list[str] = field(default_factory=list)  # every locked copy the advisories apply to
 
     @property
     def patched_alerts(self) -> list[dict]:
@@ -43,6 +43,11 @@ class UpdateGroup:
         return decide(self.target_version is not None, self.hold.kind)
 
     @property
+    def locked_version(self) -> str | None:
+        """Highest affected locked copy, for display; holds consider every copy."""
+        return max(self.locked_versions, key=version_key) if self.locked_versions else None
+
+    @property
     def max_severity(self) -> str:
         return min((a.get("severity") or "unknown" for a in self.alerts), key=severity_rank)
 
@@ -59,7 +64,7 @@ class UpdateGroup:
             "max_severity": self.max_severity,
             "hold": self.hold.kind,
             "hold_detail": self.hold.detail,
-            "locked_version": self.locked_version,
+            "locked_versions": sorted(self.locked_versions, key=version_key),
             "target_version": self.target_version,
             "alerts": self.numbers,
             "blocked_alerts": sorted(a["number"] for a in self.blocked_alerts),

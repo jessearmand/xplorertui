@@ -5,6 +5,7 @@ from collections import Counter
 
 from grouping import UpdateGroup
 from policy import DECISION_ORDER
+from versions import version_key
 
 SECTION_TITLES = {
     "MustMerge": "MustMerge (patched, nothing in the way)",
@@ -37,7 +38,7 @@ def _group_table(groups: list[UpdateGroup]) -> list[str]:
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for g in groups:
-        locked = f"`{g.locked_version}`" if g.locked_version else "—"
+        locked = ", ".join(f"`{v}`" for v in sorted(g.locked_versions, key=version_key)) or "—"
         target = f"`{g.target_version}`" if g.target_version else "—"
         dep = "direct" if any(a.get("direct") for a in g.alerts) else "transitive"
         lines.append(

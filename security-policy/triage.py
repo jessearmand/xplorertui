@@ -9,23 +9,21 @@ from manifests import ManifestIndex
 from policy import decide
 from resolver import Reach, ResolverProbe
 
-NO_LOCKFILE = Reach(None, "no lockfile entry found for this package")
 
-
-def _probe_reachability(groups: list[UpdateGroup], holds: HoldResolver, probe) -> dict[int, Reach]:
-    """One resolver dry run per lockfile, covering every patched group it pins."""
+def _probe_reachability(groups: list[UpdateGroup], holds: HoldResolver, probe) -> dict[int, dict[str, Reach]]:
+    """One resolver dry run per lockfile, covering every affected copy of every patched group it pins."""
     by_lockfile: dict[Path, list[UpdateGroup]] = {}
     for group in groups:
         lockfile = holds.lockfile_for(group)
-        if lockfile is not None and group.locked_version and group.target_version:
+        if lockfile is not None and group.locked_versions and group.target_version:
             by_lockfile.setdefault(lockfile, []).append(group)
 
-    reach: dict[int, Reach] = {}
+    reach: dict[int, dict[str, Reach]] = {}
     for lockfile, members in by_lockfile.items():
-        packages = sorted({(g.package, g.locked_version) for g in members})
+        packages = sorted({(g.package, locked) for g in members for locked in g.locked_versions})
         answers = probe.probe(lockfile, packages)
         for group in members:
-            reach[id(group)] = answers[(group.package, group.locked_version)]
+            reach[id(group)] = {locked: answers[(group.package, locked)] for locked in group.locked_versions}
     return reach
 
 
@@ -37,10 +35,10 @@ def triage(alerts: list[dict], repo_root: Path, probe=None) -> tuple[list[dict],
     rows = [dict(alert, direct=manifests.is_direct(alert)) for alert in alerts]
     groups = group_alerts(rows)
     for group in groups:
-        group.locked_version = holds.locked_version(group)
+        group.locked_versions = holds.affected_locked_versions(group)
     reach = _probe_reachability(groups, holds, probe)
     for group in groups:
-        group.hold = holds.hold_for(group, reach.get(id(group), NO_LOCKFILE))
+        group.hold = holds.hold_for(group, reach.get(id(group), {}))
         for row in group.alerts:
             row["hold"] = group.hold.kind
             row["decision"] = decide(bool(row.get("patched")), group.hold.kind)

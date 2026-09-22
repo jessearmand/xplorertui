@@ -28,6 +28,12 @@ version = "0.8.5"
 [[package]]
 name = "rand"
 version = "0.10.0"
+[[package]]
+name = "foo"
+version = "0.8.5"
+[[package]]
+name = "foo"
+version = "0.10.0"
 """
 
 
@@ -159,6 +165,28 @@ class TriageTest(TempRepoTest):
         )
         self.assertEqual(result["idna@3.15"], ("Held", "unverified"))
         self.assertEqual(result["starlette@1.3.1"], ("Held", "major_jump"))  # a known reason beats "unverified"
+
+    def test_every_affected_locked_copy_must_reach_the_fix(self):
+        # one advisory covers both locked copies of foo; the 0.10 line can move, the 0.8 line cannot
+        foo = [alert(1, "foo", "0.10.1", "Cargo.lock", "rust", "< 0.10.1")]
+        probe = FakeProbe()
+        _, groups = triage(foo, Path(self.root), probe)
+        self.assertEqual(groups[0].locked_versions, ["0.8.5", "0.10.0"])
+        self.assertEqual(sorted(probe.calls[0][1]), [("foo", "0.10.0"), ("foo", "0.8.5")])
+
+        class StuckOldLine:
+            def probe(self, lockfile, packages):
+                return {p: Reach("0.8.5" if p[1] == "0.8.5" else "0.10.1") for p in packages}
+
+        class DropsOldLine:
+            def probe(self, lockfile, packages):
+                return {p: Reach(None, "removed", removed=True) if p[1] == "0.8.5" else Reach("0.10.1") for p in packages}
+
+        self.assertEqual(self.decisions(foo, StuckOldLine())["foo@0.10.1"], ("Held", "constrained"))
+        # the 0.8 line can only reach 0.10.1 by a breaking upgrade (Cargo caret boundary)
+        self.assertEqual(self.decisions(foo, FakeProbe())["foo@0.10.1"], ("Held", "major_jump"))
+        # unless the upgrade drops that copy altogether
+        self.assertEqual(self.decisions(foo, DropsOldLine())["foo@0.10.1"], ("MustMerge", "none"))
 
     def test_missing_lockfile_is_unverified(self):
         result = self.decisions([alert(1, "starlette", "1.3.1", "elsewhere/uv.lock", "pip", "< 1.3.1")])

@@ -6,11 +6,13 @@ OUT="${1:-$ROOT/fixtures/open-alerts.json}"
 REPO="${REPO:-jessearmand/xplorertui}"
 
 tmp="$(mktemp)"
-gh api "repos/${REPO}/dependabot/alerts?state=open&per_page=100" --paginate > "$tmp"
+# --paginate emits one JSON array per page; --slurp wraps them in one outer array
+gh api "repos/${REPO}/dependabot/alerts?state=open&per_page=100" --paginate --slurp > "$tmp"
 
 python3 - "$tmp" "$OUT" <<'PY'
 import json, sys
-raw = json.load(open(sys.argv[1]))
+pages = json.load(open(sys.argv[1]))
+raw = [alert for page in pages for alert in page]
 rows = []
 for a in raw:
     patched = (a.get("security_vulnerability") or {}).get("first_patched_version") or {}
