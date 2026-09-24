@@ -11,6 +11,10 @@ Upgrades checked (2026-09-24), resolved together by `uv lock` with no other pack
 
 FastAPI 0.135.1 already accepts starlette 1.x, so nothing else has to move.
 
+Status: starlette 1.7.0 is now in `mlx-server/uv.lock` (lock only; `uv lock --locked` passes).
+`mlx-server/test_image_security.py` passes (8/8) under both starlette versions.
+transformers stays pinned at 5.3.0 here and moves with Dependabot PR #75.
+
 **Result: no observable change on any path the TUI uses.** Every exposure below was run
 old vs new, and the outputs were identical.
 
