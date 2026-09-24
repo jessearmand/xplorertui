@@ -1,0 +1,302 @@
+[
+  {
+    "severity": "critical",
+    "patched": true,
+    "hold": "none",
+    "decision": "MustMerge"
+  },
+  {
+    "severity": "critical",
+    "patched": true,
+    "hold": "pinned",
+    "decision": "Held"
+  },
+  {
+    "severity": "critical",
+    "patched": true,
+    "hold": "constrained",
+    "decision": "Held"
+  },
+  {
+    "severity": "critical",
+    "patched": true,
+    "hold": "major_jump",
+    "decision": "Held"
+  },
+  {
+    "severity": "critical",
+    "patched": true,
+    "hold": "unverified",
+    "decision": "Held"
+  },
+  {
+    "severity": "critical",
+    "patched": false,
+    "hold": "none",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "critical",
+    "patched": false,
+    "hold": "pinned",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "critical",
+    "patched": false,
+    "hold": "constrained",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "critical",
+    "patched": false,
+    "hold": "major_jump",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "critical",
+    "patched": false,
+    "hold": "unverified",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "high",
+    "patched": true,
+    "hold": "none",
+    "decision": "MustMerge"
+  },
+  {
+    "severity": "high",
+    "patched": true,
+    "hold": "pinned",
+    "decision": "Held"
+  },
+  {
+    "severity": "high",
+    "patched": true,
+    "hold": "constrained",
+    "decision": "Held"
+  },
+  {
+    "severity": "high",
+    "patched": true,
+    "hold": "major_jump",
+    "decision": "Held"
+  },
+  {
+    "severity": "high",
+    "patched": true,
+    "hold": "unverified",
+    "decision": "Held"
+  },
+  {
+    "severity": "high",
+    "patched": false,
+    "hold": "none",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "high",
+    "patched": false,
+    "hold": "pinned",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "high",
+    "patched": false,
+    "hold": "constrained",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "high",
+    "patched": false,
+    "hold": "major_jump",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "high",
+    "patched": false,
+    "hold": "unverified",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "medium",
+    "patched": true,
+    "hold": "none",
+    "decision": "MustMerge"
+  },
+  {
+    "severity": "medium",
+    "patched": true,
+    "hold": "pinned",
+    "decision": "Held"
+  },
+  {
+    "severity": "medium",
+    "patched": true,
+    "hold": "constrained",
+    "decision": "Held"
+  },
+  {
+    "severity": "medium",
+    "patched": true,
+    "hold": "major_jump",
+    "decision": "Held"
+  },
+  {
+    "severity": "medium",
+    "patched": true,
+    "hold": "unverified",
+    "decision": "Held"
+  },
+  {
+    "severity": "medium",
+    "patched": false,
+    "hold": "none",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "medium",
+    "patched": false,
+    "hold": "pinned",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "medium",
+    "patched": false,
+    "hold": "constrained",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "medium",
+    "patched": false,
+    "hold": "major_jump",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "medium",
+    "patched": false,
+    "hold": "unverified",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "low",
+    "patched": true,
+    "hold": "none",
+    "decision": "MustMerge"
+  },
+  {
+    "severity": "low",
+    "patched": true,
+    "hold": "pinned",
+    "decision": "Held"
+  },
+  {
+    "severity": "low",
+    "patched": true,
+    "hold": "constrained",
+    "decision": "Held"
+  },
+  {
+    "severity": "low",
+    "patched": true,
+    "hold": "major_jump",
+    "decision": "Held"
+  },
+  {
+    "severity": "low",
+    "patched": true,
+    "hold": "unverified",
+    "decision": "Held"
+  },
+  {
+    "severity": "low",
+    "patched": false,
+    "hold": "none",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "low",
+    "patched": false,
+    "hold": "pinned",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "low",
+    "patched": false,
+    "hold": "constrained",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "low",
+    "patched": false,
+    "hold": "major_jump",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "low",
+    "patched": false,
+    "hold": "unverified",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "unknown",
+    "patched": true,
+    "hold": "none",
+    "decision": "MustMerge"
+  },
+  {
+    "severity": "unknown",
+    "patched": true,
+    "hold": "pinned",
+    "decision": "Held"
+  },
+  {
+    "severity": "unknown",
+    "patched": true,
+    "hold": "constrained",
+    "decision": "Held"
+  },
+  {
+    "severity": "unknown",
+    "patched": true,
+    "hold": "major_jump",
+    "decision": "Held"
+  },
+  {
+    "severity": "unknown",
+    "patched": true,
+    "hold": "unverified",
+    "decision": "Held"
+  },
+  {
+    "severity": "unknown",
+    "patched": false,
+    "hold": "none",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "unknown",
+    "patched": false,
+    "hold": "pinned",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "unknown",
+    "patched": false,
+    "hold": "constrained",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "unknown",
+    "patched": false,
+    "hold": "major_jump",
+    "decision": "Blocked"
+  },
+  {
+    "severity": "unknown",
+    "patched": false,
+    "hold": "unverified",
+    "decision": "Blocked"
+  }
+]
