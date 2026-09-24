@@ -17,7 +17,7 @@ dependencies = [
     # Pin to a known-good pre-5.5 release until the upstream
     # `ReasoningEffort`/`mistral_common` loader regression is resolved for
     # Gemma 4 AutoProcessor paths.
-    "transformers==5.3.0",
+    "transformers==5.17.0",
 ]
 
 [tool.fastapi]
