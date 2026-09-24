@@ -6,6 +6,7 @@
 .firecrawl/
 output/
 scratchpad/
+__pycache__/
 
 .mcp.json
 mise.local.toml
