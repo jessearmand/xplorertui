@@ -70,6 +70,13 @@ Writes `fixtures/classification-report.md`. `--json-out` and `--groups-out` writ
 
 `fixtures/open-alerts.json` was exported 2026-09-20. Re-run `export_alerts.sh` before trusting counts for merge work. `EVALUATION.md` records what running the policy against the lockfiles showed.
 
+## Upgrade impact (`impact/`)
+
+`impact/` answers a different question: what a Held upgrade would change in the app. It holds
+old-vs-new runs of mlx-server (`impact/harness/run.sh`) and a Bend proof of the blast radius
+over every feature and package (`bend impact/PROOF.bend`). `impact/EVIDENCE.md` covers the
+starlette 1.x and transformers 5.17 bumps.
+
 ## Next step (not in this PR)
 
 Gate Dependabot security PRs / a triage bot on these decisions in CI.
