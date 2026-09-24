@@ -6,10 +6,10 @@ resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.13' and sys_platform == 'win32'",
+    "python_full_version < '3.13' and sys_platform == 'emscripten'",
     "python_full_version < '3.13' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
@@ -1067,8 +1067,8 @@ requires-dist = [
 
 [[package]]
 name = "mlx-embeddings"
-version = "0.0.5"
-source = { git = "https://github.com/Blaizzy/mlx-embeddings.git?rev=v0.1.0#6e2ef5256faadf1d79c3bf339686d43f8db17cdd" }
+version = "0.1.0"
+source = { git = "https://github.com/Blaizzy/mlx-embeddings.git?rev=v0.1.0#32981fa4e8064ed664b52071789dd18271fe4206" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "mlx" },
