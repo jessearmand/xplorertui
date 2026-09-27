@@ -70,6 +70,13 @@ pub enum CliCommand {
         #[arg(short, long)]
         model: String,
     },
+    /// Tag tweet JSONL from stdin with a Jev topic and flags (JSONL)
+    Classify,
+    /// Re-rank tweet JSONL from stdin by Jev relevance to a query (JSONL)
+    Rank {
+        /// Search query to judge relevance against
+        query: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +199,10 @@ pub async fn run_command(cmd: CliCommand) -> eyre::Result<()> {
         return Ok(());
     }
 
+    if matches!(cmd, CliCommand::Classify | CliCommand::Rank { .. }) {
+        return run_jev_command(cmd).await;
+    }
+
     let (mut client, _creds) = build_api_client()?;
     let config = load_config();
     let max = config.default_max_results;
@@ -200,8 +211,10 @@ pub async fn run_command(cmd: CliCommand) -> eyre::Result<()> {
         CliCommand::Tui
         | CliCommand::Auth
         | CliCommand::OpenRouterAuth
-        | CliCommand::Embed { .. } => {
-            unreachable!("tui, auth, openrouter-auth, and embed are handled above")
+        | CliCommand::Embed { .. }
+        | CliCommand::Classify
+        | CliCommand::Rank { .. } => {
+            unreachable!("tui, auth, openrouter-auth, embed, and jev commands are handled above")
         }
 
         CliCommand::Home => {
@@ -350,6 +363,117 @@ pub async fn run_command(cmd: CliCommand) -> eyre::Result<()> {
 }
 
 // ---------------------------------------------------------------------------
+// Jev commands (stdin JSONL → stdout JSONL, OpenRouter only)
+// ---------------------------------------------------------------------------
+
+/// Tweet text from a JSONL object: the denormalized `{"tweet": {"text"}}`
+/// shape this CLI emits, or a flat `{"text"}` object.
+fn tweet_text(obj: &serde_json::Value) -> Option<&str> {
+    obj.pointer("/tweet/text")
+        .or_else(|| obj.get("text"))
+        .and_then(|t| t.as_str())
+}
+
+/// Read tweet JSONL objects from stdin.
+fn read_tweet_lines() -> eyre::Result<Vec<serde_json::Value>> {
+    use std::io::BufRead;
+    let mut out = Vec::new();
+    for (n, line) in std::io::stdin().lock().lines().enumerate() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let obj: serde_json::Value =
+            serde_json::from_str(&line).map_err(|e| eyre!("stdin line {}: {e}", n + 1))?;
+        if tweet_text(&obj).is_none() {
+            return Err(eyre!(
+                "stdin line {}: expected a tweet object with \"tweet.text\" or \"text\"",
+                n + 1
+            ));
+        }
+        out.push(obj);
+    }
+    Ok(out)
+}
+
+async fn run_jev_command(cmd: CliCommand) -> eyre::Result<()> {
+    use crate::openrouter::decisions;
+
+    let or_client = build_openrouter_client()?;
+    let jev = load_config().jev.unwrap_or_default();
+    let mut items = read_tweet_lines()?;
+    let text = |obj: &serde_json::Value| tweet_text(obj).unwrap_or_default().to_string();
+
+    let requests: Vec<_> = match &cmd {
+        CliCommand::Classify => {
+            let topics = jev.topics();
+            items
+                .iter()
+                .map(|o| decisions::classify_post_request(&jev.model, &text(o), &topics))
+                .collect()
+        }
+        CliCommand::Rank { query } => items
+            .iter()
+            .map(|o| decisions::relevance_request(&jev.model, query, &text(o)))
+            .collect(),
+        _ => unreachable!("only jev commands are routed here"),
+    };
+    let results = or_client.decide_all(requests, jev.concurrency).await;
+
+    let total = items.len();
+    let classify = matches!(cmd, CliCommand::Classify);
+    // Failed rows keep their place in classify and sink to the bottom in rank.
+    let failed_key = if classify { 0.0 } else { f64::NEG_INFINITY };
+    let mut cost = 0.0;
+    let mut failures = 0usize;
+    let mut out: Vec<(f64, serde_json::Value)> = Vec::with_capacity(total);
+    for (mut obj, result) in items.drain(..).zip(results) {
+        let resp = match result {
+            Ok(r) => r,
+            Err(e) => {
+                failures += 1;
+                obj["jev_error"] = serde_json::json!(e.to_string());
+                out.push((failed_key, obj));
+                continue;
+            }
+        };
+        cost += resp.usage.cost;
+        let key = if classify {
+            let mut tags = serde_json::Map::new();
+            if let Some((topic, confidence, _)) = resp.choice("topic") {
+                tags.insert("topic".into(), serde_json::json!(topic));
+                tags.insert("topic_confidence".into(), serde_json::json!(confidence));
+            }
+            for (tag, _) in decisions::POST_TAGS {
+                if let Some(p) = resp.noul(tag) {
+                    tags.insert((*tag).into(), serde_json::json!(p));
+                }
+            }
+            obj["jev"] = serde_json::Value::Object(tags);
+            0.0
+        } else {
+            obj["relevance_score"] = serde_json::json!(resp.score("relevance"));
+            obj["substantive"] = serde_json::json!(resp.noul("substantive"));
+            decisions::relevance_key(&resp).unwrap_or(f64::NEG_INFINITY)
+        };
+        out.push((key, obj));
+    }
+
+    // Classify keeps input order (all keys equal); rank sorts by relevance.
+    // The sort is stable, so ties keep the input (e.g. recency) order.
+    out.sort_by(|a, b| b.0.total_cmp(&a.0));
+    for (_, obj) in &out {
+        println!("{}", serde_json::to_string(obj)?);
+    }
+
+    eprintln!("jev: {total} posts, {failures} failed, cost ${cost:.6}");
+    if total > 0 && failures == total {
+        return Err(eyre!("all Jev requests failed"));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -372,6 +496,15 @@ mod tests {
     fn parse_tweet_id_from_twitter_url() {
         let url = "https://twitter.com/user/status/9876543210?s=20";
         assert_eq!(parse_tweet_id(url).unwrap(), "9876543210");
+    }
+
+    #[test]
+    fn tweet_text_accepts_nested_and_flat() {
+        let nested = serde_json::json!({"tweet": {"text": "a"}, "author": null});
+        let flat = serde_json::json!({"text": "b"});
+        assert_eq!(tweet_text(&nested), Some("a"));
+        assert_eq!(tweet_text(&flat), Some("b"));
+        assert_eq!(tweet_text(&serde_json::json!({"id": "1"})), None);
     }
 
     #[test]

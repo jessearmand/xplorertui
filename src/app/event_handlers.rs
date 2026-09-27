@@ -365,8 +365,8 @@ impl App {
                         self.cluster_generation += 1;
                         self.cluster_result = Some(cluster_result);
                         self.status_message = Some("Clustering complete!".into());
-                        // Auto-trigger LLM topic generation if a chat provider is available.
-                        if self.has_chat_provider() {
+                        // Auto-trigger topic labelling if Jev or a chat provider is available.
+                        if self.has_topic_labeller() {
                             self.cluster_topics_loading = true;
                             self.dispatch_generate_cluster_topics();
                         }
@@ -453,10 +453,10 @@ impl App {
                     self.status_message = Some("No cluster result. Use :cluster first.".into());
                     return;
                 }
-                if !self.has_chat_provider() {
+                if !self.has_topic_labeller() {
                     self.status_message = Some(
-                        "No chat provider configured. Set mlx_server_url in config \
-                         or use :openrouter-auth + :openrouter-models."
+                        "No topic labeller configured. Add a [jev] section to config, \
+                         set mlx_server_url, or use :openrouter-auth + :openrouter-models."
                             .into(),
                     );
                     return;
@@ -482,7 +482,7 @@ impl App {
                                     applied += 1;
                                 }
                             }
-                            let provider = self.resolved_chat_provider_name().unwrap_or("LLM");
+                            let provider = self.topic_labeller_name().unwrap_or("LLM");
                             self.status_message = Some(format!(
                                 "{provider} generated {applied}/{cluster_count} topic labels"
                             ));

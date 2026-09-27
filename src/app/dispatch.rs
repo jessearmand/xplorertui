@@ -280,6 +280,10 @@ impl App {
     }
 
     pub(super) fn dispatch_generate_cluster_topics(&self) {
+        if let Some((client, jev)) = self.resolve_jev() {
+            self.dispatch_jev_cluster_topics(client, jev);
+            return;
+        }
         let generation = self.cluster_generation;
         let Some((provider, model)) = self.resolve_chat_provider() else {
             self.events.send(AppEvent::ClusterTopicsGenerated(
@@ -395,6 +399,65 @@ impl App {
             }
             .await;
 
+            let _ = sender.send(Event::App(Box::new(AppEvent::ClusterTopicsGenerated(
+                generation, result,
+            ))));
+        });
+    }
+
+    /// Label each cluster with one Jev `choice` over the topic taxonomy.
+    /// All clusters go out concurrently; no text generation or parsing.
+    fn dispatch_jev_cluster_topics(
+        &self,
+        client: Arc<OpenRouterClient>,
+        jev: crate::config::JevConfig,
+    ) {
+        use crate::openrouter::decisions;
+
+        let generation = self.cluster_generation;
+        let sender = self.events.sender();
+        let Some(ref result) = self.cluster_result else {
+            self.events.send(AppEvent::ClusterTopicsGenerated(
+                generation,
+                Err(Arc::new("No cluster result. Use :cluster first.".into())),
+            ));
+            return;
+        };
+
+        let topics = jev.topics();
+        let requests: Vec<_> = (0..result.num_clusters())
+            .map(|c| {
+                let texts: Vec<&str> = result
+                    .texts_for_cluster(c)
+                    .into_iter()
+                    .map(|(_, t)| t)
+                    .collect();
+                decisions::cluster_topic_request(&jev.model, &texts, &topics)
+            })
+            .collect();
+
+        tokio::spawn(async move {
+            let responses = client.decide_all(requests, jev.concurrency).await;
+            let mut first_error = None;
+            let labels: Vec<String> = responses
+                .into_iter()
+                .map(|r| match r {
+                    Ok(resp) => decisions::cluster_label(&resp, &topics).unwrap_or_default(),
+                    Err(e) => {
+                        first_error.get_or_insert_with(|| e.to_string());
+                        String::new()
+                    }
+                })
+                .collect();
+            // Partial success still applies; empty labels keep the placeholder.
+            let result = if labels.iter().all(|l| l.is_empty()) {
+                Err(Arc::new(format!(
+                    "Jev labelling failed: {}",
+                    first_error.unwrap_or_else(|| "no topic answers".into())
+                )))
+            } else {
+                Ok(labels)
+            };
             let _ = sender.send(Event::App(Box::new(AppEvent::ClusterTopicsGenerated(
                 generation, result,
             ))));
@@ -583,6 +646,28 @@ impl App {
     }
 
     /// Returns `true` if any chat provider (MLX or OpenRouter) is available.
+    /// Jev labels cluster topics when `[jev]` is configured and OpenRouter
+    /// is authenticated; it takes precedence over the chat LLM.
+    fn resolve_jev(&self) -> Option<(Arc<OpenRouterClient>, crate::config::JevConfig)> {
+        let jev = self.config.jev.clone()?;
+        let client = self.openrouter_client.as_ref()?;
+        Some((Arc::clone(client), jev))
+    }
+
+    /// Whether `:topics` has anything to label clusters with.
+    pub(super) fn has_topic_labeller(&self) -> bool {
+        self.resolve_jev().is_some() || self.has_chat_provider()
+    }
+
+    /// Name of the backend `:topics` will use ("Jev", "MLX", "OpenRouter").
+    pub(crate) fn topic_labeller_name(&self) -> Option<&'static str> {
+        if self.resolve_jev().is_some() {
+            Some("Jev")
+        } else {
+            self.resolved_chat_provider_name()
+        }
+    }
+
     pub(super) fn has_chat_provider(&self) -> bool {
         self.resolve_chat_provider().is_some()
     }

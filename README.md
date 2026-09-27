@@ -43,6 +43,13 @@ tick_rate_fps = 30       # UI refresh rate
 default_max_results = 20 # Tweets per API request (10–100)
 default_view = "home"    # One of: home, mentions, bookmarks, search
 openrouter_callback_port = 3000 # OpenRouter OAuth localhost callback port
+
+# Optional: label :cluster topics with Jev (TypeSafe) instead of a chat LLM,
+# and set the model for `classify` / `rank`. Needs OpenRouter auth.
+[jev]
+model = "typesafe/jev-1.13" # pin a version; thresholds shift between releases
+concurrency = 8
+# topics = { rust = "Rust language and ecosystem", ai_ml = "AI, ML, LLMs" }  # default: built-in taxonomy; `other` is always added
 ```
 
 ## Authentication
@@ -127,7 +134,7 @@ Type `:cluster` to cluster your home timeline tweets by topic:
 3. PCA projects embeddings to 2D coordinates
 4. A scatter plot is displayed using [kuva](https://github.com/psy-fer/kuva)'s terminal backend with Unicode braille characters
 
-Each cluster is labeled with the tweet closest to its centroid.
+Each cluster is labeled with the tweet closest to its centroid. `:topics` replaces those placeholders with short topic labels: with a `[jev]` config section it asks Jev to pick one topic per cluster from a fixed taxonomy (one request per cluster, sent concurrently, no text generation), and otherwise it asks the selected chat model to write labels. Clusters without a clear topic show as "Mixed".
 
 ## CLI Mode
 
@@ -147,6 +154,8 @@ xplorertui open <tweet_id_or_url>   # Single tweet + thread → JSONL
 xplorertui openrouter-models        # List embedding models → JSONL
 xplorertui embed <text> -m <model>  # Generate embedding → JSON
 xplorertui similar <query> -m <model> # Semantic search → ranked JSONL
+xplorertui classify < tweets.jsonl  # Tag with Jev topic + flags → JSONL
+xplorertui rank <query> < tweets.jsonl # Jev relevance re-rank → JSONL
 ```
 
 Each tweet line is a denormalized JSON object with the tweet, its author, and any attached media embedded:
@@ -166,7 +175,15 @@ xplorertui open https://x.com/user/status/1234567890
 
 # Semantic search (re-ranked by embedding similarity)
 xplorertui similar "rust async runtime" -m openai/text-embedding-3-small
+
+# Re-rank search results with Jev (a judgment model that reads query and post together)
+xplorertui search "rust async" | xplorertui rank "rust async runtimes" | jq -r '.tweet.text'
+
+# Tag your timeline by topic, then keep only questions
+xplorertui home | xplorertui classify | jq 'select(.jev.is_question > 0.5)'
 ```
+
+`classify` and `rank` read tweet JSONL on stdin, so they only need OpenRouter credentials. They send one Decisions request per tweet, `[jev].concurrency` at a time, and print the total cost to stderr.
 
 ## Keybindings
 

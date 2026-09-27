@@ -28,6 +28,54 @@ pub struct AppConfig {
     /// Falls back to `DEFAULT_MLX_CHAT_MODEL` when not set.
     #[serde(default)]
     pub mlx_chat_model: Option<String>,
+    /// Jev (TypeSafe) decision model settings. When `[jev]` is present,
+    /// `:topics` labels clusters with Jev instead of a chat LLM.
+    #[serde(default)]
+    pub jev: Option<JevConfig>,
+}
+
+/// `[jev]` section of config.toml.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JevConfig {
+    /// Decision model ID. Pin a version: thresholds shift between releases.
+    #[serde(default = "default_jev_model")]
+    pub model: String,
+    /// Maximum concurrent Decisions requests.
+    #[serde(default = "default_jev_concurrency")]
+    pub concurrency: usize,
+    /// Topic taxonomy (key → description). Uses the built-in taxonomy when
+    /// unset; an `other` option is always added.
+    #[serde(default)]
+    pub topics: Option<std::collections::BTreeMap<String, String>>,
+}
+
+impl Default for JevConfig {
+    fn default() -> Self {
+        Self {
+            model: default_jev_model(),
+            concurrency: default_jev_concurrency(),
+            topics: None,
+        }
+    }
+}
+
+impl JevConfig {
+    /// The configured taxonomy (or the default), always including `other`.
+    pub fn topics(&self) -> std::collections::BTreeMap<String, String> {
+        use crate::openrouter::decisions;
+        match &self.topics {
+            Some(t) if !t.is_empty() => decisions::with_other(t.clone()),
+            _ => decisions::default_topics(),
+        }
+    }
+}
+
+fn default_jev_model() -> String {
+    crate::openrouter::decisions::DEFAULT_JEV_MODEL.to_string()
+}
+
+fn default_jev_concurrency() -> usize {
+    crate::openrouter::decisions::DEFAULT_CONCURRENCY
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -67,6 +115,7 @@ impl Default for AppConfig {
             mlx_server_url: None,
             mlx_embedding_model: None,
             mlx_chat_model: None,
+            jev: None,
         }
     }
 }

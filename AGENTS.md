@@ -56,7 +56,8 @@ Tweet output uses `denormalize_tweet()` to join each tweet with its author (from
 - **`src/app.rs`** — `App` struct (all state), key handling, event loop, API dispatch
 - **`src/event.rs`** — `Event`, `AppEvent`, `ViewKind`, `EventHandler`
 - **`src/command.rs`** — `:command` parser (vim-style commands like `:user`, `:search`, `:quit`)
-- **`src/config.rs`** — TOML config from `~/.config/xplorertui/config.toml`
+- **`src/config.rs`** — TOML config from `~/.config/xplorertui/config.toml` (including the optional `[jev]` section)
+- **`src/openrouter/decisions.rs`** — Jev (TypeSafe) Decisions API client (`/api/alpha/decisions`): typed `choice`/`noul`/`score` questions, `decide_all` with bounded concurrency and retry, topic taxonomy, request builders for cluster labels, per-tweet classification, and relevance ranking. Design notes are in `docs/jev-design.md`
 - **`src/ui/`** — Ratatui widget modules. `ui::draw()` in `mod.rs` dispatches to per-view widgets. Each view (timeline, tweet, thread, user, search, bookmarks, help, status_bar, command_bar) is a separate widget module.
 - **`src/api/`** — X API v2 client. `mod.rs` has `XApiClient` with `bearer_get`/`oauth_get` methods. Endpoint methods split across `tweets.rs`, `users.rs`, `engagement.rs`. `types.rs` defines all API response types (all types derive both `Serialize` and `Deserialize`).
 - **`src/auth/`** — Auth strategies: OAuth 2.0 PKCE (`oauth2_pkce.rs`), OAuth 1.0a HMAC-SHA1 (`oauth1.rs`), bearer-only. `credentials.rs` loads from `.env` files. Auth method auto-detected by priority: OAuth2 PKCE > OAuth1 > Bearer.

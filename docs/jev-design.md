@@ -1,6 +1,8 @@
 # Jev (TypeSafe) on OpenRouter: faster topic labels, better search ranking
 
-Status: design note / not yet implemented. Sources checked 2026-09-27:
+Status: A-i (`:topics` via Jev) and B (`xplorertui rank`) implemented, plus a
+per-tweet `xplorertui classify`, in `src/openrouter/decisions.rs`. See §8 for
+live measurements, which changed parts of this design. Sources checked 2026-09-27:
 OpenRouter Jev hub, Jev tutorial, Decisions API reference, the
 "Classify and Tag Text at Scale" cookbook, and the TypeSafe `Choice` and
 `State` docs.
@@ -101,13 +103,13 @@ Keep embeddings and k-means. Per cluster, send one Jev request:
 { "model": "typesafe/jev-1.13",
   "state": { "posts": ["…up to 8 representative tweets…"] },
   "questions": {
-    "topic":    { "type": "choice", "instructions": "Which topic do most of these posts share?", "criteria": { /* taxonomy */ } },
-    "coherent": { "type": "noul",   "instructions": "Do these posts share one clear topic?" } } }
+    "topic":    { "type": "choice", "instructions": "Which topic do most of these posts share?", "criteria": { /* taxonomy */ } } } }
 ```
 
 That's k requests in parallel, one round trip, and no output parsing. If
-`coherent < 0.5` or `topic.confidence` is low, show "mixed" or fall back to the
-chat LLM for that cluster only. The second-best option in `probabilities` is a
+the choice is `other` or `topic.confidence < 0.5`, show "Mixed". (An earlier
+draft also asked a `coherent` noul. It turned out to be badly calibrated, see §8,
+so it was dropped.) The second-best option in `probabilities` is a
 free secondary label (for example "AI · Business").
 
 **A-ii. Classify-then-group (replaces k-means for the topic view).**
@@ -154,7 +156,8 @@ This also opens up search features that embeddings can't do:
   / person lookup) picks the ranking recipe.
 - **Top-1 "best answer"**: put ≤ 255 candidates in one `state` and ask a
   `choice` over their ids. This works for top-1, but the tail probabilities
-  collapse toward 0, so use `score` per post for a full ordering.
+  collapse toward 0, so use `score` per post for a full ordering. (Untested; §8
+  suggests per-item addressing inside one large state is unreliable.)
 
 ## 5. When embeddings are still needed
 
@@ -224,7 +227,7 @@ pub struct DecisionResponse { pub model: String, pub answers: HashMap<String, An
 - Show `usage.cost` totals in the status bar.
 - Pin the model version. Thresholds tuned on 1.13 may shift on `~typesafe/jev-latest`.
 
-## 7. Open questions to verify with a live key
+## 7. Open questions (answered in §8)
 
 1. Is `state` billed once per request regardless of question count? The
    cookbook numbers (621 tokens with 7 questions) suggest yes.
@@ -235,3 +238,68 @@ pub struct DecisionResponse { pub model: String, pub answers: HashMap<String, An
    concurrency.
 4. Accuracy on the user's actual timelines, measured with a 100–150 item
    hand-labelled sample and the cookbook's threshold sweep.
+
+## 8. Live measurements (2026-09-27, `typesafe/jev-1.13-20260917`)
+
+Probe scripts ran against the live API through OpenRouter. The numbers are
+small samples: treat them as direction, not benchmarks.
+
+**Q1. Is `state` billed once per request?** Yes. The same post with 1 question
+used 398 input tokens; with 7 questions it used 471 (+73) and cost $0.0000167 vs
+$0.0000198. Output tokens are reported (67 → 174) but aren't what drives the
+cost. Extra questions are close to free, so asking tags alongside the topic
+is the right call.
+
+**Q2. Can one array `state` hold many posts, with one question per
+`posts[i]`?** Only for very small batches. With a 7-topic `choice` per post:
+
+| posts in one state | accuracy | same text labelled differently | input tokens |
+|---|---|---|---|
+| 8 | 8/8 | 0 | 1,492 |
+| 22 | 19/22 | 0 | 3,645 |
+| 44 | 28/44 | 16 of 22 texts | 7,036 |
+| 88 | 33/88 | 21 of 22 texts | 13,818 |
+| 1 per request (22 requests) | 22/22 | – | ~400 each |
+
+Addressing breaks down past roughly 10–20 items: questions start answering
+about the wrong element. Batching 8 saves about half the tokens, but the
+cost is already negligible, so **the implementation sends one post per
+request**. A cluster request (several posts, one question about all of them)
+is a different shape and works well.
+
+**Q3. Latency.** 32 single-post requests at concurrency 8: 2.8 s wall time,
+p50 0.51 s, p90 0.90 s, max 0.96 s, no errors or 429s. One request is 0.3–0.7
+s. Three cluster requests in parallel took 0.9 s end to end, including the
+TLS handshake, from the Rust client.
+
+**Q4. Accuracy on real timelines.** Still open. It needs X data and a
+hand-labelled sample.
+
+**Other findings**
+
+- The `score` response also includes a `legend` (index → criteria text), and
+  its `probabilities` are keyed by index (`"0"`…`"3"`), not by criteria text.
+- The `coherent` noul is poorly calibrated for cluster labelling. A clean
+  4-post sports cluster scored 0.26, an AI cluster 0.71, and a deliberately
+  mixed one 0.02. The `choice` itself was more useful: the mixed cluster
+  picked `other` at 0.84, and both clean clusters had confidence 1.0.
+- Ranking sanity check ("rust async runtimes", 6 posts): a runtime comparison
+  scored 2.54, a question about async-std 2.06, and a Tokio release note 2.05.
+  A "BUY NOW Rust course" post scored 0.14 after weighting by
+  `substantive` = 0.03. Off-topic posts scored 0.0.
+- Cost: `classify` came to about $0.00003 per tweet (topic + 3 tags), and `rank`
+  to about $0.000016 per tweet.
+
+**Implemented surface**
+
+- `OpenRouterClient::decide` retries 429/5xx and the in-flight-budget 402
+  (honouring `Retry-After`). `decide_all` keeps results in input order and
+  runs at bounded concurrency.
+- `[jev]` in `config.toml` (`model`, `concurrency`, `topics`). When it's present
+  and OpenRouter is authenticated, `:topics` (and the auto-label after
+  `:cluster`) uses Jev instead of the chat LLM.
+- `xplorertui classify` / `xplorertui rank <query>` read tweet JSONL on stdin, so
+  they compose with `home` / `search` and need only OpenRouter credentials.
+- Not yet done: rank in the TUI search view (`:rank jev|embed`), `:classify`
+  view (A-ii), `context_annotations` (A2, needs X API), and cost in the status
+  bar.

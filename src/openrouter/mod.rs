@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod client;
+pub mod decisions;
 pub mod types;
 
 use thiserror::Error;
