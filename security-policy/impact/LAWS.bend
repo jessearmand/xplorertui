@@ -6,7 +6,7 @@
 import Base
 import ./model.bend as M
 
-# LAW: features that never call mlx-server (timelines, search, profiles, threads,
+# LAW: features that never call mlx-server (timelines, profiles, threads,
 # bookmarks, the JSONL CLI, auth, the HF and OpenRouter pickers) cannot be affected
 # by any of the four packages.
 law x_features_unaffected:

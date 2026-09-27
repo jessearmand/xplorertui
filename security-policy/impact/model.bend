@@ -6,7 +6,11 @@
 # running old vs new side by side (evidence). EVIDENCE.md says where each comes from.
 import Base
 
-# Everything a user can do. Only the last four ever talk to mlx-server.
+# Everything a user can do. Search and the last three talk to mlx-server.
+# Search counts because a successful search sends EmbedAndRankSearch whenever an
+# embedding provider is configured (src/app/event_handlers.rs, SearchLoaded).
+# Home, Mentions, Bookmarks and Search reach clustering only through the cluster
+# commands, which are modeled as ClusterTimeline and ClusterTopics.
 type Feature is Data:
   HomeTimeline{}
   Mentions{}
@@ -18,7 +22,6 @@ type Feature is Data:
   Auth{}
   HfModelPicker{}
   OpenRouterModels{}
-  SemanticRank{}
   ClusterTimeline{}
   ClusterTopics{}
   MlxProbe{}
@@ -49,7 +52,7 @@ type Verdict is Data:
 
 def is_mlx_feature(f: Feature) -> Bool:
   match f:
-    case SemanticRank{}:
+    case Search{}:
       True{}
     case ClusterTimeline{}:
       True{}
@@ -64,7 +67,7 @@ def is_mlx_feature(f: Feature) -> Bool:
 # Nothing calls MlxClient::embed_multimodal, so no feature uses Multimodal.
 def uses(f: Feature, e: Endpoint) -> Bool:
   match f e:
-    case SemanticRank{} Embeddings{}:
+    case Search{} Embeddings{}:
       True{}
     case ClusterTimeline{} Health{}:
       True{}

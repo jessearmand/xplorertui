@@ -12,13 +12,13 @@ from pathlib import Path
 FEATURES = [
     "HomeTimeline", "Mentions", "Bookmarks", "Search", "UserProfile", "Thread",
     "CliJsonl", "Auth", "HfModelPicker", "OpenRouterModels",
-    "SemanticRank", "ClusterTimeline", "ClusterTopics", "MlxProbe",
+    "ClusterTimeline", "ClusterTopics", "MlxProbe",
 ]
-MLX_FEATURES = {"SemanticRank", "ClusterTimeline", "ClusterTopics", "MlxProbe"}
+MLX_FEATURES = {"Search", "ClusterTimeline", "ClusterTopics", "MlxProbe"}
 ENDPOINTS = ["Health", "Embeddings", "Chat", "Multimodal"]
 PKGS = ["Starlette", "Transformers", "Tokenizers", "Safetensors"]
 USES = {
-    ("SemanticRank", "Embeddings"),
+    ("Search", "Embeddings"),  # automatic semantic re-rank after a search
     ("ClusterTimeline", "Health"),
     ("ClusterTimeline", "Embeddings"),
     ("ClusterTopics", "Chat"),

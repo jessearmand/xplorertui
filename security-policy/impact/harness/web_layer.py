@@ -39,7 +39,7 @@ def main():
             if "timestamp" in j: j["timestamp"] = 0
             # PIL error text embeds object addresses, which differ run to run.
             text = re.sub(r"0x[0-9a-f]+", "0x…", json.dumps(j, sort_keys=True, ensure_ascii=False))
-            print(r.status_code, path, r.headers.get("content-type"), text[:160])
+            print(r.status_code, path, r.headers.get("content-type"), text)
 
 
 # image_security decodes in a spawn-context child, which re-imports __main__.

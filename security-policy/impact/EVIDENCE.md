@@ -23,15 +23,17 @@ old vs new, and the outputs were identical.
 The Rust app never imports Python. It talks to mlx-server over HTTP through the optional
 `MlxClient` (`src/mlx/client.rs`), so only four features can be affected at all:
 
-| Feature | Endpoints (`src/app/dispatch.rs`, `src/app/mod.rs`) |
+| Feature | Endpoints (`src/app/dispatch.rs`, `src/app/mod.rs`, `src/app/event_handlers.rs`) |
 |---|---|
 | startup / `:probe` capability check | `/health` |
-| semantic re-rank | `/v1/embeddings` |
+| search (every successful search is re-ranked by embeddings when an embedding provider is configured) | `/v1/embeddings` |
 | timeline clustering | `/health`, `/v1/embeddings` |
 | cluster topic labeling | `/v1/chat/completions` |
 
-Timelines, search, profiles, threads, bookmarks, the JSONL CLI, auth, and the HF and
-OpenRouter model pickers never call mlx-server. `MlxClient::embed_multimodal` has no callers,
+Timelines, mentions, profiles, threads, bookmarks, the JSONL CLI, auth, and the HF and
+OpenRouter model pickers never call mlx-server. Home, mentions, bookmarks and search reach
+clustering only when the user runs `:cluster` or refreshes the cluster view; that path is the
+timeline-clustering row. `MlxClient::embed_multimodal` has no callers,
 so no feature reaches `/v1/embeddings/multimodal`.
 
 What each endpoint imports:
@@ -59,8 +61,10 @@ The failing import can't run.
 
 ## Old-vs-new runs (`harness/run.sh`)
 
-`harness/run.sh` builds old and new venvs and diffs each check's output. It ignores version
-banners and timestamped log lines, and normalizes object addresses.
+`harness/run.sh` builds old and new venvs and diffs each check's output. The web venvs pin
+everything except starlette to `mlx-server/uv.lock`. The diff ignores version banners and
+timestamped log lines, and responses are compared as complete JSON bodies with object
+addresses normalized. The script exits nonzero if any check differs.
 
 | Check | What runs | Result |
 |---|---|---|

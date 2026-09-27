@@ -59,7 +59,7 @@ def Laws.x_features_unaffected(f, p):
     case M.Bookmarks{}:
       e => {==}
     case M.Search{}:
-      e => {==}
+      e => exfalso({M.verdict(M.Search{}, p) == M.Unaffected{} : M.Verdict}, true_is_not_false(e))
     case M.UserProfile{}:
       e => {==}
     case M.Thread{}:
@@ -72,8 +72,6 @@ def Laws.x_features_unaffected(f, p):
       e => {==}
     case M.OpenRouterModels{}:
       e => {==}
-    case M.SemanticRank{}:
-      e => exfalso({M.verdict(M.SemanticRank{}, p) == M.Unaffected{} : M.Verdict}, true_is_not_false(e))
     case M.ClusterTimeline{}:
       e => exfalso({M.verdict(M.ClusterTimeline{}, p) == M.Unaffected{} : M.Verdict}, true_is_not_false(e))
     case M.ClusterTopics{}:
@@ -108,11 +106,11 @@ def Laws.nothing_needs_device_check(f, p):
     case M.Bookmarks{} M.Safetensors{}:
       e => unaffected_clash(e)
     case M.Search{} M.Starlette{}:
-      e => unaffected_clash(e)
+      e => verified_clash(e)
     case M.Search{} M.Transformers{}:
-      e => unaffected_clash(e)
+      e => verified_clash(e)
     case M.Search{} M.Tokenizers{}:
-      e => unaffected_clash(e)
+      e => verified_clash(e)
     case M.Search{} M.Safetensors{}:
       e => unaffected_clash(e)
     case M.UserProfile{} M.Starlette{}:
@@ -163,14 +161,6 @@ def Laws.nothing_needs_device_check(f, p):
       e => unaffected_clash(e)
     case M.OpenRouterModels{} M.Safetensors{}:
       e => unaffected_clash(e)
-    case M.SemanticRank{} M.Starlette{}:
-      e => verified_clash(e)
-    case M.SemanticRank{} M.Transformers{}:
-      e => verified_clash(e)
-    case M.SemanticRank{} M.Tokenizers{}:
-      e => verified_clash(e)
-    case M.SemanticRank{} M.Safetensors{}:
-      e => unaffected_clash(e)
     case M.ClusterTimeline{} M.Starlette{}:
       e => verified_clash(e)
     case M.ClusterTimeline{} M.Transformers{}:
@@ -205,7 +195,7 @@ def Laws.starlette_verified_for_mlx_features(f):
     case M.Bookmarks{}:
       e => exfalso({M.verdict(M.Bookmarks{}, M.Starlette{}) == M.VerifiedSame{} : M.Verdict}, false_is_not_true(e))
     case M.Search{}:
-      e => exfalso({M.verdict(M.Search{}, M.Starlette{}) == M.VerifiedSame{} : M.Verdict}, false_is_not_true(e))
+      e => {==}
     case M.UserProfile{}:
       e => exfalso({M.verdict(M.UserProfile{}, M.Starlette{}) == M.VerifiedSame{} : M.Verdict}, false_is_not_true(e))
     case M.Thread{}:
@@ -218,8 +208,6 @@ def Laws.starlette_verified_for_mlx_features(f):
       e => exfalso({M.verdict(M.HfModelPicker{}, M.Starlette{}) == M.VerifiedSame{} : M.Verdict}, false_is_not_true(e))
     case M.OpenRouterModels{}:
       e => exfalso({M.verdict(M.OpenRouterModels{}, M.Starlette{}) == M.VerifiedSame{} : M.Verdict}, false_is_not_true(e))
-    case M.SemanticRank{}:
-      e => {==}
     case M.ClusterTimeline{}:
       e => {==}
     case M.ClusterTopics{}:
@@ -260,8 +248,6 @@ def Laws.safetensors_only_through_chat(f):
       e => exfalso({M.uses(M.HfModelPicker{}, M.Chat{}) == True{} : Bool}, false_is_not_true(e))
     case M.OpenRouterModels{}:
       e => exfalso({M.uses(M.OpenRouterModels{}, M.Chat{}) == True{} : Bool}, false_is_not_true(e))
-    case M.SemanticRank{}:
-      e => exfalso({M.uses(M.SemanticRank{}, M.Chat{}) == True{} : Bool}, false_is_not_true(e))
     case M.ClusterTimeline{}:
       e => exfalso({M.uses(M.ClusterTimeline{}, M.Chat{}) == True{} : Bool}, false_is_not_true(e))
     case M.ClusterTopics{}:
@@ -290,8 +276,6 @@ def Laws.multimodal_unreachable(f):
     case M.HfModelPicker{}:
       {==}
     case M.OpenRouterModels{}:
-      {==}
-    case M.SemanticRank{}:
       {==}
     case M.ClusterTimeline{}:
       {==}
