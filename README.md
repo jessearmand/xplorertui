@@ -167,6 +167,10 @@ Supply an OpenRouter API key in one of these ways. When `OPENROUTER_API_KEY` is 
 - **OAuth PKCE:** run `xplorertui openrouter-auth`, or type `:openrouter-auth` (alias `:or-auth`) in the TUI. The key is saved to `~/.config/xplorertui/openrouter_tokens.json`.
 - **`.env` file:** set `OPENROUTER_API_KEY` (see [Using `.env` files](#using-env-files)).
 
+### Jev Setup
+
+Jev features (`:topics` labels, `classify`, `rank`) use the same OpenRouter key. To use Jev for `:topics` in the TUI, add a `[jev]` section to `~/.config/xplorertui/config.toml` (see [Configuration](#configuration)). Without it, `:topics` asks the selected chat model to write labels. `classify` and `rank` use the default Jev settings when the section is not there.
+
 ### Embedding Model Selection
 
 Before using embedding features, select a model:
@@ -237,7 +241,7 @@ xplorertui search "rust async" | xplorertui rank "rust async runtimes" | jq -r '
 xplorertui home | xplorertui classify | jq 'select(.jev.is_question > 0.5)'
 ```
 
-`classify` and `rank` read tweet JSONL on stdin, so they only need OpenRouter credentials. They send one Decisions request per tweet, `[jev].concurrency` at a time, and print the total cost to stderr.
+`classify` and `rank` read tweet JSONL on stdin, so they only need OpenRouter credentials (for example `fnox exec -- xplorertui home | fnox exec -- xplorertui classify`). They send one Decisions request per tweet, `[jev].concurrency` at a time, and print the total cost to stderr.
 
 ## Keybindings
 

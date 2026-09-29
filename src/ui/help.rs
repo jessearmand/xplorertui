@@ -116,7 +116,7 @@ impl Widget for HelpView {
         push_binding(
             &mut bindings,
             ":topics",
-            "Regenerate cluster topic labels via LLM",
+            "Regenerate cluster topic labels (Jev or chat LLM)",
         );
         push_binding(&mut bindings, ":refresh", "Refresh current view");
         push_binding(&mut bindings, ":quit", "Quit");
