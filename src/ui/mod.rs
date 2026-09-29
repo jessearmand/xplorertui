@@ -1,11 +1,11 @@
 pub mod bookmarks;
 pub mod cluster;
 pub mod command_bar;
-pub mod error_popup;
 pub mod help;
 pub mod hf_models;
 pub mod input;
 pub mod models;
+pub mod popup;
 pub mod search;
 pub mod skeleton;
 pub mod status_bar;
@@ -24,9 +24,9 @@ use crate::event::ViewKind;
 use bookmarks::BookmarksView;
 use cluster::ClusterView;
 use command_bar::CommandBar;
-use error_popup::ErrorPopup;
 use help::HelpView;
 use models::ModelsView;
+use popup::PopupView;
 use search::SearchView;
 use status_bar::StatusBar;
 use thread::ThreadView;
@@ -118,9 +118,9 @@ pub fn draw(frame: &mut Frame, app: &App) {
         }
     }
 
-    // Error detail popup overlay (renders on top of everything)
-    if let Some(ref detail) = app.error_detail {
-        frame.render_widget(ErrorPopup::new(detail), frame.area());
+    // Popup overlay (renders on top of everything)
+    if let Some(ref popup) = app.popup {
+        frame.render_widget(PopupView::new(popup), frame.area());
     }
 }
 

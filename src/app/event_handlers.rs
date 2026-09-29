@@ -20,6 +20,11 @@ impl App {
                 self.push_view(kind);
             }
             AppEvent::PopView => {
+                // Leaving the model picker without choosing abandons a
+                // pending "cluster after model selection".
+                if self.current_view() == Some(&ViewKind::OpenRouterModels) {
+                    self.resume_cluster_after_model = None;
+                }
                 self.pop_view();
             }
             AppEvent::RefreshView => {
@@ -303,6 +308,9 @@ impl App {
                 self.selected_embedding_model = Some(model_id.clone());
                 self.status_message = Some(format!("Selected model: {model_id}"));
                 self.pop_view();
+                if let Some(source) = self.resume_cluster_after_model.take() {
+                    self.start_cluster(source);
+                }
             }
 
             // Embeddings: semantic search re-ranking
@@ -375,6 +383,11 @@ impl App {
                         self.set_error(format!("Clustering error: {e}"));
                     }
                 }
+            }
+            AppEvent::EmbeddingProviderMissing(source) => {
+                self.cluster_loading = false;
+                self.status_message = Some("No embedding model available for clustering".into());
+                self.prompt_for_embedding_model(source);
             }
 
             // Text models (for chat/topic generation)

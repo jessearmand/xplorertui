@@ -107,12 +107,18 @@ impl App {
                 Ok(client) => {
                     self.openrouter_client = Some(Arc::new(client));
                     self.status_message = Some("OpenRouter authenticated successfully!".into());
+                    // Continue a clustering run that was waiting on auth.
+                    if self.resume_cluster_after_model.is_some() {
+                        self.open_embedding_models();
+                    }
                 }
                 Err(e) => {
+                    self.resume_cluster_after_model = None;
                     self.status_message = Some(format!("OpenRouter client error: {e}"));
                 }
             }
         } else if let Err(e) = result {
+            self.resume_cluster_after_model = None;
             self.status_message = Some(format!("OpenRouter auth failed: {e}"));
         }
     }

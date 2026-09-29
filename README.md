@@ -185,12 +185,14 @@ With an OpenRouter client and embedding model configured, search results (`/quer
 
 ### Topic Clustering
 
-Type `:cluster` to cluster your home timeline tweets by topic:
+Type `:cluster` to cluster the tweets in the current view (following, mentions, search, or bookmarks) by topic:
 
 1. All tweet texts are embedded via the selected model
 2. K-means clustering groups tweets into 5 topic clusters
 3. PCA projects embeddings to 2D coordinates
 4. A scatter plot is displayed using [kuva](https://github.com/psy-fer/kuva)'s terminal backend with Unicode braille characters
+
+If no embedding model is available (the MLX server is not reachable and no OpenRouter embedding model is selected), a prompt offers to open the embedding model picker, or to sign in to OpenRouter first. Clustering starts when you pick a model.
 
 Each cluster is labeled with the tweet closest to its centroid. `:topics` replaces those placeholders with short topic labels: with a `[jev]` config section it asks Jev to pick one topic per cluster from a fixed taxonomy (one request per cluster, sent concurrently, no text generation), and otherwise it asks the selected chat model to write labels. Clusters without a clear topic show as "Mixed".
 
@@ -256,6 +258,7 @@ xplorertui home | xplorertui classify | jq 'select(.jev.is_question > 0.5)'
 | `n` | Load next page |
 | `y` | Copy tweet URL to clipboard |
 | `o` | Open tweet in browser |
+| `m` | Show the full status message (when it is cut off and shows `[m]ore`) |
 
 ### Views
 

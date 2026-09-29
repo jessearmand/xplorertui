@@ -76,6 +76,7 @@ impl Widget for HelpView {
         push_binding(&mut bindings, "r", "Refresh current view");
         push_binding(&mut bindings, "y", "Copy tweet URL");
         push_binding(&mut bindings, "o", "Open tweet in browser");
+        push_binding(&mut bindings, "m", "Show full status message");
         bindings.push(Line::from(""));
 
         push_section(&mut bindings, "Views");

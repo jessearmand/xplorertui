@@ -89,19 +89,85 @@ impl Widget for StatusBar<'_> {
         if let Some(ref msg) = self.app.status_message {
             let left_width: usize = spans.iter().map(|s| s.width()).sum();
             let available = (area.width as usize).saturating_sub(left_width);
-            let display = truncate_for_width(msg, available);
-            let display_width = Span::raw(&display).width();
-            let padding = available.saturating_sub(display_width);
+            let msg_style = Style::default().bg(Color::DarkGray).fg(Color::Cyan);
+            let (message_spans, used) = status_message_spans(msg, available, msg_style);
+            let padding = available.saturating_sub(used);
             if padding > 0 {
                 spans.push(Span::styled(" ".repeat(padding), bg_style));
             }
-            spans.push(Span::styled(
-                display,
-                Style::default().bg(Color::DarkGray).fg(Color::Cyan),
-            ));
+            spans.extend(message_spans);
         }
 
         let line = Line::from(spans);
         buf.set_line(area.x, area.y, &line, area.width);
+    }
+}
+
+/// Hint appended to a truncated status message: `m` opens the full text.
+const MORE_HINT: &str = " [m]ore";
+
+/// Fit `msg` into `available` columns. When it does not fit, truncate it
+/// and append [`MORE_HINT`] so the user knows the full text is one key away.
+/// Returns the spans and their total width.
+fn status_message_spans(
+    msg: &str,
+    available: usize,
+    msg_style: Style,
+) -> (Vec<Span<'static>>, usize) {
+    // A newline would be drawn as-is and garble the bar; flatten it.
+    let flat = msg.replace('\n', " ");
+    let full_width = Span::raw(flat.as_str()).width();
+    if full_width <= available {
+        return (vec![Span::styled(flat, msg_style)], full_width);
+    }
+
+    let hint_width = Span::raw(MORE_HINT).width();
+    if available <= hint_width {
+        let display = truncate_for_width(&flat, available);
+        let width = Span::raw(display.as_str()).width();
+        return (vec![Span::styled(display, msg_style)], width);
+    }
+
+    let display = truncate_for_width(&flat, available - hint_width);
+    let width = Span::raw(display.as_str()).width() + hint_width;
+    let hint_style = msg_style.fg(Color::Yellow).add_modifier(Modifier::BOLD);
+    (
+        vec![
+            Span::styled(display, msg_style),
+            Span::styled(MORE_HINT, hint_style),
+        ],
+        width,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn text(spans: &[Span<'_>]) -> String {
+        spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    #[test]
+    fn short_message_has_no_hint() {
+        let (spans, width) = status_message_spans("Loaded 5 models", 40, Style::default());
+        assert_eq!(text(&spans), "Loaded 5 models");
+        assert_eq!(width, 15);
+    }
+
+    #[test]
+    fn long_message_is_truncated_with_hint() {
+        let msg = "Clustering error: MLX server not reachable and no fallback";
+        let (spans, width) = status_message_spans(msg, 30, Style::default());
+        let shown = text(&spans);
+        assert!(shown.ends_with(MORE_HINT), "got {shown:?}");
+        assert!(shown.contains('…'), "got {shown:?}");
+        assert!(width <= 30);
+    }
+
+    #[test]
+    fn newlines_are_flattened() {
+        let (spans, _) = status_message_spans("a\nb", 10, Style::default());
+        assert_eq!(text(&spans), "a b");
     }
 }

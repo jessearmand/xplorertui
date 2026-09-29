@@ -120,15 +120,6 @@ impl App {
             None
         };
 
-        if embed_provider.is_none() && mlx_fallback.is_none() && openrouter_fallback.is_none() {
-            self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
-                "No embedding provider configured. Set mlx_server_url in config \
-                 or use :openrouter-auth + :embeddings."
-                    .into(),
-            ))));
-            return;
-        }
-
         let sender = self.events.sender();
         let Some(source) = self.cluster_source else {
             self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
@@ -136,6 +127,11 @@ impl App {
             ))));
             return;
         };
+
+        if embed_provider.is_none() && mlx_fallback.is_none() && openrouter_fallback.is_none() {
+            self.events.send(AppEvent::EmbeddingProviderMissing(source));
+            return;
+        }
         let tweets = match source {
             ClusterSource::Home => self.home_timeline.tweets.clone(),
             ClusterSource::Mentions => self.mentions.tweets.clone(),
@@ -162,12 +158,9 @@ impl App {
                 } else if let Some((p, m)) = openrouter_fallback {
                     (p, m)
                 } else {
-                    let _ = sender.send(Event::App(Box::new(AppEvent::ClusteringComplete(Err(
-                        Arc::new(
-                            "MLX server not reachable and no OpenRouter fallback configured."
-                                .into(),
-                        ),
-                    )))));
+                    let _ = sender.send(Event::App(Box::new(AppEvent::EmbeddingProviderMissing(
+                        source,
+                    ))));
                     return;
                 }
             } else if let Some((p, m)) = openrouter_fallback {
