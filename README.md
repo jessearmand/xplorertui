@@ -259,6 +259,7 @@ xplorertui home | xplorertui classify | jq 'select(.jev.is_question > 0.5)'
 | `y` | Copy tweet URL to clipboard |
 | `o` | Open tweet in browser |
 | `m` | Show the full status message (when it is cut off and shows `[m]ore`) |
+| `j`/`k`, `↑`/`↓`, `PgUp`/`PgDn` | Scroll a popup whose text is longer than the window |
 
 ### Views
 

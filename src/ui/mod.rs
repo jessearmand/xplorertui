@@ -120,7 +120,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     // Popup overlay (renders on top of everything)
     if let Some(ref popup) = app.popup {
-        frame.render_widget(PopupView::new(popup), frame.area());
+        frame.render_widget(PopupView::new(popup, app.popup_scroll), frame.area());
     }
 }
 

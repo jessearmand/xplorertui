@@ -201,7 +201,8 @@ impl OpenRouterClient {
 
 fn is_retryable(status: u16, body: &str) -> bool {
     match status {
-        429 | 500 | 502 | 503 | 504 => true,
+        // Any 5xx, including 529 (provider overloaded), is transient.
+        429 | 500..=599 => true,
         // OpenRouter uses 402 for its in-flight budget, which clears on its own.
         402 => body.contains("openrouter_in_flight_budget"),
         _ => false,
@@ -534,6 +535,8 @@ mod tests {
     fn retryable_statuses() {
         assert!(is_retryable(429, ""));
         assert!(is_retryable(503, ""));
+        assert!(is_retryable(529, ""));
+        assert!(!is_retryable(600, ""));
         assert!(is_retryable(
             402,
             r#"{"limit_source":"openrouter_in_flight_budget"}"#

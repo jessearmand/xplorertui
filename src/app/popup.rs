@@ -89,11 +89,46 @@ impl Popup {
     }
 }
 
+/// Rows moved by PageUp/PageDown in a popup.
+const POPUP_PAGE: u16 = 10;
+
 impl App {
+    /// Show `popup`, replacing any open one, scrolled to the top.
+    pub(super) fn open_popup(&mut self, popup: Popup) {
+        self.popup = Some(popup);
+        self.popup_scroll = 0;
+    }
+
     pub(super) fn handle_popup_key(&mut self, key: KeyEvent) {
+        if self.popup.is_none() {
+            return;
+        }
+        // Scrolling works in every popup. The renderer clamps the offset, so
+        // it's only bounded here to keep it from growing without limit.
+        let max = u16::MAX / 2;
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                self.popup_scroll = (self.popup_scroll + 1).min(max);
+                return;
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                self.popup_scroll = self.popup_scroll.saturating_sub(1);
+                return;
+            }
+            KeyCode::PageDown => {
+                self.popup_scroll = (self.popup_scroll + POPUP_PAGE).min(max);
+                return;
+            }
+            KeyCode::PageUp => {
+                self.popup_scroll = self.popup_scroll.saturating_sub(POPUP_PAGE);
+                return;
+            }
+            _ => {}
+        }
         let Some(popup) = self.popup.take() else {
             return;
         };
+        self.popup_scroll = 0;
         match popup {
             Popup::Message { .. } => {
                 if !matches!(key.code, KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q')) {
@@ -111,7 +146,7 @@ impl App {
     /// Show the full status message in a popup (`m` key).
     pub(super) fn show_status_detail(&mut self) {
         if let Some(msg) = self.status_message.clone() {
-            self.popup = Some(Popup::info(msg));
+            self.open_popup(Popup::info(msg));
         }
     }
 
@@ -168,7 +203,7 @@ impl App {
                 PromptAction::OpenRouterAuth { resume: source },
             )
         };
-        self.popup = Some(Popup::Confirm {
+        self.open_popup(Popup::Confirm {
             title: "Embedding Model Needed",
             text: format!(
                 "Clustering needs an embedding model, and none is available.\n\n\
@@ -270,6 +305,34 @@ mod tests {
         assert!(app.popup.is_some());
         app.handle_popup_key(key(KeyCode::Enter));
         assert!(app.popup.is_none());
+    }
+
+    #[tokio::test]
+    async fn scroll_keys_move_offset_and_closing_resets_it() {
+        let mut app = app_in_empty_cluster_view();
+        app.open_popup(Popup::info("long message"));
+        app.handle_popup_key(key(KeyCode::Char('j')));
+        app.handle_popup_key(key(KeyCode::Down));
+        app.handle_popup_key(key(KeyCode::PageDown));
+        assert_eq!(app.popup_scroll, 2 + POPUP_PAGE);
+        app.handle_popup_key(key(KeyCode::Char('k')));
+        app.handle_popup_key(key(KeyCode::PageUp));
+        assert_eq!(app.popup_scroll, 1);
+        app.handle_popup_key(key(KeyCode::Up));
+        app.handle_popup_key(key(KeyCode::Up));
+        assert_eq!(app.popup_scroll, 0);
+        assert!(app.popup.is_some());
+
+        app.popup_scroll = 5;
+        app.handle_popup_key(key(KeyCode::Esc));
+        assert!(app.popup.is_none());
+        assert_eq!(app.popup_scroll, 0);
+
+        // Opening a popup over a scrolled one starts at the top.
+        app.open_popup(Popup::info("a"));
+        app.popup_scroll = 3;
+        app.open_popup(Popup::info("b"));
+        assert_eq!(app.popup_scroll, 0);
     }
 
     #[tokio::test]
