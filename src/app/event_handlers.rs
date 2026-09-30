@@ -20,6 +20,11 @@ impl App {
                 self.push_view(kind);
             }
             AppEvent::PopView => {
+                // Leaving the model picker without choosing abandons a
+                // pending "cluster after model selection".
+                if self.current_view() == Some(&ViewKind::OpenRouterModels) {
+                    self.resume_cluster_after_model = None;
+                }
                 self.pop_view();
             }
             AppEvent::RefreshView => {
@@ -303,6 +308,9 @@ impl App {
                 self.selected_embedding_model = Some(model_id.clone());
                 self.status_message = Some(format!("Selected model: {model_id}"));
                 self.pop_view();
+                if let Some(source) = self.resume_cluster_after_model.take() {
+                    self.start_cluster(source);
+                }
             }
 
             // Embeddings: semantic search re-ranking
@@ -365,8 +373,8 @@ impl App {
                         self.cluster_generation += 1;
                         self.cluster_result = Some(cluster_result);
                         self.status_message = Some("Clustering complete!".into());
-                        // Auto-trigger LLM topic generation if a chat provider is available.
-                        if self.has_chat_provider() {
+                        // Auto-trigger topic labelling if Jev or a chat provider is available.
+                        if self.has_topic_labeller() {
                             self.cluster_topics_loading = true;
                             self.dispatch_generate_cluster_topics();
                         }
@@ -375,6 +383,11 @@ impl App {
                         self.set_error(format!("Clustering error: {e}"));
                     }
                 }
+            }
+            AppEvent::EmbeddingProviderMissing(source) => {
+                self.cluster_loading = false;
+                self.status_message = Some("No embedding model available for clustering".into());
+                self.prompt_for_embedding_model(source);
             }
 
             // Text models (for chat/topic generation)
@@ -453,10 +466,10 @@ impl App {
                     self.status_message = Some("No cluster result. Use :cluster first.".into());
                     return;
                 }
-                if !self.has_chat_provider() {
+                if !self.has_topic_labeller() {
                     self.status_message = Some(
-                        "No chat provider configured. Set mlx_server_url in config \
-                         or use :openrouter-auth + :openrouter-models."
+                        "No topic labeller configured. Add a [jev] section to config, \
+                         set mlx_server_url, or use :openrouter-auth + :openrouter-models."
                             .into(),
                     );
                     return;
@@ -482,7 +495,7 @@ impl App {
                                     applied += 1;
                                 }
                             }
-                            let provider = self.resolved_chat_provider_name().unwrap_or("LLM");
+                            let provider = self.topic_labeller_name().unwrap_or("LLM");
                             self.status_message = Some(format!(
                                 "{provider} generated {applied}/{cluster_count} topic labels"
                             ));

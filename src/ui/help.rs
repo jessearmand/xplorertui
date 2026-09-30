@@ -76,6 +76,8 @@ impl Widget for HelpView {
         push_binding(&mut bindings, "r", "Refresh current view");
         push_binding(&mut bindings, "y", "Copy tweet URL");
         push_binding(&mut bindings, "o", "Open tweet in browser");
+        push_binding(&mut bindings, "m", "Show full status message");
+        push_binding(&mut bindings, "j/k", "Scroll a long popup message");
         bindings.push(Line::from(""));
 
         push_section(&mut bindings, "Views");
@@ -116,7 +118,7 @@ impl Widget for HelpView {
         push_binding(
             &mut bindings,
             ":topics",
-            "Regenerate cluster topic labels via LLM",
+            "Regenerate cluster topic labels (Jev or chat LLM)",
         );
         push_binding(&mut bindings, ":refresh", "Refresh current view");
         push_binding(&mut bindings, ":quit", "Quit");

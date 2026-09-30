@@ -15,14 +15,9 @@ impl App {
             return;
         }
 
-        // Dismiss error popup if open (swallow all other keys).
-        if self.error_detail.is_some() {
-            match key.code {
-                KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
-                    self.error_detail = None;
-                }
-                _ => {}
-            }
+        // A popup (message or prompt) swallows all other keys.
+        if self.popup.is_some() {
+            self.handle_popup_key(key);
             return;
         }
 
@@ -356,6 +351,9 @@ impl App {
             }
             KeyCode::Char('r') => {
                 self.events.send(AppEvent::RefreshView);
+            }
+            KeyCode::Char('m') => {
+                self.show_status_detail();
             }
             KeyCode::Char('f') => {
                 if is_model_view {

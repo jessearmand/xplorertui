@@ -53,20 +53,29 @@ Tweet output uses `denormalize_tweet()` to join each tweet with its author (from
 
 - **`src/main.rs`** — Entry point. Uses `clap` to route: no subcommand/`tui` → TUI, `auth` → PKCE flow, other → `cli::run_command()`
 - **`src/cli.rs`** — CLI definition (`Cli`, `CliCommand`), `build_api_client()`, `run_command()`, JSONL denormalization/output, `parse_tweet_id()` URL-or-ID parser
-- **`src/app.rs`** — `App` struct (all state), key handling, event loop, API dispatch
+- **`src/app/`** — `App` struct (all state) and event loop in `mod.rs`; key handling (`key_handlers.rs`), `:command` execution (`commands.rs`), API dispatch (`dispatch.rs`), response handling (`event_handlers.rs`), and modal popups (`popup.rs`: `App.popup` holds an error/info message or a yes/no `Popup::Confirm` with a `PromptAction`; an open popup swallows all keys)
 - **`src/event.rs`** — `Event`, `AppEvent`, `ViewKind`, `EventHandler`
 - **`src/command.rs`** — `:command` parser (vim-style commands like `:user`, `:search`, `:quit`)
-- **`src/config.rs`** — TOML config from `~/.config/xplorertui/config.toml`
-- **`src/ui/`** — Ratatui widget modules. `ui::draw()` in `mod.rs` dispatches to per-view widgets. Each view (timeline, tweet, thread, user, search, bookmarks, help, status_bar, command_bar) is a separate widget module.
+- **`src/config.rs`** — TOML config from `~/.config/xplorertui/config.toml` (including the optional `[jev]` section)
+- **`src/openrouter/decisions.rs`** — Jev (TypeSafe) Decisions API client (`/api/alpha/decisions`): typed `choice`/`noul`/`score` questions, `decide_all` with bounded concurrency and retry, topic taxonomy, request builders for cluster labels, per-tweet classification, and relevance ranking. Design notes are in `docs/jev-design.md`
+- **`src/ui/`** — Ratatui widget modules. `ui::draw()` in `mod.rs` dispatches to per-view widgets. Each view (timeline, tweet, thread, user, search, bookmarks, help, status_bar, command_bar) is a separate widget module. `popup.rs` draws `App.popup` over everything. The status bar truncates long messages and shows a `[m]ore` hint; `m` opens the full text in a popup.
 - **`src/api/`** — X API v2 client. `mod.rs` has `XApiClient` with `bearer_get`/`oauth_get` methods. Endpoint methods split across `tweets.rs`, `users.rs`, `engagement.rs`. `types.rs` defines all API response types (all types derive both `Serialize` and `Deserialize`).
-- **`src/auth/`** — Auth strategies: OAuth 2.0 PKCE (`oauth2_pkce.rs`), OAuth 1.0a HMAC-SHA1 (`oauth1.rs`), bearer-only. `credentials.rs` loads from `.env` files. Auth method auto-detected by priority: OAuth2 PKCE > OAuth1 > Bearer.
+- **`src/auth/`** — Auth strategies: OAuth 2.0 PKCE (`oauth2_pkce.rs`), OAuth 1.0a HMAC-SHA1 (`oauth1.rs`), bearer-only. `credentials.rs` reads credentials from environment variables, after loading optional `.env` files. Auth method auto-detected by priority: OAuth2 PKCE > OAuth1 > Bearer.
 
 ### Authentication & Credentials
 
-Credentials loaded from environment variables via `.env` files in priority order:
-1. `~/.config/xplorertui/.env`
-2. `~/.config/x-cli/.env`
-3. `./.env` (cwd)
+Credentials are read from environment variables. Supply them with [fnox](https://github.com/jdx/fnox), which injects secrets from a secret store (the repo's `fnox.toml` uses the macOS Keychain) into the process environment:
+
+```bash
+fnox set X_CLIENT_ID                   # prompts for the value; stored in the Keychain
+fnox exec -- cargo run                 # TUI
+fnox exec -- cargo run -- home | jq .  # CLI
+fnox check                             # confirm all declared secrets resolve
+```
+
+Only `X_CLIENT_ID` needs fnox for the recommended setup. The other secrets come from OAuth flows and are stored on disk: X user tokens via `xplorertui auth` (`~/.config/xplorertui/tokens.json`) and the OpenRouter key via `xplorertui openrouter-auth` (`~/.config/xplorertui/openrouter_tokens.json`). Never write secret values into `fnox.toml`, source, tests, or logs.
+
+`.env` files are still supported and loaded in priority order: `~/.config/xplorertui/.env`, `~/.config/x-cli/.env`, `./.env` (cwd). `dotenvy` does not override variables that are already set, so fnox-injected values win over `.env` values.
 
 | Variable | Auth Method |
 |---|---|
@@ -74,7 +83,7 @@ Credentials loaded from environment variables via `.env` files in priority order
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` (optional) | OAuth 2.0 PKCE |
 | `X_BEARER_TOKEN` | App-only bearer |
 
-OAuth2 PKCE tokens are persisted at `~/.config/xplorertui/tokens.json`.
+OAuth2 PKCE tokens are persisted at `~/.config/xplorertui/tokens.json`. `OPENROUTER_API_KEY` in the environment takes precedence over the stored OpenRouter key.
 
 User-context endpoints (home timeline, mentions, bookmarks) use `oauth_get`; read-only endpoints use `bearer_get`.
 

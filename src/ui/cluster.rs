@@ -263,7 +263,7 @@ impl Widget for ClusterView<'_> {
                 result,
                 selected_index,
                 self.app.cluster_topics_loading,
-                self.app.resolved_chat_provider_name(),
+                self.app.topic_labeller_name(),
                 source_label,
                 area,
                 buf,
