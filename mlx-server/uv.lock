@@ -1067,8 +1067,8 @@ requires-dist = [
 
 [[package]]
 name = "mlx-embeddings"
-version = "0.0.5"
-source = { git = "https://github.com/Blaizzy/mlx-embeddings.git?rev=v0.1.0#6e2ef5256faadf1d79c3bf339686d43f8db17cdd" }
+version = "0.1.0"
+source = { git = "https://github.com/Blaizzy/mlx-embeddings.git?rev=v0.1.0#32981fa4e8064ed664b52071789dd18271fe4206" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "mlx" },
