@@ -46,15 +46,7 @@ impl App {
                 self.events.send(AppEvent::StartOpenRouterAuth);
             }
             Some(Command::Embeddings) => {
-                self.model_filter = None;
-                self.model_filter_open = false;
-                self.model_search.clear();
-                self.model_search_active = false;
-                self.model_filter_search.clear();
-                self.model_filter_search_active = false;
-                self.events.send(AppEvent::FetchOpenRouterModels);
-                self.events
-                    .send(AppEvent::PushView(ViewKind::OpenRouterModels));
+                self.open_embedding_models();
             }
             Some(Command::OpenRouter) => {
                 self.model_filter = None;

@@ -4,6 +4,9 @@ mod dispatch;
 mod event_handlers;
 mod key_handlers;
 mod navigation;
+mod popup;
+
+pub use popup::{Popup, PopupTone, PromptAction};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -202,7 +205,14 @@ pub struct App {
 
     // Status
     pub status_message: Option<String>,
-    pub error_detail: Option<String>,
+    /// Modal overlay (error details, full status message, or a prompt).
+    pub popup: Option<Popup>,
+    /// First visible text row of the open popup (`j`/`k` scroll). The
+    /// renderer clamps it, so it may exceed the text length.
+    pub popup_scroll: u16,
+    /// Cluster source to re-run once an embedding model is selected (set
+    /// when the user accepts the "Embedding Model Needed" prompt).
+    pub resume_cluster_after_model: Option<ClusterSource>,
     pub loading: bool,
 
     // Skeleton loading animation
@@ -294,7 +304,9 @@ impl App {
             cluster_source: None,
             refresh_then_cluster: false,
             status_message: None,
-            error_detail: None,
+            popup: None,
+            popup_scroll: 0,
+            resume_cluster_after_model: None,
             loading: false,
             epoch: Instant::now(),
             loading_started_at: None,
@@ -436,7 +448,7 @@ impl App {
 
     fn set_error(&mut self, msg: String) {
         self.status_message = Some(msg.clone());
-        self.error_detail = Some(msg);
+        self.open_popup(Popup::error(msg));
     }
 }
 

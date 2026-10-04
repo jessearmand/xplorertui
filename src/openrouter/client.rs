@@ -41,6 +41,11 @@ impl OpenRouterClient {
         Self { http }
     }
 
+    /// The underlying HTTP client (auth and attribution headers preset).
+    pub(super) fn http(&self) -> &reqwest::Client {
+        &self.http
+    }
+
     /// Issue an authenticated GET request to an OpenRouter API path.
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, OpenRouterError> {
         let url = format!("{BASE_URL}{path}");

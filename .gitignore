@@ -3,6 +3,8 @@
 **/.remember
 **/.claude/settings.local.json
 
+.claude/skills/*workspace/
+
 .firecrawl/
 output/
 scratchpad/

@@ -6,6 +6,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use crate::api::types::{ListResponse, SingleResponse, Tweet, User};
+use crate::app::ClusterSource;
 use crate::embeddings::cluster::ClusterResult;
 use crate::huggingface::types::HfModel;
 use crate::openrouter::types::Model;
@@ -144,6 +145,9 @@ pub enum AppEvent {
     },
     ClusterTimeline,
     ClusteringComplete(ApiResult<ClusterResult>),
+    /// Clustering found no embedding provider (MLX unreachable and no
+    /// OpenRouter embedding model); prompts the user to select one.
+    EmbeddingProviderMissing(ClusterSource),
     GenerateClusterTopics,
     ClusterTopicsGenerated(u64, ApiResult<Vec<String>>),
 }
