@@ -72,6 +72,40 @@ def test_chat_loads_and_generates_on_the_mlx_thread(fake_chat):
     assert fake_chat["load"] != threading.get_ident()  # off the caller's thread
 
 
+def test_preloaded_model_survives_a_lifespan_restart(monkeypatch):
+    # The lifespan preloads the default embedding model. If it is cached across
+    # a restart, its lazy arrays (built on the old MLX thread, never evaluated)
+    # are evaluated on the new one. Patch the loader, not the registry, so the
+    # registry's own cache is exercised.
+    mlx_embeddings = pytest.importorskip("mlx_embeddings")
+    from types import SimpleNamespace
+
+    loads = []
+
+    def load(model_id, **kwargs):
+        model = FakeModel()
+        loads.append(model.load_thread)
+        return model, FakeTokenizer()
+
+    def generate(model, tokenizer, texts, **kwargs):
+        mx.eval(model.freqs)  # may raise across threads on MLX >= 0.32
+        return SimpleNamespace(text_embeds=mx.ones((len(texts), 4)))
+
+    monkeypatch.setattr(server.registry, "default_model", "fake/embedder")
+    monkeypatch.setattr(mlx_embeddings, "load", load)
+    monkeypatch.setattr(mlx_embeddings, "generate", generate)
+
+    with TestClient(server.app):
+        pass  # preload only; the model's lazy arrays stay unevaluated
+    with TestClient(server.app) as client:
+        response = client.post(
+            "/v1/embeddings", json={"model": "fake/embedder", "input": ["a", "b"]}
+        )
+    assert response.status_code == 200, response.json()
+    assert len(response.json()["data"]) == 2
+    assert len(loads) == 2  # reloaded on the new lifespan's MLX thread
+
+
 @pytest.mark.asyncio
 async def test_run_mlx_keeps_lazy_arrays_usable_across_calls():
     lazy = await server.run_mlx(lambda: mx.arange(4) * 2)

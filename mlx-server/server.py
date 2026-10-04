@@ -101,9 +101,13 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        # Join the MLX thread before the interpreter tears down: MLX aborts if
-        # a thread holding its streams is still alive at exit.
         if _mlx_executor is not None:
+            # Cached models are bound to this MLX thread; drop them on it so a
+            # later lifespan reloads them on its own thread instead of
+            # evaluating stale arrays across threads.
+            await run_mlx(registry.clear)
+            # Join the MLX thread before the interpreter tears down: MLX aborts
+            # if a thread holding its streams is still alive at exit.
             _mlx_executor.shutdown(wait=True)
             _mlx_executor = None
 
