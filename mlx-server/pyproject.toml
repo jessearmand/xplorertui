@@ -20,5 +20,17 @@ dependencies = [
     "transformers==5.17.0",
 ]
 
+[dependency-groups]
+# `uv run pytest` installs these. httpx2 is what starlette 1.x's TestClient
+# expects; with plain httpx it warns that httpx support is deprecated.
+dev = [
+    "httpx2>=2.13",
+    "pytest>=8",
+    "pytest-asyncio>=1",
+]
+
 [tool.fastapi]
 entrypoint = "server:app"
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"

@@ -67,6 +67,6 @@ ty check .
 # Format
 ruff format .
 
-# Tests (test_mlx_thread.py needs mlx and mlx-lm; it is skipped without them)
-uv run --with pytest --with pytest-asyncio pytest -q
+# Tests (the dev group brings pytest, pytest-asyncio and httpx2)
+uv run pytest -q
 ```
