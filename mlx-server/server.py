@@ -14,8 +14,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from typing import Any, cast
+from functools import partial
+from typing import Any, TypeVar, cast
 
 from fastapi import FastAPI, HTTPException
 
@@ -52,6 +55,34 @@ _OPTIQ_ATTENTION_PATCHED = False
 
 registry = ModelRegistry(default_model=DEFAULT_MODEL)
 
+T = TypeVar("T")
+
+# ---------------------------------------------------------------------------
+# MLX thread — every model load and every evaluation runs here
+# ---------------------------------------------------------------------------
+#
+# Since MLX 0.32, streams belong to the thread that created them. A lazy array
+# built on one thread (e.g. RoPE frequencies computed at model load) cannot be
+# evaluated on another: "There is no Stream(gpu, 0) in current thread". So all
+# MLX work, from loading to converting results to lists, goes through one
+# dedicated thread. That also keeps inference off the event loop and
+# serializes access to the device.
+
+_mlx_executor: ThreadPoolExecutor | None = None
+
+
+def _get_mlx_executor() -> ThreadPoolExecutor:
+    global _mlx_executor
+    if _mlx_executor is None:
+        _mlx_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mlx")
+    return _mlx_executor
+
+
+async def run_mlx(fn: Callable[..., T], /, *args: Any, **kwargs: Any) -> T:
+    """Run ``fn`` on the MLX thread without blocking the event loop."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_get_mlx_executor(), partial(fn, *args, **kwargs))
+
 
 # ---------------------------------------------------------------------------
 # Lifespan — shared resources
@@ -60,13 +91,25 @@ registry = ModelRegistry(default_model=DEFAULT_MODEL)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _mlx_executor
     # Pre-load default model at startup if specified.
     if registry.default_model:
         logger.info("Pre-loading default model: %s", registry.default_model)
-        registry.get_text_model(registry.default_model)
+        await run_mlx(registry.get_text_model, registry.default_model)
         logger.info("Default model loaded.")
 
-    yield
+    try:
+        yield
+    finally:
+        if _mlx_executor is not None:
+            # Cached models are bound to this MLX thread; drop them on it so a
+            # later lifespan reloads them on its own thread instead of
+            # evaluating stale arrays across threads.
+            await run_mlx(registry.clear)
+            # Join the MLX thread before the interpreter tears down: MLX aborts
+            # if a thread holding its streams is still alive at exit.
+            _mlx_executor.shutdown(wait=True)
+            _mlx_executor = None
 
 
 app = FastAPI(
@@ -103,22 +146,14 @@ async def create_embeddings(request: EmbeddingRequest):
 
     try:
         logger.info("Loading embedding model: %s", model_id)
-        model, tokenizer = registry.get_text_model(model_id)
+        model, tokenizer = await run_mlx(registry.get_text_model, model_id)
     except Exception as e:
         logger.error("Failed to load embedding model %s: %s", model_id, e)
         raise HTTPException(status_code=500, detail=f"Failed to load model: {e}")
 
     try:
-        from mlx_embeddings import generate
-        from mlx_embeddings.models.base import BaseModelOutput
-
         t0 = time.perf_counter()
-        # generate() is typed as -> mx.array but actually returns
-        # BaseModelOutput for text models (upstream type annotation issue).
-        raw = generate(model, tokenizer, texts=request.input)
-        output = cast(BaseModelOutput, raw)
-        assert output.text_embeds is not None, "Model returned no text embeddings"
-        embeddings = mx_to_list(output.text_embeds)
+        embeddings = await run_mlx(_embed_texts, model, tokenizer, request.input)
         elapsed = time.perf_counter() - t0
         logger.info(
             "Embedding complete: %d texts, %.2fs, model=%s",
@@ -156,35 +191,16 @@ async def create_multimodal_embeddings(request: MultimodalEmbeddingRequest):
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     try:
-        model, processor = registry.get_vl_model(model_id)
+        model, processor = await run_mlx(registry.get_vl_model, model_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load VL model: {e}")
 
     try:
-        from mlx_embeddings import generate
-        from mlx_embeddings.models.base import ViTModelOutput
-
         # texts must be a non-empty list per generate() signature.
         texts: list[str] = request.texts if request.texts else [""]
-
-        # generate() is typed as -> mx.array but actually returns
-        # ViTModelOutput for VL models (upstream type annotation issue).
-        raw = generate(
-            model,
-            processor,
-            texts=texts,
-            images=decoded_images,
+        all_embeddings = await run_mlx(
+            _embed_multimodal, model, processor, texts, decoded_images
         )
-        output = cast(ViTModelOutput, raw)
-
-        all_embeddings: list[list[float]] = []
-
-        if output.text_embeds is not None:
-            all_embeddings.extend(mx_to_list(output.text_embeds))
-
-        if output.image_embeds is not None:
-            all_embeddings.extend(mx_to_list(output.image_embeds))
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Multimodal embedding failed: {e}")
 
@@ -217,7 +233,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
     try:
         logger.info("Loading chat model: %s", model_id)
-        backend, model, tokenizer = registry.get_chat_model(model_id)
+        backend, model, tokenizer = await run_mlx(registry.get_chat_model, model_id)
         logger.info("Chat model ready: %s (backend=%s)", model_id, backend.value)
     except Exception as e:
         logger.error("Failed to load chat model %s: %s", model_id, e)
@@ -244,7 +260,8 @@ async def chat_completions(request: ChatCompletionRequest):
                 prompt_tokens,
                 completion_tokens,
                 finish_reason,
-            ) = await _generate_mlx_lm(
+            ) = await run_mlx(
+                _generate_mlx_lm,
                 model,
                 tokenizer,
                 messages,
@@ -258,7 +275,9 @@ async def chat_completions(request: ChatCompletionRequest):
                 prompt_tokens,
                 completion_tokens,
                 finish_reason,
-            ) = await _generate_mlx_vlm(model, tokenizer, messages, max_tokens, temp)
+            ) = await run_mlx(
+                _generate_mlx_vlm, model, tokenizer, messages, max_tokens, temp
+            )
     except Exception as e:
         logger.error("Generation failed for %s: %s", model_id, e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
@@ -289,7 +308,38 @@ async def chat_completions(request: ChatCompletionRequest):
     )
 
 
-async def _generate_mlx_lm(
+def _embed_texts(model, tokenizer, texts: list[str]) -> list[list[float]]:
+    """Text embeddings via mlx-embeddings. Runs on the MLX thread."""
+    from mlx_embeddings import generate
+    from mlx_embeddings.models.base import BaseModelOutput
+
+    # generate() is typed as -> mx.array but actually returns
+    # BaseModelOutput for text models (upstream type annotation issue).
+    raw = generate(model, tokenizer, texts=texts)
+    output = cast(BaseModelOutput, raw)
+    assert output.text_embeds is not None, "Model returned no text embeddings"
+    return mx_to_list(output.text_embeds)
+
+
+def _embed_multimodal(model, processor, texts: list[str], images) -> list[list[float]]:
+    """Text + image embeddings via mlx-embeddings. Runs on the MLX thread."""
+    from mlx_embeddings import generate
+    from mlx_embeddings.models.base import ViTModelOutput
+
+    # generate() is typed as -> mx.array but actually returns
+    # ViTModelOutput for VL models (upstream type annotation issue).
+    raw = generate(model, processor, texts=texts, images=images)
+    output = cast(ViTModelOutput, raw)
+
+    all_embeddings: list[list[float]] = []
+    if output.text_embeds is not None:
+        all_embeddings.extend(mx_to_list(output.text_embeds))
+    if output.image_embeds is not None:
+        all_embeddings.extend(mx_to_list(output.image_embeds))
+    return all_embeddings
+
+
+def _generate_mlx_lm(
     model,
     tokenizer,
     messages: list[dict],
@@ -297,7 +347,7 @@ async def _generate_mlx_lm(
     temp: float,
     model_id: str,
 ) -> tuple[str, int, int, str]:
-    """Generate text using mlx-lm (text-only LLMs)."""
+    """Generate text using mlx-lm (text-only LLMs). Runs on the MLX thread."""
     from mlx_lm import generate
     from mlx_lm.sample_utils import make_sampler
 
@@ -318,12 +368,7 @@ async def _generate_mlx_lm(
         generate_kwargs["prompt_cache"] = prompt_cache
 
     generate_fn = cast(Any, generate)
-    text = await asyncio.to_thread(
-        generate_fn,
-        model,
-        tokenizer,
-        **generate_kwargs,
-    )
+    text = generate_fn(model, tokenizer, **generate_kwargs)
 
     text = _strip_thinking(text)
     prompt_tokens = len(tokenizer.encode(prompt))
@@ -336,10 +381,10 @@ async def _generate_mlx_lm(
     )
 
 
-async def _generate_mlx_vlm(
+def _generate_mlx_vlm(
     model, processor, messages: list[dict], max_tokens: int, temp: float
 ) -> tuple[str, int, int, str]:
-    """Generate text using mlx-vlm (vision-language models like gemma-4)."""
+    """Generate text using mlx-vlm (vision-language models). Runs on the MLX thread."""
     from mlx_vlm import generate
     from mlx_vlm.prompt_utils import apply_chat_template
 
@@ -348,8 +393,7 @@ async def _generate_mlx_vlm(
         apply_chat_template(processor, model.config, messages, enable_thinking=False),
     )
 
-    result = await asyncio.to_thread(
-        generate,
+    result = generate(
         model,
         processor,
         prompt,

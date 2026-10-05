@@ -51,6 +51,10 @@ mlx_chat_model = "mlx-community/Qwen3.5-0.8B-OptiQ-4bit"          # optional
 - **`schemas.py`** — Pydantic request/response models
 - **`registry.py`** — `ModelRegistry` (lazy model loading), image decode helpers, MLX array conversion
 
+### Threading
+
+All MLX work (model loads, generation, embedding, `mx_to_list`) goes through `run_mlx()` in `server.py`, which runs it on one dedicated thread. Since MLX 0.32, a lazy array created on one thread cannot be evaluated on another (`There is no Stream(gpu, 0) in current thread`); Gemma 4's RoPE frequencies hit this. Never call registry loaders or MLX generation directly from an endpoint or via `asyncio.to_thread`. `test_mlx_thread.py` guards this.
+
 ## Development
 
 ```bash
@@ -62,4 +66,7 @@ ty check .
 
 # Format
 ruff format .
+
+# Tests (the dev group brings pytest, pytest-asyncio and httpx2)
+uv run pytest -q
 ```

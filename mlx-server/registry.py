@@ -91,6 +91,17 @@ class ModelRegistry:
             self._vl_models[model_id] = (model, processor)
         return self._vl_models[model_id]
 
+    def clear(self) -> None:
+        """Drop every cached model.
+
+        Models hold MLX arrays bound to the thread that loaded them, so they
+        must not outlive that thread. Call this on the MLX thread before it
+        exits.
+        """
+        self._text_models.clear()
+        self._vl_models.clear()
+        self._chat_models.clear()
+
     def loaded_model_ids(self) -> list[str]:
         text_ids = list(self._text_models.keys())
         vl_ids = list(self._vl_models.keys())
