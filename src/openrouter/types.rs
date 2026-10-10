@@ -108,11 +108,39 @@ pub struct ChatMessage {
 }
 
 /// Controls reasoning token behavior in chat completions.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ReasoningConfig {
+    /// `false` turns reasoning off for models that allow it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
     /// When true, the model still reasons internally but reasoning
-    /// tokens are excluded from the response.
-    pub exclude: bool,
+    /// tokens are excluded from the response. They still count against
+    /// `max_tokens`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude: Option<bool>,
+    /// Reasoning effort hint ("low", "medium", "high").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+}
+
+impl ReasoningConfig {
+    /// No reasoning: the whole token budget goes to the answer.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: Some(false),
+            ..Self::default()
+        }
+    }
+
+    /// Low-effort reasoning, hidden from the response. For models that
+    /// refuse `disabled()`.
+    pub fn hidden_low() -> Self {
+        Self {
+            exclude: Some(true),
+            effort: Some("low".into()),
+            ..Self::default()
+        }
+    }
 }
 
 /// Request body for `POST /api/v1/chat/completions`.
@@ -124,9 +152,8 @@ pub struct ChatCompletionRequest {
     pub max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
-    /// Controls reasoning token output. Use `{ exclude: true }` to
-    /// suppress chain-of-thought from the response while the model
-    /// still reasons internally.
+    /// Controls reasoning: `ReasoningConfig::disabled()` turns it off,
+    /// `exclude` hides it from the response while the model still reasons.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ReasoningConfig>,
 }
@@ -173,4 +200,20 @@ pub struct ChatUsage {
     pub completion_tokens: Option<u64>,
     #[serde(default)]
     pub total_tokens: Option<u64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reasoning_config_serializes_only_set_fields() {
+        let off = serde_json::to_value(ReasoningConfig::disabled()).unwrap();
+        assert_eq!(off, serde_json::json!({ "enabled": false }));
+        let hidden = serde_json::to_value(ReasoningConfig::hidden_low()).unwrap();
+        assert_eq!(
+            hidden,
+            serde_json::json!({ "exclude": true, "effort": "low" })
+        );
+    }
 }

@@ -297,97 +297,22 @@ impl App {
             return;
         };
 
-        // Build the prompt: collect up to 8 representative tweets per cluster.
         let num_clusters = result.num_clusters();
-        let max_tokens = Some(cluster_topic_max_tokens(num_clusters));
+        let max_tokens = cluster_topic_max_tokens(num_clusters);
+        let user_content = cluster_prompt_body(result);
         let sender = self.events.sender();
-        let mut user_content = String::new();
-        for c in 0..num_clusters {
-            user_content.push_str(&format!("## Cluster {c}\n"));
-            let texts = result.texts_for_cluster(c);
-            for (_, text) in texts.iter().take(8) {
-                let truncated: String = text.chars().take(280).collect();
-                let cleaned = truncated.replace('\n', " ");
-                user_content.push_str(&format!("- {cleaned}\n"));
-            }
-            user_content.push('\n');
-        }
-
-        use crate::openrouter::types::ChatMessage;
-        let messages = vec![
-            ChatMessage {
-                role: "system".into(),
-                content: "For each cluster of tweets, analyze a common topic and \
-                          generate a short descriptive topic label (3-5 words). \
-                          Reply with exactly one line per cluster in the format \
-                          `Cluster <index>: <label>`. Include every cluster 0 \
-                          through N-1. No numbering, no preamble, no trailing \
-                          explanations."
-                    .into(),
-            },
-            ChatMessage {
-                role: "user".into(),
-                content: user_content,
-            },
-        ];
 
         tokio::spawn(async move {
             let result = async {
-                // Exclude reasoning tokens -- we only need the final labels.
-                use crate::openrouter::types::ReasoningConfig;
-                let resp = provider
-                    .chat_completion(
-                        &model,
-                        messages,
-                        max_tokens,
-                        Some(0.3),
-                        Some(ReasoningConfig { exclude: true }),
-                    )
+                let content = provider
+                    .complete_text(&model, CLUSTER_LABEL_PROMPT, user_content, max_tokens)
                     .await?;
-
-                let choice = resp
-                    .choices
-                    .first()
-                    .ok_or_else(|| Arc::new("Chat model returned no choices".to_string()))?;
-
-                // Only use `content` -- reasoning/reasoning_content are
-                // chain-of-thought fields and must NOT be treated as output.
-                let raw = choice.message.content.clone().ok_or_else(|| {
-                    let reason = choice.finish_reason.as_deref().unwrap_or("unknown");
-                    if reason == "length" {
-                        Arc::new(
-                            "Model exhausted token budget on reasoning \
-                             before producing content (finish_reason: length)"
-                                .to_string(),
-                        )
-                    } else {
-                        Arc::new(format!(
-                            "Chat model returned null content \
-                             (finish_reason: {reason})"
-                        ))
-                    }
-                })?;
-
-                // Strip <think>...</think> blocks that reasoning models
-                // may embed in content.
-                let content = openrouter::strip_think_tags(&raw);
-
-                if content.trim().is_empty() {
-                    return Err(Arc::new(
-                        "Chat model returned empty content \
-                         (after stripping reasoning tags)"
-                            .to_string(),
-                    ));
-                }
-
                 let labels = parse_cluster_topic_labels(&content, num_clusters);
-
                 if labels.iter().all(|l| l.is_empty()) {
                     return Err(Arc::new(format!(
                         "No labels parsed from response: {content}"
                     )));
                 }
-
                 Ok(labels)
             }
             .await;
@@ -398,8 +323,11 @@ impl App {
         });
     }
 
-    /// Label each cluster with one Jev `choice` over the topic taxonomy.
-    /// All clusters go out concurrently; no text generation or parsing.
+    /// Label clusters with Jev. When a chat provider is available (and
+    /// `[jev] propose_labels` is on), the chat model proposes candidate
+    /// labels and Jev picks a distinct one per cluster; otherwise, or if
+    /// the proposal fails, Jev picks from the fixed topic taxonomy. All
+    /// Jev requests go out concurrently.
     fn dispatch_jev_cluster_topics(
         &self,
         client: Arc<OpenRouterClient>,
@@ -417,19 +345,71 @@ impl App {
             return;
         };
 
-        let topics = jev.topics();
-        let requests: Vec<_> = (0..result.num_clusters())
+        let num_clusters = result.num_clusters();
+        let cluster_posts: Vec<Vec<String>> = (0..num_clusters)
             .map(|c| {
-                let texts: Vec<&str> = result
+                result
                     .texts_for_cluster(c)
                     .into_iter()
-                    .map(|(_, t)| t)
-                    .collect();
-                decisions::cluster_topic_request(&jev.model, &texts, &topics)
+                    .take(decisions::MAX_POSTS_PER_CLUSTER)
+                    .map(|(_, t)| t.to_string())
+                    .collect()
             })
             .collect();
+        let proposer = self
+            .resolve_chat_provider()
+            .filter(|_| jev.propose_labels)
+            .map(|(provider, model)| (provider, model, cluster_prompt_body(result)));
 
         tokio::spawn(async move {
+            let posts =
+                |c: usize| -> Vec<&str> { cluster_posts[c].iter().map(String::as_str).collect() };
+
+            if let Some((provider, model, body)) = proposer {
+                let candidates = provider
+                    .complete_text(
+                        &model,
+                        decisions::PROPOSE_LABELS_PROMPT,
+                        body,
+                        decisions::propose_max_tokens(num_clusters),
+                    )
+                    .await
+                    .map(|content| decisions::parse_label_candidates(&content));
+                match candidates {
+                    Ok(candidates) if candidates.len() >= 2 => {
+                        let requests = (0..num_clusters)
+                            .map(|c| {
+                                decisions::pick_label_request(&jev.model, &posts(c), &candidates)
+                            })
+                            .collect();
+                        let responses = client.decide_all(requests, jev.concurrency).await;
+                        let ok: Vec<_> = responses.iter().map(|r| r.as_ref().ok()).collect();
+                        let labels: Vec<String> =
+                            decisions::assign_unique_labels(&ok, candidates.len())
+                                .into_iter()
+                                .map(|i| i.map(|i| candidates[i].clone()).unwrap_or_default())
+                                .collect();
+                        let result =
+                            labels_or_error(labels, responses.into_iter().find_map(Result::err));
+                        let _ = sender.send(Event::App(Box::new(
+                            AppEvent::ClusterTopicsGenerated(generation, result),
+                        )));
+                        return;
+                    }
+                    Ok(candidates) => tracing::warn!(
+                        "label proposal gave {} candidates; using the topic taxonomy",
+                        candidates.len()
+                    ),
+                    Err(e) => {
+                        tracing::warn!("label proposal failed ({e}); using the topic taxonomy")
+                    }
+                }
+            }
+
+            let topics = jev.topics();
+            let requests = (0..num_clusters)
+                .map(|c| decisions::cluster_topic_request(&jev.model, &posts(c), &topics))
+                .collect();
             let responses = client.decide_all(requests, jev.concurrency).await;
             let mut first_error = None;
             let labels: Vec<String> = responses
@@ -437,20 +417,12 @@ impl App {
                 .map(|r| match r {
                     Ok(resp) => decisions::cluster_label(&resp, &topics).unwrap_or_default(),
                     Err(e) => {
-                        first_error.get_or_insert_with(|| e.to_string());
+                        first_error.get_or_insert(e);
                         String::new()
                     }
                 })
                 .collect();
-            // Partial success still applies; empty labels keep the placeholder.
-            let result = if labels.iter().all(|l| l.is_empty()) {
-                Err(Arc::new(format!(
-                    "Jev labelling failed: {}",
-                    first_error.unwrap_or_else(|| "no topic answers".into())
-                )))
-            } else {
-                Ok(labels)
-            };
+            let result = labels_or_error(labels, first_error);
             let _ = sender.send(Event::App(Box::new(AppEvent::ClusterTopicsGenerated(
                 generation, result,
             ))));
@@ -652,13 +624,20 @@ impl App {
         self.resolve_jev().is_some() || self.has_chat_provider()
     }
 
-    /// Name of the backend `:topics` will use ("Jev", "MLX", "OpenRouter").
+    /// Name of the backend `:topics` will use ("Jev", "MLX + Jev", "MLX",
+    /// "OpenRouter", ...).
     pub(crate) fn topic_labeller_name(&self) -> Option<&'static str> {
-        if self.resolve_jev().is_some() {
-            Some("Jev")
-        } else {
-            self.resolved_chat_provider_name()
+        let Some((_, jev)) = self.resolve_jev() else {
+            return self.resolved_chat_provider_name();
+        };
+        if !jev.propose_labels {
+            return Some("Jev");
         }
+        Some(match self.resolved_chat_provider_name() {
+            Some("MLX") => "MLX + Jev",
+            Some(_) => "OpenRouter + Jev",
+            None => "Jev",
+        })
     }
 
     pub(super) fn has_chat_provider(&self) -> bool {
@@ -817,6 +796,146 @@ impl ChatProvider {
                 .map_err(|e| Arc::new(e.to_string())),
         }
     }
+
+    /// One system + user turn with reasoning turned off, returning the
+    /// answer text. Hiding reasoning (`exclude`) is not enough for short
+    /// budgets: hidden reasoning still counts against `max_tokens` and can
+    /// use all of it before the answer starts. Models that refuse to turn
+    /// reasoning off are retried with low, hidden reasoning and extra room.
+    async fn complete_text(
+        &self,
+        model: &str,
+        system: &str,
+        user: String,
+        max_tokens: u32,
+    ) -> Result<String, Arc<String>> {
+        use openrouter::types::{ChatMessage, ReasoningConfig};
+        let messages = vec![
+            ChatMessage {
+                role: "system".into(),
+                content: system.into(),
+            },
+            ChatMessage {
+                role: "user".into(),
+                content: user,
+            },
+        ];
+        let resp = match self {
+            Self::OpenRouter(client) => match client
+                .chat_completion(
+                    model,
+                    messages.clone(),
+                    Some(max_tokens),
+                    Some(0.3),
+                    Some(ReasoningConfig::disabled()),
+                )
+                .await
+            {
+                Err(openrouter::OpenRouterError::ApiError {
+                    status: 400,
+                    detail,
+                }) if detail.to_ascii_lowercase().contains("reasoning") => {
+                    tracing::debug!("{model} cannot disable reasoning: {detail}");
+                    client
+                        .chat_completion(
+                            model,
+                            messages,
+                            Some(max_tokens.saturating_add(REASONING_HEADROOM_TOKENS)),
+                            Some(0.3),
+                            Some(ReasoningConfig::hidden_low()),
+                        )
+                        .await
+                }
+                other => other,
+            }
+            .map_err(|e| Arc::new(e.to_string()))?,
+            Self::Mlx(_) => {
+                self.chat_completion(model, messages, Some(max_tokens), Some(0.3), None)
+                    .await?
+            }
+        };
+
+        let choice = resp
+            .choices
+            .first()
+            .ok_or_else(|| Arc::new("Chat model returned no choices".to_string()))?;
+
+        // Only use `content` -- reasoning/reasoning_content are
+        // chain-of-thought fields and must NOT be treated as output.
+        let raw = choice.message.content.clone().ok_or_else(|| {
+            let reason = choice.finish_reason.as_deref().unwrap_or("unknown");
+            if reason == "length" {
+                Arc::new(
+                    "Model exhausted token budget on reasoning \
+                     before producing content (finish_reason: length)"
+                        .to_string(),
+                )
+            } else {
+                Arc::new(format!(
+                    "Chat model returned null content \
+                     (finish_reason: {reason})"
+                ))
+            }
+        })?;
+
+        // Strip <think>...</think> blocks that reasoning models
+        // may embed in content.
+        let content = openrouter::strip_think_tags(&raw);
+        if content.trim().is_empty() {
+            return Err(Arc::new(
+                "Chat model returned empty content \
+                 (after stripping reasoning tags)"
+                    .to_string(),
+            ));
+        }
+        Ok(content)
+    }
+}
+
+/// Partial success still applies (empty labels keep the placeholder);
+/// all-empty is an error.
+fn labels_or_error(
+    labels: Vec<String>,
+    first_error: Option<openrouter::OpenRouterError>,
+) -> ApiResult<Vec<String>> {
+    if labels.iter().all(|l| l.is_empty()) {
+        Err(Arc::new(format!(
+            "Jev labelling failed: {}",
+            first_error.map_or_else(|| "no topic answers".into(), |e| e.to_string())
+        )))
+    } else {
+        Ok(labels)
+    }
+}
+
+/// Extra `max_tokens` when a model insists on reasoning (hidden reasoning
+/// counts against the budget).
+const REASONING_HEADROOM_TOKENS: u32 = 2048;
+
+const CLUSTER_LABEL_PROMPT: &str = "For each cluster of tweets, analyze a common topic and \
+     generate a short descriptive topic label (3-5 words). \
+     Reply with exactly one line per cluster in the format \
+     `Cluster <index>: <label>`. Include every cluster 0 \
+     through N-1. No numbering, no preamble, no trailing \
+     explanations.";
+
+/// Up to `MAX_POSTS_PER_CLUSTER` posts per cluster under `## Cluster <n>`
+/// headings, the user turn for both chat labelling and Jev proposals.
+fn cluster_prompt_body(result: &crate::embeddings::cluster::ClusterResult) -> String {
+    let mut body = String::new();
+    for c in 0..result.num_clusters() {
+        body.push_str(&format!("## Cluster {c}\n"));
+        for (_, text) in result
+            .texts_for_cluster(c)
+            .iter()
+            .take(openrouter::decisions::MAX_POSTS_PER_CLUSTER)
+        {
+            let truncated: String = text.chars().take(280).collect();
+            body.push_str(&format!("- {}\n", truncated.replace('\n', " ")));
+        }
+        body.push('\n');
+    }
+    body
 }
 
 /// Clean a raw label line: strip bullet/numbering prefixes and trim.
@@ -909,6 +1028,98 @@ pub(crate) fn parse_cluster_topic_labels(content: &str, num_clusters: usize) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live check of propose-then-pick against OpenRouter, using the same
+    /// helpers as `dispatch_jev_cluster_topics`. Run with:
+    /// `OPENROUTER_API_KEY=... cargo test propose_live -- --ignored`
+    #[tokio::test]
+    #[ignore]
+    async fn propose_live_then_jev_picks_distinct_labels() {
+        use crate::embeddings::cluster::ClusterResult;
+        use crate::openrouter::decisions;
+
+        let key = std::env::var("OPENROUTER_API_KEY").expect("OPENROUTER_API_KEY");
+        let client = Arc::new(OpenRouterClient::new(key));
+        // Rust and terminal-tool clusters both map to "Software engineering"
+        // in the default taxonomy.
+        let clusters: [&[&str]; 3] = [
+            &[
+                "Rewrote our parser in Rust, the borrow checker caught two real bugs",
+                "New crate release: zero-copy deserialization for Rust",
+                "Async Rust finally clicked for me after reading the Tokio docs",
+            ],
+            &[
+                "My Neovim + tmux setup after a year of tweaking dotfiles",
+                "Switched terminal emulators again, Ghostty feels fast",
+                "zsh startup down to 40ms after trimming plugins",
+            ],
+            &[
+                "Bitcoin ETF inflows hit a new weekly record",
+                "ETH gas fees spiked during the token launch",
+                "Solana DEX volume overtook Ethereum this week",
+            ],
+        ];
+        let mut texts = Vec::new();
+        let mut labels = Vec::new();
+        for (c, posts) in clusters.iter().enumerate() {
+            for p in *posts {
+                texts.push(p.to_string());
+                labels.push(c);
+            }
+        }
+        let n = texts.len();
+        let result = ClusterResult {
+            points: vec![(0.0, 0.0); n],
+            labels,
+            tweet_ids: (0..n).map(|i| i.to_string()).collect(),
+            tweet_texts: texts,
+            conversation_ids: vec![None; n],
+            author_ids: vec![None; n],
+            cluster_topics: vec![String::new(); 3],
+        };
+
+        // Qwen3.5-9B used to spend the whole budget on hidden reasoning.
+        let provider = ChatProvider::OpenRouter(Arc::clone(&client));
+        let content = provider
+            .complete_text(
+                "qwen/qwen3.5-9b",
+                decisions::PROPOSE_LABELS_PROMPT,
+                cluster_prompt_body(&result),
+                decisions::propose_max_tokens(3),
+            )
+            .await
+            .expect("proposal");
+        let candidates = decisions::parse_label_candidates(&content);
+        assert!(candidates.len() >= 3, "{content}");
+
+        let requests = clusters
+            .iter()
+            .map(|posts| {
+                decisions::pick_label_request(decisions::DEFAULT_JEV_MODEL, posts, &candidates)
+            })
+            .collect();
+        let responses = client.decide_all(requests, 3).await;
+        let ok: Vec<_> = responses.iter().map(|r| r.as_ref().ok()).collect();
+        let picked = decisions::assign_unique_labels(&ok, candidates.len());
+        assert!(picked.iter().all(Option::is_some), "{picked:?}");
+        let names: Vec<&str> = picked
+            .iter()
+            .map(|i| candidates[i.unwrap()].as_str())
+            .collect();
+        eprintln!("candidates: {candidates:?}\npicked: {names:?}");
+
+        // A model that refuses `reasoning.enabled = false` falls back.
+        let short = provider
+            .complete_text(
+                "anthropic/claude-sonnet-5.5",
+                "Reply with a 2-word topic label only.",
+                "Cargo, crates and the borrow checker".into(),
+                32,
+            )
+            .await
+            .expect("fallback");
+        assert!(!short.trim().is_empty());
+    }
 
     #[test]
     fn parses_well_formed_prefix_output() {

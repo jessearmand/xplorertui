@@ -295,11 +295,82 @@ hand-labelled sample.
 - `OpenRouterClient::decide` retries 429/5xx and the in-flight-budget 402
   (honouring `Retry-After`). `decide_all` keeps results in input order and
   runs at bounded concurrency.
-- `[jev]` in `config.toml` (`model`, `concurrency`, `topics`). When it's present
-  and OpenRouter is authenticated, `:topics` (and the auto-label after
-  `:cluster`) uses Jev instead of the chat LLM.
+- `[jev]` in `config.toml` (`model`, `concurrency`, `topics`,
+  `propose_labels`). When it's present and OpenRouter is authenticated,
+  `:topics` (and the auto-label after `:cluster`) uses Jev. With a chat model
+  available it runs A3 (see §9); otherwise it picks from the taxonomy.
 - `xplorertui classify` / `xplorertui rank <query>` read tweet JSONL on stdin, so
   they compose with `home` / `search` and need only OpenRouter credentials.
 - Not yet done: rank in the TUI search view (`:rank jev|embed`), `:classify`
   view (A-ii), `context_annotations` (A2, needs X API), and cost in the status
   bar.
+
+## 9. Real-timeline evaluation (2026-10-10)
+
+This answers Q4 and explains why taxonomy labels came out generic and
+duplicated. Scripts and summary results are in `tools/jev-eval/`.
+
+**Setup.** 224 recent English posts from X search: 144 "tech-heavy timeline"
+posts from 9 query buckets (local inference, model releases, chips and
+datacenters, AI policy, Rust, terminal tools, coding agents, startup funding,
+crypto), and 80 "broad" posts from 8 non-tech buckets. Each corpus was
+shuffled to stand in for a timeline, embedded locally with
+`Qwen/Qwen3-Embedding-0.6B` and `google/embeddinggemma-2`, and clustered with
+k-means (k = 5 and 8, 3 seeds each, so 6 runs per cell). Clusters were only
+about 60% one query bucket: real posts mix.
+
+**Metrics.** *dup* = how many labels repeat within a run. *dist* = for each
+cluster, whether a matcher (Jev and Luna, averaged) shown up to 8 other posts
+from that cluster picks the cluster's own label out of all k labels.
+
+| Labeller | Tech k=5 dup / dist | Tech k=8 | Broad k=5 | Broad k=8 |
+|---|---|---|---|---|
+| Jev, default taxonomy (old behaviour) | 1.0 / 0.52 | 3.5 / 0.50 | 0.3 / 0.42 | 1.3 / 0.47 |
+| Luna, default taxonomy | 0.8 / 0.62 | 3.3 / 0.52 | 0.7 / 0.37 | 1.0 / 0.40 |
+| Qwen3.5-9B writes labels (reasoning off) | 0 / 0.92 | 0 / 0.82 | 0 / 0.83 | 0 / 0.85 |
+| Jev, 30-topic taxonomy | 0 / 0.83 | 0 / 0.74 | 0.8 / 0.52 | 1.2 / 0.48 |
+| Jev, two-level taxonomy (re-ask colliding parents) | 0 / 0.80 | 0.5 / 0.80 | 0.2 / 0.67 | 1.5 / 0.69 |
+| **Qwen3.5-9B proposes, Jev picks, unique assignment (A3)** | 0 / 0.88 | 0 / 0.84 | 0 / 0.80 | 0 / 0.93 |
+
+**Why the taxonomy collides.** Jev can only choose from the options it's
+given. A tech-heavy timeline has many real subtopics, but they fall into
+about four of the 20 default topics (AI, programming, business, crypto), so
+with k = 8 some clusters must share a name. Asking for "the most specific
+topic" doesn't change that, and forcing unique labels on the coarse list
+gives unique but wrong labels. A finer taxonomy fixes tech timelines but not
+broad ones: real broad posts split into, for example, three politics
+clusters, and no fixed list anticipates that. Labels proposed from the
+clusters' own posts do, so A3 is now the default whenever a chat model is
+available. Proposing from the whole corpus instead of cluster samples gave
+labels that were too niche.
+
+**Per-post topic accuracy** (30-topic taxonomy, one post per request,
+reference labels from Claude Sonnet 5.5):
+
+| | Jev 1.13 | Luna (`openai/gpt-6-luna-decisions`) |
+|---|---|---|
+| Accuracy | 83.5% | 80.4% |
+| Accuracy at confidence ≥ 0.8 | 92.9% (169 posts) | 90.9% (164 posts) |
+| Same top-level topic as reference | 92% | 89% |
+| p50 / p90 latency | 0.27 / 0.34 s | 0.26 / 0.31 s |
+| Cost per 1k posts | $0.045 | $0 as billed during the test |
+
+Most misses are between neighbouring subtopics (coding agents vs terminal
+tools, AI products vs model releases). Luna is served by the same
+`/api/alpha/decisions` endpoint and request format, so it can be used by
+setting `[jev] model`. It refused 3 questions during the sweep (spam or adult
+posts), returned as 502 "refused to answer"; those are no longer retried.
+
+**Fixes made alongside.**
+
+- Chat labelling used `reasoning: { exclude: true }` with a 32–256 token
+  budget. Hidden reasoning still counts against `max_tokens`, so reasoning
+  models such as Qwen3.5-9B used the whole budget and never produced labels.
+  Chat requests now send `reasoning: { enabled: false }`; models that reject
+  that (Sonnet 5.5 returns 400 "Reasoning is mandatory") are retried with
+  low-effort hidden reasoning and 2,048 extra tokens.
+- `cluster_label` still shortens descriptions at the first comma or
+  parenthesis, so custom `topics` with long descriptions get clipped labels.
+  A3 sidesteps this; a display-name field would fix it for taxonomies.
+- Representative posts are still the first 8 in timeline order, not the
+  ones closest to the centroid.

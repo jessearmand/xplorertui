@@ -1,0 +1,4783 @@
+[
+ {
+  "corpus": "narrow",
+  "emb": "qwen",
+  "k": 5,
+  "seed": 0,
+  "sizes": [
+   8,
+   19,
+   66,
+   23,
+   28
+  ],
+  "purity": 0.6028408471772316,
+  "buckets": [
+   [
+    [
+     "terminal_tools",
+     7
+    ],
+    [
+     "coding_agents",
+     1
+    ]
+   ],
+   [
+    [
+     "rust",
+     14
+    ],
+    [
+     "terminal_tools",
+     5
+    ]
+   ],
+   [
+    [
+     "local_inference",
+     16
+    ],
+    [
+     "model_releases",
+     16
+    ],
+    [
+     "coding_agents",
+     15
+    ]
+   ],
+   [
+    [
+     "crypto",
+     16
+    ],
+    [
+     "chips_datacenters",
+     4
+    ],
+    [
+     "startup_funding",
+     2
+    ]
+   ],
+   [
+    [
+     "startup_funding",
+     13
+    ],
+    [
+     "chips_datacenters",
+     10
+    ],
+    [
+     "ai_policy",
+     5
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Software engineering",
+     "Software engineering",
+     "AI",
+     "Cryptocurrency",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.4
+   },
+   "luna_default": {
+    "labels": [
+     "Software engineering",
+     "Software engineering",
+     "AI",
+     "Cryptocurrency",
+     "Business"
+    ],
+    "dup": 1,
+    "dist": 0.9
+   },
+   "qwen9_app": {
+    "labels": [
+     "Terminal tools and workflows",
+     "Rewriting software in Rust",
+     "AI models and coding agents",
+     "Crypto trading signals and analysis",
+     "AI startup funding and Nvidia"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_fine": {
+    "labels": [
+     "Terminal & CLI tools",
+     "Rust",
+     "AI model releases",
+     "Crypto markets",
+     "AI chips & datacenters \u00b7 Business news"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_fine": {
+    "labels": [
+     "Terminal & CLI tools",
+     "Rust",
+     "Mixed",
+     "Crypto markets",
+     "Startup funding"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "jev_two_level": {
+    "labels": [
+     "Terminal & CLI tools",
+     "Rust",
+     "AI",
+     "Cryptocurrency",
+     "Business"
+    ],
+    "dup": 0,
+    "dist": 0.9
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Local development workflows",
+     "Rewriting software in Rust",
+     "Local LLM deployment strategies",
+     "Bitcoin volatility and trading signals",
+     "Nvidia and semiconductor industry news"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Local development workflows",
+     "Rewriting software in Rust",
+     "Local LLM deployment strategies",
+     "Bitcoin volatility and trading signals",
+     "Venture capital funding trends"
+    ],
+    "dup": 0,
+    "dist": 0.9
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "qwen",
+  "k": 5,
+  "seed": 1,
+  "sizes": [
+   19,
+   38,
+   6,
+   63,
+   18
+  ],
+  "purity": 0.6385129490392648,
+  "buckets": [
+   [
+    [
+     "startup_funding",
+     14
+    ],
+    [
+     "chips_datacenters",
+     4
+    ],
+    [
+     "crypto",
+     1
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     14
+    ],
+    [
+     "rust",
+     13
+    ],
+    [
+     "coding_agents",
+     8
+    ]
+   ],
+   [
+    [
+     "chips_datacenters",
+     6
+    ]
+   ],
+   [
+    [
+     "model_releases",
+     16
+    ],
+    [
+     "ai_policy",
+     15
+    ],
+    [
+     "local_inference",
+     14
+    ]
+   ],
+   [
+    [
+     "crypto",
+     15
+    ],
+    [
+     "chips_datacenters",
+     2
+    ],
+    [
+     "rust",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Business",
+     "Software engineering",
+     "Finance",
+     "AI",
+     "Cryptocurrency"
+    ],
+    "dup": 0,
+    "dist": 0.6
+   },
+   "luna_default": {
+    "labels": [
+     "Business",
+     "Software engineering",
+     "Finance",
+     "AI",
+     "Cryptocurrency"
+    ],
+    "dup": 0,
+    "dist": 0.6
+   },
+   "qwen9_app": {
+    "labels": [
+     "AI startups secure major funding",
+     "Developer tools and coding workflows",
+     "NVIDIA stock and GPU market dynamics",
+     "AI infrastructure and governance challenges",
+     "Crypto trading signals and token trends"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_fine": {
+    "labels": [
+     "Startup funding",
+     "Terminal & CLI tools",
+     "AI chips & datacenters",
+     "AI products",
+     "Crypto markets"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "luna_fine": {
+    "labels": [
+     "Startup funding",
+     "Terminal & CLI tools",
+     "AI chips & datacenters",
+     "AI products",
+     "Crypto markets"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "jev_two_level": {
+    "labels": [
+     "Business",
+     "Software engineering",
+     "Finance",
+     "AI",
+     "Cryptocurrency"
+    ],
+    "dup": 0,
+    "dist": 0.6
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "AI startup funding rounds",
+     "Developer workflow optimization",
+     "NVIDIA GPU market dominance",
+     "Large language model governance",
+     "Cryptocurrency trading signals"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "AI startup funding rounds",
+     "Developer workflow optimization",
+     "NVIDIA GPU market dominance",
+     "AI infrastructure bottlenecks",
+     "Cryptocurrency trading signals"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "qwen",
+  "k": 5,
+  "seed": 2,
+  "sizes": [
+   46,
+   27,
+   16,
+   16,
+   39
+  ],
+  "purity": 0.4664607333085594,
+  "buckets": [
+   [
+    [
+     "ai_policy",
+     14
+    ],
+    [
+     "model_releases",
+     9
+    ],
+    [
+     "coding_agents",
+     8
+    ]
+   ],
+   [
+    [
+     "startup_funding",
+     13
+    ],
+    [
+     "crypto",
+     11
+    ],
+    [
+     "chips_datacenters",
+     2
+    ]
+   ],
+   [
+    [
+     "local_inference",
+     8
+    ],
+    [
+     "model_releases",
+     6
+    ],
+    [
+     "chips_datacenters",
+     1
+    ]
+   ],
+   [
+    [
+     "chips_datacenters",
+     11
+    ],
+    [
+     "crypto",
+     5
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     14
+    ],
+    [
+     "rust",
+     13
+    ],
+    [
+     "coding_agents",
+     8
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "AI",
+     "Cryptocurrency",
+     "AI",
+     "Mixed",
+     "Software engineering"
+    ],
+    "dup": 1,
+    "dist": 0.4
+   },
+   "luna_default": {
+    "labels": [
+     "AI",
+     "Cryptocurrency",
+     "AI",
+     "Science and technology \u00b7 AI",
+     "Software engineering"
+    ],
+    "dup": 1,
+    "dist": 0.2
+   },
+   "qwen9_app": {
+    "labels": [
+     "AI Regulation and Local Inference",
+     "Crypto Markets and AI Funding",
+     "Model Benchmarks and Local Hardware",
+     "Semiconductor Industry and Chips",
+     "Developer Tools and Coding Agents"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   },
+   "jev_fine": {
+    "labels": [
+     "AI products",
+     "Crypto markets",
+     "AI model releases \u00b7 Local AI inference",
+     "AI chips & datacenters",
+     "AI coding agents"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   },
+   "luna_fine": {
+    "labels": [
+     "AI products",
+     "Mixed",
+     "Local AI inference",
+     "AI chips & datacenters",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.5
+   },
+   "jev_two_level": {
+    "labels": [
+     "AI products",
+     "Cryptocurrency",
+     "AI model releases",
+     "Business",
+     "Software engineering"
+    ],
+    "dup": 0,
+    "dist": 0.5
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Offline AI inference",
+     "Crypto market analysis",
+     "Local LLM optimization",
+     "Semiconductor industry news",
+     "Developer workflow tools"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "AI infrastructure constraints",
+     "Crypto market analysis",
+     "Local LLM optimization",
+     "Semiconductor industry news",
+     "Developer workflow tools"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "qwen",
+  "k": 8,
+  "seed": 0,
+  "sizes": [
+   4,
+   14,
+   21,
+   22,
+   15,
+   23,
+   13,
+   32
+  ],
+  "purity": 0.6559744376999812,
+  "buckets": [
+   [
+    [
+     "terminal_tools",
+     4
+    ]
+   ],
+   [
+    [
+     "ai_policy",
+     11
+    ],
+    [
+     "coding_agents",
+     1
+    ],
+    [
+     "model_releases",
+     1
+    ]
+   ],
+   [
+    [
+     "startup_funding",
+     13
+    ],
+    [
+     "chips_datacenters",
+     8
+    ]
+   ],
+   [
+    [
+     "crypto",
+     16
+    ],
+    [
+     "chips_datacenters",
+     4
+    ],
+    [
+     "rust",
+     1
+    ]
+   ],
+   [
+    [
+     "local_inference",
+     3
+    ],
+    [
+     "terminal_tools",
+     3
+    ],
+    [
+     "coding_agents",
+     3
+    ]
+   ],
+   [
+    [
+     "coding_agents",
+     11
+    ],
+    [
+     "terminal_tools",
+     9
+    ],
+    [
+     "local_inference",
+     1
+    ]
+   ],
+   [
+    [
+     "rust",
+     13
+    ]
+   ],
+   [
+    [
+     "model_releases",
+     14
+    ],
+    [
+     "local_inference",
+     12
+    ],
+    [
+     "ai_policy",
+     3
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Software engineering",
+     "AI",
+     "Business \u00b7 Finance",
+     "Cryptocurrency",
+     "AI",
+     "AI \u00b7 Software engineering",
+     "Software engineering",
+     "AI"
+    ],
+    "dup": 3,
+    "dist": 0.625
+   },
+   "luna_default": {
+    "labels": [
+     "Software engineering",
+     "AI",
+     "Business",
+     "Cryptocurrency",
+     "AI",
+     "Software engineering",
+     "Software engineering",
+     "AI"
+    ],
+    "dup": 4,
+    "dist": 0.5625
+   },
+   "qwen9_app": {
+    "labels": [
+     "Transitioning to Neovim and Terminal",
+     "AI Regulation and Policy Debates",
+     "Venture Capital and AI Funding",
+     "Crypto Market Signals and Analysis",
+     "AI Tools, Hiring, and Learning",
+     "AI Coding Agents and Workflows",
+     "Rewriting Software in Rust",
+     "Open-Weight Model Releases and Security"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "jev_fine": {
+    "labels": [
+     "Terminal & CLI tools",
+     "AI policy",
+     "Startup funding",
+     "Crypto markets",
+     "AI products",
+     "AI coding agents",
+     "Rust",
+     "AI model releases"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "luna_fine": {
+    "labels": [
+     "Terminal & CLI tools",
+     "AI policy",
+     "Startup funding",
+     "Crypto markets",
+     "AI products",
+     "AI coding agents",
+     "Rust",
+     "AI model releases \u00b7 Local AI inference"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "jev_two_level": {
+    "labels": [
+     "Terminal & CLI tools",
+     "AI policy",
+     "Business",
+     "Cryptocurrency",
+     "AI products",
+     "AI products",
+     "Rust",
+     "AI model releases"
+    ],
+    "dup": 1,
+    "dist": 0.875
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Neovim migration",
+     "AI regulation policy",
+     "AI startup funding",
+     "Crypto trading signals",
+     "AI developer tools",
+     "Coding agent integration",
+     "Rust language adoption",
+     "Open-weight models"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Neovim migration",
+     "India AI governance",
+     "AI startup funding",
+     "Crypto trading signals",
+     "Coding agent integration",
+     "AI developer tools",
+     "Rust language adoption",
+     "Open-weight models"
+    ],
+    "dup": 0,
+    "dist": 0.6875
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "qwen",
+  "k": 8,
+  "seed": 1,
+  "sizes": [
+   9,
+   16,
+   23,
+   32,
+   14,
+   18,
+   15,
+   17
+  ],
+  "purity": 0.4859325523687736,
+  "buckets": [
+   [
+    [
+     "chips_datacenters",
+     3
+    ],
+    [
+     "startup_funding",
+     3
+    ],
+    [
+     "model_releases",
+     1
+    ]
+   ],
+   [
+    [
+     "coding_agents",
+     9
+    ],
+    [
+     "terminal_tools",
+     4
+    ],
+    [
+     "ai_policy",
+     2
+    ]
+   ],
+   [
+    [
+     "startup_funding",
+     12
+    ],
+    [
+     "chips_datacenters",
+     6
+    ],
+    [
+     "crypto",
+     5
+    ]
+   ],
+   [
+    [
+     "rust",
+     8
+    ],
+    [
+     "local_inference",
+     5
+    ],
+    [
+     "crypto",
+     5
+    ]
+   ],
+   [
+    [
+     "ai_policy",
+     12
+    ],
+    [
+     "startup_funding",
+     1
+    ],
+    [
+     "chips_datacenters",
+     1
+    ]
+   ],
+   [
+    [
+     "local_inference",
+     9
+    ],
+    [
+     "model_releases",
+     5
+    ],
+    [
+     "ai_policy",
+     2
+    ]
+   ],
+   [
+    [
+     "crypto",
+     5
+    ],
+    [
+     "model_releases",
+     5
+    ],
+    [
+     "chips_datacenters",
+     4
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     9
+    ],
+    [
+     "rust",
+     7
+    ],
+    [
+     "coding_agents",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "AI",
+     "Software engineering",
+     "Business",
+     "AI",
+     "AI",
+     "AI",
+     "Finance \u00b7 AI",
+     "Software engineering"
+    ],
+    "dup": 4,
+    "dist": 0.5
+   },
+   "luna_default": {
+    "labels": [
+     "AI",
+     "Software engineering",
+     "Business",
+     "AI \u00b7 Software engineering",
+     "AI",
+     "AI",
+     "Finance",
+     "Software engineering"
+    ],
+    "dup": 3,
+    "dist": 0.5
+   },
+   "qwen9_app": {
+    "labels": [
+     "AI Infrastructure and Funding",
+     "Coding Agents and Workflows",
+     "Startup Funding and Market News",
+     "Multimodal AI and Tools",
+     "Global AI Regulation and Governance",
+     "Local LLMs and Model Optimization",
+     "AI Chip Stocks and Models",
+     "Developer Tools and Rust"
+    ],
+    "dup": 0,
+    "dist": 0.875
+   },
+   "jev_fine": {
+    "labels": [
+     "AI products \u00b7 Business news",
+     "AI coding agents",
+     "Startup funding",
+     "AI coding agents \u00b7 AI products",
+     "AI policy",
+     "Local AI inference",
+     "Mixed",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 0.25
+   },
+   "luna_fine": {
+    "labels": [
+     "AI products",
+     "AI coding agents",
+     "Startup funding",
+     "AI coding agents",
+     "AI policy",
+     "Local AI inference",
+     "Stock markets",
+     "Terminal & CLI tools"
+    ],
+    "dup": 1,
+    "dist": 0.6875
+   },
+   "jev_two_level": {
+    "labels": [
+     "AI products",
+     "AI coding agents",
+     "Business",
+     "AI products",
+     "AI policy",
+     "Local AI inference",
+     "Finance",
+     "Terminal & CLI tools"
+    ],
+    "dup": 1,
+    "dist": 0.75
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "AI industry trends",
+     "AI coding agent limitations",
+     "AI startup fundraising news",
+     "Developer agent tooling & plugins",
+     "AI regulation & safety policies",
+     "Local LLM optimization & speed",
+     "AI decision model launches",
+     "Developer workflow tools"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "AI industry trends",
+     "AI coding agent architecture",
+     "AI startup fundraising news",
+     "Developer agent tooling & plugins",
+     "AI regulation & safety policies",
+     "Local LLM optimization & speed",
+     "AI decision model launches",
+     "Developer workflow tools"
+    ],
+    "dup": 0,
+    "dist": 0.6875
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "qwen",
+  "k": 8,
+  "seed": 2,
+  "sizes": [
+   6,
+   36,
+   5,
+   20,
+   5,
+   11,
+   43,
+   18
+  ],
+  "purity": 0.5680305966643177,
+  "buckets": [
+   [
+    [
+     "terminal_tools",
+     2
+    ],
+    [
+     "local_inference",
+     1
+    ],
+    [
+     "startup_funding",
+     1
+    ]
+   ],
+   [
+    [
+     "model_releases",
+     14
+    ],
+    [
+     "local_inference",
+     9
+    ],
+    [
+     "ai_policy",
+     8
+    ]
+   ],
+   [
+    [
+     "chips_datacenters",
+     3
+    ],
+    [
+     "ai_policy",
+     1
+    ],
+    [
+     "startup_funding",
+     1
+    ]
+   ],
+   [
+    [
+     "startup_funding",
+     13
+    ],
+    [
+     "chips_datacenters",
+     7
+    ]
+   ],
+   [
+    [
+     "ai_policy",
+     4
+    ],
+    [
+     "coding_agents",
+     1
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     7
+    ],
+    [
+     "coding_agents",
+     2
+    ],
+    [
+     "rust",
+     2
+    ]
+   ],
+   [
+    [
+     "coding_agents",
+     13
+    ],
+    [
+     "rust",
+     11
+    ],
+    [
+     "terminal_tools",
+     7
+    ]
+   ],
+   [
+    [
+     "crypto",
+     15
+    ],
+    [
+     "chips_datacenters",
+     3
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "AI",
+     "AI",
+     "AI",
+     "Business",
+     "AI",
+     "Software engineering",
+     "Software engineering",
+     "Cryptocurrency"
+    ],
+    "dup": 4,
+    "dist": 0.4375
+   },
+   "luna_default": {
+    "labels": [
+     "AI",
+     "AI",
+     "AI \u00b7 Science and technology",
+     "Business",
+     "AI",
+     "Software engineering",
+     "Software engineering",
+     "Cryptocurrency"
+    ],
+    "dup": 3,
+    "dist": 0.5
+   },
+   "qwen9_app": {
+    "labels": [
+     "AI Hardware, Regulation, and Open Source",
+     "AI Infrastructure and Global Regulation",
+     "Semiconductor Industry and Geopolitics",
+     "Venture Capital and AI Startups",
+     "India AI Policy and Tech Jobs",
+     "Developer Tools and Terminal Workflows",
+     "AI Agents and Coding Projects",
+     "Crypto Markets and Trading Signals"
+    ],
+    "dup": 0,
+    "dist": 0.6875
+   },
+   "jev_fine": {
+    "labels": [
+     "AI products",
+     "AI model releases",
+     "AI chips & datacenters",
+     "Startup funding",
+     "AI policy",
+     "Terminal & CLI tools",
+     "AI coding agents",
+     "Crypto markets"
+    ],
+    "dup": 0,
+    "dist": 0.875
+   },
+   "luna_fine": {
+    "labels": [
+     "Mixed",
+     "Mixed",
+     "AI chips & datacenters",
+     "Startup funding",
+     "AI policy",
+     "Terminal & CLI tools",
+     "Mixed",
+     "Crypto markets"
+    ],
+    "dup": 2,
+    "dist": 0.5625
+   },
+   "jev_two_level": {
+    "labels": [
+     "AI products",
+     "AI model releases",
+     "AI chips & datacenters",
+     "Business",
+     "AI policy",
+     "Terminal & CLI tools",
+     "AI coding agents",
+     "Cryptocurrency"
+    ],
+    "dup": 0,
+    "dist": 0.875
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Terminal-based AI workflows",
+     "Open-weight model alternatives",
+     "AI chip export controls",
+     "Record-breaking AI Series A funding",
+     "India's AI regulation draft",
+     "Local development environment optimization",
+     "AI-native software engineering",
+     "Crypto market technical analysis"
+    ],
+    "dup": 0,
+    "dist": 0.8125
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "AI-native software engineering",
+     "AI infrastructure scaling",
+     "Global AI regulatory frameworks",
+     "Record-breaking AI Series A funding",
+     "India's AI regulation draft",
+     "Terminal-based AI workflows",
+     "Rust programming challenges",
+     "Crypto market technical analysis"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "gemma",
+  "k": 5,
+  "seed": 0,
+  "sizes": [
+   12,
+   34,
+   38,
+   39,
+   21
+  ],
+  "purity": 0.5464866918427289,
+  "buckets": [
+   [
+    [
+     "terminal_tools",
+     9
+    ],
+    [
+     "coding_agents",
+     3
+    ]
+   ],
+   [
+    [
+     "rust",
+     15
+    ],
+    [
+     "coding_agents",
+     9
+    ],
+    [
+     "terminal_tools",
+     6
+    ]
+   ],
+   [
+    [
+     "model_releases",
+     15
+    ],
+    [
+     "local_inference",
+     13
+    ],
+    [
+     "ai_policy",
+     4
+    ]
+   ],
+   [
+    [
+     "startup_funding",
+     15
+    ],
+    [
+     "ai_policy",
+     11
+    ],
+    [
+     "chips_datacenters",
+     9
+    ]
+   ],
+   [
+    [
+     "crypto",
+     16
+    ],
+    [
+     "chips_datacenters",
+     5
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Software engineering",
+     "Software engineering",
+     "AI",
+     "AI \u00b7 Business",
+     "Cryptocurrency"
+    ],
+    "dup": 1,
+    "dist": 0.9
+   },
+   "luna_default": {
+    "labels": [
+     "Software engineering",
+     "Software engineering",
+     "AI",
+     "Business",
+     "Cryptocurrency"
+    ],
+    "dup": 1,
+    "dist": 0.6
+   },
+   "qwen9_app": {
+    "labels": [
+     "Terminal tools and developer workflows",
+     "Rust programming and AI creativity",
+     "AI model releases and regulations",
+     "AI startup funding and industry news",
+     "Crypto trading signals and market updates"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_fine": {
+    "labels": [
+     "Terminal & CLI tools",
+     "Rust",
+     "AI model releases",
+     "Startup funding",
+     "Crypto markets"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_fine": {
+    "labels": [
+     "Terminal & CLI tools",
+     "AI coding agents",
+     "AI model releases",
+     "Startup funding",
+     "Crypto markets"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_two_level": {
+    "labels": [
+     "Terminal & CLI tools",
+     "Rust",
+     "AI model releases",
+     "AI products",
+     "Cryptocurrency"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Developer environment setup",
+     "AI-native software rebuilding",
+     "Open-weight reasoning models",
+     "AI startup venture capital",
+     "Crypto trading bot signals"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Developer environment setup",
+     "Rust language adoption",
+     "Open-weight reasoning models",
+     "AI startup venture capital",
+     "Crypto trading bot signals"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "gemma",
+  "k": 5,
+  "seed": 1,
+  "sizes": [
+   19,
+   62,
+   20,
+   30,
+   13
+  ],
+  "purity": 0.605984937529929,
+  "buckets": [
+   [
+    [
+     "startup_funding",
+     12
+    ],
+    [
+     "chips_datacenters",
+     6
+    ],
+    [
+     "ai_policy",
+     1
+    ]
+   ],
+   [
+    [
+     "local_inference",
+     15
+    ],
+    [
+     "model_releases",
+     15
+    ],
+    [
+     "ai_policy",
+     14
+    ]
+   ],
+   [
+    [
+     "crypto",
+     16
+    ],
+    [
+     "chips_datacenters",
+     2
+    ],
+    [
+     "startup_funding",
+     1
+    ]
+   ],
+   [
+    [
+     "rust",
+     13
+    ],
+    [
+     "coding_agents",
+     11
+    ],
+    [
+     "terminal_tools",
+     3
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     12
+    ],
+    [
+     "coding_agents",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Business",
+     "AI",
+     "Mixed",
+     "Software engineering",
+     "Software engineering"
+    ],
+    "dup": 1,
+    "dist": 0.4
+   },
+   "luna_default": {
+    "labels": [
+     "Business",
+     "AI",
+     "Cryptocurrency \u00b7 Finance",
+     "Software engineering",
+     "Software engineering"
+    ],
+    "dup": 1,
+    "dist": 0.8
+   },
+   "qwen9_app": {
+    "labels": [
+     "Startup funding and tech stock picks",
+     "AI infrastructure and global regulation",
+     "Crypto market signals and ETF flows",
+     "AI coding agents and Rust development",
+     "Mobile coding and terminal workflows"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_fine": {
+    "labels": [
+     "Startup funding",
+     "AI products \u00b7 AI policy",
+     "Crypto markets",
+     "AI coding agents",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_fine": {
+    "labels": [
+     "Startup funding",
+     "AI products",
+     "Crypto markets",
+     "AI coding agents",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_two_level": {
+    "labels": [
+     "Business",
+     "AI",
+     "Cryptocurrency",
+     "AI coding agents",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 0.9
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Venture capital market activity",
+     "AI infrastructure challenges",
+     "Cryptocurrency market signals",
+     "AI coding agent workflows",
+     "Linux command line workflows"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Venture capital market activity",
+     "Global AI governance policies",
+     "Cryptocurrency market signals",
+     "AI coding agent workflows",
+     "Mobile terminal development"
+    ],
+    "dup": 0,
+    "dist": 0.6
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "gemma",
+  "k": 5,
+  "seed": 2,
+  "sizes": [
+   18,
+   41,
+   15,
+   54,
+   16
+  ],
+  "purity": 0.5653929539295393,
+  "buckets": [
+   [
+    [
+     "coding_agents",
+     9
+    ],
+    [
+     "terminal_tools",
+     3
+    ],
+    [
+     "local_inference",
+     2
+    ]
+   ],
+   [
+    [
+     "crypto",
+     15
+    ],
+    [
+     "startup_funding",
+     13
+    ],
+    [
+     "chips_datacenters",
+     11
+    ]
+   ],
+   [
+    [
+     "rust",
+     14
+    ],
+    [
+     "terminal_tools",
+     1
+    ]
+   ],
+   [
+    [
+     "model_releases",
+     15
+    ],
+    [
+     "ai_policy",
+     14
+    ],
+    [
+     "local_inference",
+     14
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     12
+    ],
+    [
+     "coding_agents",
+     4
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "AI",
+     "Finance",
+     "Software engineering",
+     "AI",
+     "Software engineering"
+    ],
+    "dup": 2,
+    "dist": 0.4
+   },
+   "luna_default": {
+    "labels": [
+     "Software engineering \u00b7 AI",
+     "Mixed",
+     "Software engineering",
+     "AI",
+     "Software engineering"
+    ],
+    "dup": 1,
+    "dist": 0.6
+   },
+   "qwen9_app": {
+    "labels": [
+     "AI Agents and Trading Bots",
+     "Crypto Markets and AI Funding",
+     "Rust Programming and Rewrites",
+     "AI Regulation and Hardware",
+     "Developer Workflows and Terminals"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "jev_fine": {
+    "labels": [
+     "AI coding agents",
+     "Mixed",
+     "Rust",
+     "AI model releases \u00b7 AI products",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 0.5
+   },
+   "luna_fine": {
+    "labels": [
+     "AI coding agents",
+     "AI chips & datacenters",
+     "Rust",
+     "AI products",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "jev_two_level": {
+    "labels": [
+     "AI products",
+     "Finance",
+     "Rust",
+     "AI model releases",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 0.9
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "AI coding agents",
+     "Semiconductor industry",
+     "Rust programming projects",
+     "LLM infrastructure",
+     "Developer workflow tools"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "AI coding agents",
+     "Semiconductor industry",
+     "Rust programming projects",
+     "LLM infrastructure",
+     "Developer workflow tools"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "gemma",
+  "k": 8,
+  "seed": 0,
+  "sizes": [
+   7,
+   16,
+   21,
+   22,
+   31,
+   28,
+   12,
+   7
+  ],
+  "purity": 0.6485105955872085,
+  "buckets": [
+   [
+    [
+     "terminal_tools",
+     5
+    ],
+    [
+     "coding_agents",
+     2
+    ]
+   ],
+   [
+    [
+     "rust",
+     14
+    ],
+    [
+     "terminal_tools",
+     2
+    ]
+   ],
+   [
+    [
+     "startup_funding",
+     11
+    ],
+    [
+     "chips_datacenters",
+     10
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     9
+    ],
+    [
+     "coding_agents",
+     9
+    ],
+    [
+     "local_inference",
+     2
+    ]
+   ],
+   [
+    [
+     "ai_policy",
+     14
+    ],
+    [
+     "chips_datacenters",
+     5
+    ],
+    [
+     "coding_agents",
+     4
+    ]
+   ],
+   [
+    [
+     "model_releases",
+     13
+    ],
+    [
+     "local_inference",
+     11
+    ],
+    [
+     "startup_funding",
+     1
+    ]
+   ],
+   [
+    [
+     "crypto",
+     9
+    ],
+    [
+     "startup_funding",
+     2
+    ],
+    [
+     "rust",
+     1
+    ]
+   ],
+   [
+    [
+     "crypto",
+     7
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Software engineering",
+     "Software engineering",
+     "Mixed",
+     "AI",
+     "AI",
+     "AI",
+     "Cryptocurrency",
+     "Cryptocurrency"
+    ],
+    "dup": 4,
+    "dist": 0.375
+   },
+   "luna_default": {
+    "labels": [
+     "Software engineering",
+     "Software engineering",
+     "Business \u00b7 Finance",
+     "Software engineering",
+     "AI",
+     "AI",
+     "Cryptocurrency",
+     "Cryptocurrency"
+    ],
+    "dup": 4,
+    "dist": 0.5625
+   },
+   "qwen9_app": {
+    "labels": [
+     "Terminal tools and developer workflows",
+     "Rewriting software in Rust",
+     "AI startup funding and market news",
+     "AI coding agents and MCP servers",
+     "AI regulation and industry geopolitics",
+     "Open source LLM releases and benchmarks",
+     "Crypto trading bots and DeFi news",
+     "Cryptocurrency market signals and analysis"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "jev_fine": {
+    "labels": [
+     "Terminal & CLI tools",
+     "Rust",
+     "Startup funding",
+     "AI coding agents",
+     "Mixed",
+     "AI model releases",
+     "Crypto tech",
+     "Crypto markets"
+    ],
+    "dup": 0,
+    "dist": 0.5625
+   },
+   "luna_fine": {
+    "labels": [
+     "Terminal & CLI tools",
+     "Rust",
+     "Startup funding",
+     "AI coding agents",
+     "Mixed",
+     "AI model releases \u00b7 Local AI inference",
+     "Crypto tech \u00b7 Crypto markets",
+     "Crypto markets"
+    ],
+    "dup": 0,
+    "dist": 0.6875
+   },
+   "jev_two_level": {
+    "labels": [
+     "Terminal & CLI tools",
+     "Rust",
+     "Finance",
+     "AI products",
+     "AI policy",
+     "AI model releases",
+     "Crypto tech",
+     "Crypto markets"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Dev environment setup",
+     "Rust programming",
+     "AI infrastructure investing",
+     "AI coding agents",
+     "AI industry regulation",
+     "Open-weight models",
+     "Blockchain infrastructure",
+     "Cryptocurrency signals"
+    ],
+    "dup": 0,
+    "dist": 0.875
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Developer productivity tools",
+     "Rust programming",
+     "Venture capital trends",
+     "Developer AI tooling",
+     "AI industry regulation",
+     "Open-weight models",
+     "Blockchain infrastructure",
+     "Cryptocurrency signals"
+    ],
+    "dup": 0,
+    "dist": 0.8125
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "gemma",
+  "k": 8,
+  "seed": 1,
+  "sizes": [
+   10,
+   49,
+   17,
+   17,
+   17,
+   17,
+   12,
+   5
+  ],
+  "purity": 0.6689250700280112,
+  "buckets": [
+   [
+    [
+     "startup_funding",
+     8
+    ],
+    [
+     "chips_datacenters",
+     2
+    ]
+   ],
+   [
+    [
+     "ai_policy",
+     14
+    ],
+    [
+     "model_releases",
+     13
+    ],
+    [
+     "local_inference",
+     9
+    ]
+   ],
+   [
+    [
+     "rust",
+     13
+    ],
+    [
+     "coding_agents",
+     2
+    ],
+    [
+     "terminal_tools",
+     1
+    ]
+   ],
+   [
+    [
+     "chips_datacenters",
+     10
+    ],
+    [
+     "startup_funding",
+     5
+    ],
+    [
+     "ai_policy",
+     1
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     10
+    ],
+    [
+     "coding_agents",
+     7
+    ]
+   ],
+   [
+    [
+     "crypto",
+     16
+    ],
+    [
+     "rust",
+     1
+    ]
+   ],
+   [
+    [
+     "local_inference",
+     7
+    ],
+    [
+     "model_releases",
+     3
+    ],
+    [
+     "coding_agents",
+     1
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     4
+    ],
+    [
+     "coding_agents",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Business",
+     "AI",
+     "Software engineering",
+     "Finance",
+     "Software engineering",
+     "Cryptocurrency",
+     "AI",
+     "Software engineering"
+    ],
+    "dup": 3,
+    "dist": 0.5625
+   },
+   "luna_default": {
+    "labels": [
+     "Business",
+     "AI",
+     "Software engineering",
+     "Finance",
+     "Software engineering",
+     "Cryptocurrency",
+     "AI",
+     "Software engineering"
+    ],
+    "dup": 3,
+    "dist": 0.5625
+   },
+   "qwen9_app": {
+    "labels": [
+     "AI Startup Funding and Valuations",
+     "AI Infrastructure and Governance",
+     "Rewriting Code in Rust",
+     "Semiconductor Stocks and Infrastructure",
+     "Remote AI Agent Control",
+     "Crypto Trading Signals and Tokens",
+     "Local AI Models and Quantization",
+     "Developer Dotfiles and Termux"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   },
+   "jev_fine": {
+    "labels": [
+     "Startup funding",
+     "AI products",
+     "Rust",
+     "Stock markets \u00b7 AI chips & datacenters",
+     "AI coding agents",
+     "Crypto markets",
+     "Local AI inference \u00b7 AI model releases",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 0.8125
+   },
+   "luna_fine": {
+    "labels": [
+     "Startup funding",
+     "AI products",
+     "Rust",
+     "Stock markets \u00b7 AI chips & datacenters",
+     "AI coding agents",
+     "Crypto markets",
+     "Local AI inference",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 0.8125
+   },
+   "jev_two_level": {
+    "labels": [
+     "Business",
+     "AI products",
+     "Rust",
+     "Finance",
+     "AI coding agents",
+     "Cryptocurrency",
+     "Local AI inference",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "AI startup funding rounds",
+     "Generative AI content creation trends",
+     "Rust programming language adoption",
+     "Semiconductor stock market analysis",
+     "Developer productivity tools and agents",
+     "Crypto trading signals and alerts",
+     "Local AI model optimization",
+     "Linux dotfiles and configuration management"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "AI startup funding rounds",
+     "AI infrastructure bottlenecks",
+     "Rust programming language adoption",
+     "Semiconductor stock market analysis",
+     "Developer productivity tools and agents",
+     "Crypto trading signals and alerts",
+     "Local AI model optimization",
+     "Linux dotfiles and configuration management"
+    ],
+    "dup": 0,
+    "dist": 0.6875
+   }
+  }
+ },
+ {
+  "corpus": "narrow",
+  "emb": "gemma",
+  "k": 8,
+  "seed": 2,
+  "sizes": [
+   12,
+   28,
+   26,
+   11,
+   17,
+   25,
+   15,
+   10
+  ],
+  "purity": 0.630934188360659,
+  "buckets": [
+   [
+    [
+     "terminal_tools",
+     4
+    ],
+    [
+     "coding_agents",
+     3
+    ],
+    [
+     "local_inference",
+     3
+    ]
+   ],
+   [
+    [
+     "startup_funding",
+     15
+    ],
+    [
+     "chips_datacenters",
+     11
+    ],
+    [
+     "coding_agents",
+     1
+    ]
+   ],
+   [
+    [
+     "model_releases",
+     14
+    ],
+    [
+     "local_inference",
+     8
+    ],
+    [
+     "chips_datacenters",
+     2
+    ]
+   ],
+   [
+    [
+     "coding_agents",
+     6
+    ],
+    [
+     "terminal_tools",
+     4
+    ],
+    [
+     "ai_policy",
+     1
+    ]
+   ],
+   [
+    [
+     "crypto",
+     16
+    ],
+    [
+     "rust",
+     1
+    ]
+   ],
+   [
+    [
+     "ai_policy",
+     13
+    ],
+    [
+     "local_inference",
+     5
+    ],
+    [
+     "chips_datacenters",
+     3
+    ]
+   ],
+   [
+    [
+     "rust",
+     14
+    ],
+    [
+     "terminal_tools",
+     1
+    ]
+   ],
+   [
+    [
+     "terminal_tools",
+     7
+    ],
+    [
+     "coding_agents",
+     3
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "AI",
+     "Business",
+     "AI",
+     "Software engineering \u00b7 AI",
+     "Cryptocurrency",
+     "AI",
+     "Software engineering",
+     "Software engineering"
+    ],
+    "dup": 3,
+    "dist": 0.5
+   },
+   "luna_default": {
+    "labels": [
+     "AI \u00b7 Software engineering",
+     "Business",
+     "AI",
+     "Software engineering",
+     "Cryptocurrency",
+     "AI",
+     "Software engineering",
+     "Software engineering"
+    ],
+    "dup": 3,
+    "dist": 0.4375
+   },
+   "qwen9_app": {
+    "labels": [
+     "AI coding tools and agents",
+     "AI startup funding and chips",
+     "Hardware and model benchmarks",
+     "Local agent workflows and control",
+     "Crypto trading signals and bots",
+     "AI regulation and infrastructure",
+     "Rust programming and open source",
+     "Developer dotfiles and terminal"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   },
+   "jev_fine": {
+    "labels": [
+     "AI coding agents \u00b7 AI model releases",
+     "Startup funding",
+     "AI model releases",
+     "AI coding agents",
+     "Crypto markets",
+     "AI policy",
+     "Rust",
+     "Terminal & CLI tools"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_fine": {
+    "labels": [
+     "AI coding agents",
+     "Mixed",
+     "AI model releases",
+     "AI coding agents",
+     "Crypto markets",
+     "AI policy",
+     "Rust",
+     "Terminal & CLI tools"
+    ],
+    "dup": 1,
+    "dist": 0.5625
+   },
+   "jev_two_level": {
+    "labels": [
+     "AI model releases",
+     "Business",
+     "AI model releases",
+     "AI coding agents",
+     "Cryptocurrency",
+     "AI policy",
+     "Rust",
+     "Terminal & CLI tools"
+    ],
+    "dup": 1,
+    "dist": 0.8125
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Local AI agent workflows & CLI tools",
+     "Tech investment trends & hardware news",
+     "Open-weight model deployment & optimization",
+     "Coding agent integration & remote control",
+     "Crypto market signals & trading bots",
+     "AI regulation & governance challenges",
+     "Rust programming & system rewrites",
+     "Developer productivity & terminal environments"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Software development workflows & productivity",
+     "Tech investment trends & hardware news",
+     "Open-weight model deployment & optimization",
+     "Coding agent integration & remote control",
+     "Digital asset flows & technical analysis",
+     "AI regulation & governance challenges",
+     "Rust programming & system rewrites",
+     "Developer productivity & terminal environments"
+    ],
+    "dup": 0,
+    "dist": 0.875
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "qwen",
+  "k": 5,
+  "seed": 0,
+  "sizes": [
+   38,
+   10,
+   10,
+   9,
+   13
+  ],
+  "purity": 0.4755735492577598,
+  "buckets": [
+   [
+    [
+     "sports",
+     9
+    ],
+    [
+     "music",
+     7
+    ],
+    [
+     "fitness",
+     7
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     7
+    ],
+    [
+     "gaming",
+     1
+    ],
+    [
+     "travel",
+     1
+    ]
+   ],
+   [
+    [
+     "politics",
+     8
+    ],
+    [
+     "travel",
+     2
+    ]
+   ],
+   [
+    [
+     "music",
+     3
+    ],
+    [
+     "fitness",
+     3
+    ],
+    [
+     "sports",
+     1
+    ]
+   ],
+   [
+    [
+     "gaming",
+     4
+    ],
+    [
+     "film_tv",
+     3
+    ],
+    [
+     "cooking",
+     2
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Celebrities and pop culture",
+     "Film",
+     "News",
+     "Mixed",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.30000000000000004
+   },
+   "luna_default": {
+    "labels": [
+     "Celebrities and pop culture",
+     "Film",
+     "News",
+     "Daily life",
+     "Mixed"
+    ],
+    "dup": 0,
+    "dist": 0.30000000000000004
+   },
+   "qwen9_app": {
+    "labels": [
+     "Music tickets and tech gadgets",
+     "Movie reviews and gaming",
+     "Indian politics and elections",
+     "Sports awards and concerts",
+     "AI ethics and tech industry"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   },
+   "jev_fine": {
+    "labels": [
+     "Music \u00b7 Pop culture",
+     "Film & TV",
+     "Politics",
+     "Mixed",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.5
+   },
+   "luna_fine": {
+    "labels": [
+     "Mixed",
+     "Film & TV",
+     "Politics",
+     "Mixed",
+     "Mixed"
+    ],
+    "dup": 2,
+    "dist": 0.5
+   },
+   "jev_two_level": {
+    "labels": [
+     "Pop culture",
+     "Film & TV",
+     "News",
+     "Daily life",
+     "Software engineering"
+    ],
+    "dup": 0,
+    "dist": 0.5
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Live event ticket scalping",
+     "Pop culture media consumption",
+     "Indian election integrity",
+     "Concert experience sharing",
+     "Tech industry ethics"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Music tour ticket sales",
+     "Movie and film discussions",
+     "Indian election integrity",
+     "Concert experience sharing",
+     "Pop culture media consumption"
+    ],
+    "dup": 0,
+    "dist": 0.5
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "qwen",
+  "k": 5,
+  "seed": 1,
+  "sizes": [
+   2,
+   42,
+   9,
+   10,
+   17
+  ],
+  "purity": 0.6303081232492997,
+  "buckets": [
+   [
+    [
+     "cooking",
+     2
+    ]
+   ],
+   [
+    [
+     "sports",
+     9
+    ],
+    [
+     "gaming",
+     8
+    ],
+    [
+     "fitness",
+     7
+    ]
+   ],
+   [
+    [
+     "music",
+     6
+    ],
+    [
+     "fitness",
+     2
+    ],
+    [
+     "travel",
+     1
+    ]
+   ],
+   [
+    [
+     "politics",
+     8
+    ],
+    [
+     "sports",
+     1
+    ],
+    [
+     "travel",
+     1
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     8
+    ],
+    [
+     "cooking",
+     2
+    ],
+    [
+     "travel",
+     2
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Fitness and health \u00b7 Food and dining",
+     "Daily life",
+     "Music \u00b7 Celebrities and pop culture",
+     "News",
+     "Film"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_default": {
+    "labels": [
+     "Mixed",
+     "Mixed",
+     "Music",
+     "News",
+     "Mixed"
+    ],
+    "dup": 2,
+    "dist": 0.4
+   },
+   "qwen9_app": {
+    "labels": [
+     "Recipes and Product Development Stories",
+     "Ticket Sales and Random News",
+     "Concert Tickets and Political Scandals",
+     "Indian Election Controversies and Politics",
+     "Movie Reviews and Crypto Scams"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   },
+   "jev_fine": {
+    "labels": [
+     "Mixed",
+     "Mixed",
+     "Music",
+     "Politics",
+     "Film & TV \u00b7 Pop culture"
+    ],
+    "dup": 1,
+    "dist": 0.4
+   },
+   "luna_fine": {
+    "labels": [
+     "Mixed",
+     "Mixed",
+     "Music",
+     "Politics",
+     "Mixed"
+    ],
+    "dup": 2,
+    "dist": 0.5
+   },
+   "jev_two_level": {
+    "labels": [
+     "Fitness & health",
+     "Daily life",
+     "Music",
+     "News",
+     "Film & TV"
+    ],
+    "dup": 0,
+    "dist": 0.9
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Health and fitness nutrition",
+     "Charity shop pranks and AI compute costs",
+     "Concert ticket resale and scalping",
+     "Electoral integrity and vote theft accusations",
+     "Movie reviews and entertainment news"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Health and fitness nutrition",
+     "Cooking recipes and comfort food",
+     "Concert ticket resale and scalping",
+     "Electoral integrity and vote theft accusations",
+     "Movie reviews and entertainment news"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "qwen",
+  "k": 5,
+  "seed": 2,
+  "sizes": [
+   18,
+   9,
+   8,
+   40,
+   5
+  ],
+  "purity": 0.5372222222222223,
+  "buckets": [
+   [
+    [
+     "politics",
+     10
+    ],
+    [
+     "sports",
+     6
+    ],
+    [
+     "travel",
+     1
+    ]
+   ],
+   [
+    [
+     "gaming",
+     5
+    ],
+    [
+     "film_tv",
+     2
+    ],
+    [
+     "music",
+     1
+    ]
+   ],
+   [
+    [
+     "music",
+     6
+    ],
+    [
+     "fitness",
+     2
+    ]
+   ],
+   [
+    [
+     "travel",
+     9
+    ],
+    [
+     "cooking",
+     9
+    ],
+    [
+     "film_tv",
+     8
+    ]
+   ],
+   [
+    [
+     "fitness",
+     3
+    ],
+    [
+     "gaming",
+     2
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "News",
+     "Mixed",
+     "Music",
+     "Daily life",
+     "Gaming"
+    ],
+    "dup": 0,
+    "dist": 0.2
+   },
+   "luna_default": {
+    "labels": [
+     "News",
+     "Mixed",
+     "Music",
+     "Daily life",
+     "Fitness and health"
+    ],
+    "dup": 0,
+    "dist": 0.2
+   },
+   "qwen9_app": {
+    "labels": [
+     "Election integrity and sports betting",
+     "Tech specs and ticket sales",
+     "Concert experiences and personal stories",
+     "Movies, books, and personal reflections",
+     "Gaming, gym, and adult humor"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_fine": {
+    "labels": [
+     "Politics",
+     "Mixed",
+     "Music",
+     "Daily life",
+     "Gaming"
+    ],
+    "dup": 0,
+    "dist": 0.4
+   },
+   "luna_fine": {
+    "labels": [
+     "Politics",
+     "Mixed",
+     "Music",
+     "Daily life",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.30000000000000004
+   },
+   "jev_two_level": {
+    "labels": [
+     "News",
+     "Other",
+     "Music",
+     "Daily life",
+     "Gaming"
+    ],
+    "dup": 0,
+    "dist": 0.5
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Political and sports news",
+     "AI hardware and enterprise computing",
+     "Ticket sales and event promotions",
+     "Pop culture and media reviews",
+     "Gaming and collectibles"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Electoral integrity controversies",
+     "Academic writing services",
+     "Live event experiences",
+     "Personal reflection and memories",
+     "Personal anecdotes and stories"
+    ],
+    "dup": 0,
+    "dist": 0.9
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "qwen",
+  "k": 8,
+  "seed": 0,
+  "sizes": [
+   9,
+   6,
+   5,
+   10,
+   21,
+   18,
+   7,
+   4
+  ],
+  "purity": 0.675,
+  "buckets": [
+   [
+    [
+     "fitness",
+     6
+    ],
+    [
+     "sports",
+     2
+    ],
+    [
+     "gaming",
+     1
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     4
+    ],
+    [
+     "sports",
+     1
+    ],
+    [
+     "politics",
+     1
+    ]
+   ],
+   [
+    [
+     "gaming",
+     3
+    ],
+    [
+     "film_tv",
+     2
+    ]
+   ],
+   [
+    [
+     "politics",
+     8
+    ],
+    [
+     "travel",
+     2
+    ]
+   ],
+   [
+    [
+     "cooking",
+     7
+    ],
+    [
+     "gaming",
+     4
+    ],
+    [
+     "fitness",
+     4
+    ]
+   ],
+   [
+    [
+     "travel",
+     6
+    ],
+    [
+     "music",
+     5
+    ],
+    [
+     "cooking",
+     3
+    ]
+   ],
+   [
+    [
+     "sports",
+     7
+    ]
+   ],
+   [
+    [
+     "music",
+     4
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Fitness and health \u00b7 Sports",
+     "Film",
+     "Mixed",
+     "News",
+     "Mixed",
+     "Daily life",
+     "Sports",
+     "Music \u00b7 Celebrities and pop culture"
+    ],
+    "dup": 1,
+    "dist": 0.5
+   },
+   "luna_default": {
+    "labels": [
+     "Fitness and health",
+     "Film",
+     "Mixed",
+     "News",
+     "Food and dining",
+     "Daily life",
+     "Sports",
+     "Celebrities and pop culture"
+    ],
+    "dup": 0,
+    "dist": 0.5
+   },
+   "qwen9_app": {
+    "labels": [
+     "Gym workouts and sports updates",
+     "Movie reviews and political opinions",
+     "AI costs and academic writing services",
+     "Indian politics and election protests",
+     "Music albums and tech reviews",
+     "Travel apps and personal life updates",
+     "Premier League match predictions",
+     "Concert and event ticket sales"
+    ],
+    "dup": 0,
+    "dist": 0.875
+   },
+   "jev_fine": {
+    "labels": [
+     "Fitness & health",
+     "Film & TV",
+     "Mixed",
+     "Politics",
+     "Mixed",
+     "Daily life",
+     "Sports",
+     "Music"
+    ],
+    "dup": 1,
+    "dist": 0.375
+   },
+   "luna_fine": {
+    "labels": [
+     "Fitness & health",
+     "Film & TV",
+     "Mixed",
+     "Politics",
+     "Mixed",
+     "Daily life",
+     "Sports",
+     "Music"
+    ],
+    "dup": 1,
+    "dist": 0.375
+   },
+   "jev_two_level": {
+    "labels": [
+     "Fitness & health",
+     "Film & TV",
+     "Other",
+     "News",
+     "Other",
+     "Daily life",
+     "Sports",
+     "Music"
+    ],
+    "dup": 1,
+    "dist": 0.8125
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Gym workouts and fitness routines",
+     "Movie reviews and film appreciation",
+     "Academic writing services and crypto tokens",
+     "Electoral integrity and vote theft",
+     "Social media algorithms and content creation",
+     "Concert experiences and personal memories",
+     "Match predictions and betting picks",
+     "Reselling concert and event tickets"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Gym workouts and fitness routines",
+     "Movie reviews and film appreciation",
+     "Academic writing services and crypto tokens",
+     "Electoral integrity and vote theft",
+     "Social media algorithms and content creation",
+     "Personal wellness and leisure activities",
+     "Match predictions and betting picks",
+     "Reselling concert and event tickets"
+    ],
+    "dup": 0,
+    "dist": 0.875
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "qwen",
+  "k": 8,
+  "seed": 1,
+  "sizes": [
+   1,
+   14,
+   5,
+   8,
+   27,
+   8,
+   9,
+   8
+  ],
+  "purity": 0.6403935185185186,
+  "buckets": [
+   [
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "gaming",
+     7
+    ],
+    [
+     "cooking",
+     3
+    ],
+    [
+     "fitness",
+     2
+    ]
+   ],
+   [
+    [
+     "music",
+     3
+    ],
+    [
+     "fitness",
+     2
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     6
+    ],
+    [
+     "fitness",
+     1
+    ],
+    [
+     "gaming",
+     1
+    ]
+   ],
+   [
+    [
+     "music",
+     7
+    ],
+    [
+     "travel",
+     6
+    ],
+    [
+     "fitness",
+     4
+    ]
+   ],
+   [
+    [
+     "sports",
+     7
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "politics",
+     8
+    ],
+    [
+     "travel",
+     1
+    ]
+   ],
+   [
+    [
+     "politics",
+     2
+    ],
+    [
+     "film_tv",
+     1
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Mixed",
+     "Gaming",
+     "Daily life \u00b7 Music",
+     "Film",
+     "Mixed",
+     "Sports",
+     "News",
+     "News"
+    ],
+    "dup": 2,
+    "dist": 0.5625
+   },
+   "luna_default": {
+    "labels": [
+     "Business",
+     "Gaming",
+     "Daily life",
+     "Film",
+     "Mixed",
+     "Sports",
+     "News",
+     "News"
+    ],
+    "dup": 1,
+    "dist": 0.5
+   },
+   "qwen9_app": {
+    "labels": [
+     "Product development and iteration",
+     "AI agents and gaming news",
+     "Concert experiences and personal stories",
+     "Movie reviews and film discussions",
+     "Ticket sales and recipe sharing",
+     "Premier League match predictions",
+     "Indian politics and election debates",
+     "Sports analysis and political opinions"
+    ],
+    "dup": 0,
+    "dist": 0.875
+   },
+   "jev_fine": {
+    "labels": [
+     "Fitness & health",
+     "Gaming",
+     "Music \u00b7 Daily life",
+     "Film & TV",
+     "Mixed",
+     "Sports",
+     "Politics",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.6875
+   },
+   "luna_fine": {
+    "labels": [
+     "Food & cooking",
+     "Mixed",
+     "Mixed",
+     "Film & TV",
+     "Mixed",
+     "Sports",
+     "Politics",
+     "Mixed"
+    ],
+    "dup": 3,
+    "dist": 0.6875
+   },
+   "jev_two_level": {
+    "labels": [
+     "Business",
+     "Gaming",
+     "Daily life",
+     "Film & TV",
+     "Daily life",
+     "Sports",
+     "Politics",
+     "Politics"
+    ],
+    "dup": 2,
+    "dist": 0.75
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Product Iteration & Feedback",
+     "Gaming & MMORPG Reviews",
+     "Concert Day Experiences",
+     "Movie & Film Reviews",
+     "Ticket Resale & Scams",
+     "Premier League Match Predictions",
+     "Indian Election Allegations",
+     "Election Strategy & Voting"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Product Iteration & Feedback",
+     "Gaming & MMORPG Reviews",
+     "Concert Day Experiences",
+     "Movie & Film Reviews",
+     "Ticket Resale & Scams",
+     "Premier League Match Predictions",
+     "Indian Election Allegations",
+     "Election Strategy & Voting"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "qwen",
+  "k": 8,
+  "seed": 2,
+  "sizes": [
+   5,
+   6,
+   21,
+   18,
+   6,
+   3,
+   15,
+   6
+  ],
+  "purity": 0.5916666666666667,
+  "buckets": [
+   [
+    [
+     "politics",
+     3
+    ],
+    [
+     "sports",
+     1
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "gaming",
+     3
+    ],
+    [
+     "film_tv",
+     2
+    ],
+    [
+     "music",
+     1
+    ]
+   ],
+   [
+    [
+     "travel",
+     7
+    ],
+    [
+     "music",
+     5
+    ],
+    [
+     "film_tv",
+     4
+    ]
+   ],
+   [
+    [
+     "cooking",
+     6
+    ],
+    [
+     "film_tv",
+     4
+    ],
+    [
+     "fitness",
+     3
+    ]
+   ],
+   [
+    [
+     "sports",
+     6
+    ]
+   ],
+   [
+    [
+     "politics",
+     2
+    ],
+    [
+     "gaming",
+     1
+    ]
+   ],
+   [
+    [
+     "fitness",
+     7
+    ],
+    [
+     "sports",
+     3
+    ],
+    [
+     "gaming",
+     3
+    ]
+   ],
+   [
+    [
+     "politics",
+     5
+    ],
+    [
+     "travel",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "News",
+     "Mixed",
+     "Travel and adventure \u00b7 Daily life",
+     "Daily life",
+     "Sports",
+     "News",
+     "Mixed",
+     "News"
+    ],
+    "dup": 3,
+    "dist": 0.25
+   },
+   "luna_default": {
+    "labels": [
+     "News",
+     "Mixed",
+     "Daily life \u00b7 Travel and adventure",
+     "Mixed",
+     "Sports",
+     "News",
+     "Fitness and health",
+     "News"
+    ],
+    "dup": 3,
+    "dist": 0.1875
+   },
+   "qwen9_app": {
+    "labels": [
+     "Political nominations and election reactions",
+     "Ticket sales and freelance commissions",
+     "Personal travel and creative projects",
+     "Food recipes and adult content",
+     "Sports predictions and match analysis",
+     "Political criticism and party disputes",
+     "Fitness routines and gaming updates",
+     "Indian election integrity and protests"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   },
+   "jev_fine": {
+    "labels": [
+     "Politics",
+     "Mixed",
+     "Travel \u00b7 Daily life",
+     "Daily life \u00b7 Pop culture",
+     "Sports",
+     "Politics",
+     "Fitness & health",
+     "Politics"
+    ],
+    "dup": 2,
+    "dist": 0.375
+   },
+   "luna_fine": {
+    "labels": [
+     "Politics",
+     "Mixed",
+     "Daily life",
+     "Mixed",
+     "Sports",
+     "Politics",
+     "Fitness & health",
+     "Politics"
+    ],
+    "dup": 3,
+    "dist": 0.3125
+   },
+   "jev_two_level": {
+    "labels": [
+     "Politics",
+     "Other",
+     "Travel",
+     "Daily life",
+     "Sports",
+     "Politics",
+     "Daily life",
+     "Politics"
+    ],
+    "dup": 3,
+    "dist": 0.3125
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Election integrity concerns",
+     "Academic writing services",
+     "Personal travel journals",
+     "Adult content and scams",
+     "Premier League predictions",
+     "Indian political corruption",
+     "Fitness and gym routines",
+     "Indian election rigging claims"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Election integrity concerns",
+     "Academic writing services",
+     "Personal travel journals",
+     "Family baking recipes",
+     "Premier League predictions",
+     "Indian political corruption",
+     "Fitness and gym routines",
+     "Indian election rigging claims"
+    ],
+    "dup": 0,
+    "dist": 0.8125
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "gemma",
+  "k": 5,
+  "seed": 0,
+  "sizes": [
+   23,
+   26,
+   14,
+   7,
+   10
+  ],
+  "purity": 0.5446344959388438,
+  "buckets": [
+   [
+    [
+     "sports",
+     9
+    ],
+    [
+     "music",
+     6
+    ],
+    [
+     "fitness",
+     4
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     9
+    ],
+    [
+     "cooking",
+     7
+    ],
+    [
+     "music",
+     3
+    ]
+   ],
+   [
+    [
+     "politics",
+     10
+    ],
+    [
+     "travel",
+     4
+    ]
+   ],
+   [
+    [
+     "fitness",
+     4
+    ],
+    [
+     "gaming",
+     1
+    ],
+    [
+     "music",
+     1
+    ]
+   ],
+   [
+    [
+     "gaming",
+     7
+    ],
+    [
+     "film_tv",
+     1
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Mixed",
+     "Daily life",
+     "News",
+     "Daily life",
+     "Gaming"
+    ],
+    "dup": 1,
+    "dist": 0.4
+   },
+   "luna_default": {
+    "labels": [
+     "Celebrities and pop culture",
+     "Daily life",
+     "News",
+     "Daily life",
+     "Gaming"
+    ],
+    "dup": 1,
+    "dist": 0.5
+   },
+   "qwen9_app": {
+    "labels": [
+     "K-pop, Sports, and Ticket Sales",
+     "Personal Stories and Life Updates",
+     "Indian Politics and Elections",
+     "Random Observations and Anecdotes",
+     "Technology, Gaming, and Social Media"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "jev_fine": {
+    "labels": [
+     "Sports",
+     "Daily life",
+     "Politics",
+     "Daily life",
+     "Gaming"
+    ],
+    "dup": 1,
+    "dist": 0.9
+   },
+   "luna_fine": {
+    "labels": [
+     "Mixed",
+     "Daily life",
+     "Politics",
+     "Daily life",
+     "Gaming"
+    ],
+    "dup": 1,
+    "dist": 0.4
+   },
+   "jev_two_level": {
+    "labels": [
+     "Sports",
+     "Daily life",
+     "News",
+     "Daily life",
+     "Gaming"
+    ],
+    "dup": 1,
+    "dist": 0.8
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Sports news and fan interactions",
+     "Personal concert and travel experiences",
+     "Indian election controversies and protests",
+     "Gym etiquette and fitness humor",
+     "Gaming industry reviews and news"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Sports news and fan interactions",
+     "Personal concert and travel experiences",
+     "Indian election controversies and protests",
+     "Gym etiquette and fitness humor",
+     "Gaming industry reviews and news"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "gemma",
+  "k": 5,
+  "seed": 1,
+  "sizes": [
+   12,
+   19,
+   36,
+   10,
+   3
+  ],
+  "purity": 0.5319298245614035,
+  "buckets": [
+   [
+    [
+     "cooking",
+     5
+    ],
+    [
+     "gaming",
+     3
+    ],
+    [
+     "travel",
+     2
+    ]
+   ],
+   [
+    [
+     "politics",
+     10
+    ],
+    [
+     "travel",
+     5
+    ],
+    [
+     "gaming",
+     2
+    ]
+   ],
+   [
+    [
+     "music",
+     9
+    ],
+    [
+     "fitness",
+     8
+    ],
+    [
+     "film_tv",
+     7
+    ]
+   ],
+   [
+    [
+     "sports",
+     8
+    ],
+    [
+     "fitness",
+     1
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     2
+    ],
+    [
+     "gaming",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Business",
+     "News",
+     "Celebrities and pop culture \u00b7 Daily life",
+     "Sports",
+     "Mixed"
+    ],
+    "dup": 0,
+    "dist": 0.30000000000000004
+   },
+   "luna_default": {
+    "labels": [
+     "Food and dining",
+     "News",
+     "Daily life",
+     "Sports",
+     "Mixed"
+    ],
+    "dup": 0,
+    "dist": 0.5
+   },
+   "qwen9_app": {
+    "labels": [
+     "Family recipes, games, and design",
+     "Politics, elections, and ticket sales",
+     "Humorous stories, scams, and movies",
+     "Premier League and NFL betting",
+     "AI costs and academic ghostwriting"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_fine": {
+    "labels": [
+     "Mixed",
+     "Politics",
+     "Pop culture \u00b7 Daily life",
+     "Sports",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.7
+   },
+   "luna_fine": {
+    "labels": [
+     "Mixed",
+     "Politics",
+     "Mixed",
+     "Sports",
+     "Mixed"
+    ],
+    "dup": 2,
+    "dist": 0.5
+   },
+   "jev_two_level": {
+    "labels": [
+     "Business",
+     "News",
+     "Pop culture",
+     "Sports",
+     "Education"
+    ],
+    "dup": 0,
+    "dist": 0.7
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Family-friendly baking & recipes",
+     "Indian election vote theft allegations",
+     "Concert ticket scalping & sales",
+     "Football match predictions & fan celebrations",
+     "Thesis and essay writing commissions"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Family-friendly baking & recipes",
+     "Indian election vote theft allegations",
+     "Celebrity concert ticket sales",
+     "Football match predictions & fan celebrations",
+     "AI enterprise compute cost optimization"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "gemma",
+  "k": 5,
+  "seed": 2,
+  "sizes": [
+   18,
+   18,
+   10,
+   18,
+   16
+  ],
+  "purity": 0.3936111111111111,
+  "buckets": [
+   [
+    [
+     "gaming",
+     5
+    ],
+    [
+     "politics",
+     4
+    ],
+    [
+     "fitness",
+     3
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     7
+    ],
+    [
+     "music",
+     4
+    ],
+    [
+     "cooking",
+     3
+    ]
+   ],
+   [
+    [
+     "politics",
+     6
+    ],
+    [
+     "travel",
+     3
+    ],
+    [
+     "music",
+     1
+    ]
+   ],
+   [
+    [
+     "sports",
+     7
+    ],
+    [
+     "fitness",
+     5
+    ],
+    [
+     "music",
+     4
+    ]
+   ],
+   [
+    [
+     "cooking",
+     5
+    ],
+    [
+     "travel",
+     3
+    ],
+    [
+     "sports",
+     2
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Mixed",
+     "Celebrities and pop culture",
+     "News",
+     "Sports",
+     "Business"
+    ],
+    "dup": 0,
+    "dist": 0.30000000000000004
+   },
+   "luna_default": {
+    "labels": [
+     "Mixed",
+     "Celebrities and pop culture",
+     "News",
+     "Sports \u00b7 Daily life",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.30000000000000004
+   },
+   "qwen9_app": {
+    "labels": [
+     "Social media ethics and politics",
+     "Personal stories and entertainment",
+     "Indian election controversies",
+     "Sports predictions and lifestyle",
+     "Product launches and achievements"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   },
+   "jev_fine": {
+    "labels": [
+     "Mixed",
+     "Pop culture \u00b7 Daily life",
+     "Politics",
+     "Sports",
+     "Mixed"
+    ],
+    "dup": 1,
+    "dist": 0.2
+   },
+   "luna_fine": {
+    "labels": [
+     "Mixed",
+     "Mixed",
+     "Politics",
+     "Sports",
+     "Mixed"
+    ],
+    "dup": 2,
+    "dist": 0.3
+   },
+   "jev_two_level": {
+    "labels": [
+     "News",
+     "Pop culture",
+     "Politics",
+     "Sports",
+     "Business"
+    ],
+    "dup": 0,
+    "dist": 0.6
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Global current events",
+     "Entertainment reviews",
+     "Indian election integrity",
+     "Sports match predictions",
+     "Product development stories"
+    ],
+    "dup": 0,
+    "dist": 0.9
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Life events and memories",
+     "Entertainment reviews",
+     "Indian election integrity",
+     "Sports match predictions",
+     "Personal lifestyle updates"
+    ],
+    "dup": 0,
+    "dist": 0.8
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "gemma",
+  "k": 8,
+  "seed": 0,
+  "sizes": [
+   4,
+   16,
+   14,
+   9,
+   7,
+   8,
+   12,
+   10
+  ],
+  "purity": 0.6468501984126984,
+  "buckets": [
+   [
+    [
+     "fitness",
+     2
+    ],
+    [
+     "cooking",
+     2
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     7
+    ],
+    [
+     "cooking",
+     4
+    ],
+    [
+     "travel",
+     3
+    ]
+   ],
+   [
+    [
+     "politics",
+     10
+    ],
+    [
+     "travel",
+     4
+    ]
+   ],
+   [
+    [
+     "gaming",
+     7
+    ],
+    [
+     "film_tv",
+     1
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "fitness",
+     3
+    ],
+    [
+     "film_tv",
+     2
+    ],
+    [
+     "gaming",
+     1
+    ]
+   ],
+   [
+    [
+     "music",
+     8
+    ]
+   ],
+   [
+    [
+     "fitness",
+     5
+    ],
+    [
+     "music",
+     2
+    ],
+    [
+     "cooking",
+     2
+    ]
+   ],
+   [
+    [
+     "sports",
+     9
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Daily life",
+     "Film",
+     "News",
+     "Gaming",
+     "Mixed",
+     "Music",
+     "Daily life",
+     "Sports"
+    ],
+    "dup": 1,
+    "dist": 0.5
+   },
+   "luna_default": {
+    "labels": [
+     "Food and dining \u00b7 Daily life",
+     "Film",
+     "News",
+     "Gaming",
+     "Daily life",
+     "Mixed",
+     "Daily life \u00b7 Fitness and health",
+     "Sports"
+    ],
+    "dup": 0,
+    "dist": 0.3125
+   },
+   "qwen9_app": {
+    "labels": [
+     "Weekend plans and leisure activities",
+     "Mixed topics and random thoughts",
+     "Indian politics and election issues",
+     "Tech reviews and gaming news",
+     "Adult content and scams",
+     "Ticket sales for concerts and events",
+     "Lifestyle and personal hobbies",
+     "Premier League football predictions"
+    ],
+    "dup": 0,
+    "dist": 0.625
+   },
+   "jev_fine": {
+    "labels": [
+     "Daily life \u00b7 Fitness & health",
+     "Film & TV \u00b7 Pop culture",
+     "Politics",
+     "Gaming",
+     "Mixed",
+     "Music",
+     "Daily life",
+     "Sports"
+    ],
+    "dup": 0,
+    "dist": 0.5
+   },
+   "luna_fine": {
+    "labels": [
+     "Mixed",
+     "Mixed",
+     "Politics",
+     "Gaming",
+     "Mixed",
+     "Music",
+     "Daily life",
+     "Sports"
+    ],
+    "dup": 2,
+    "dist": 0.625
+   },
+   "jev_two_level": {
+    "labels": [
+     "Daily life",
+     "Film & TV",
+     "News",
+     "Gaming",
+     "Daily life",
+     "Music",
+     "Daily life",
+     "Sports"
+    ],
+    "dup": 2,
+    "dist": 0.8125
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Weekend leisure activities",
+     "Film and entertainment reviews",
+     "Indian election politics",
+     "Social media and gaming culture",
+     "Adult content and scams",
+     "Concert ticket sales",
+     "Fitness and wellness",
+     "Premier League football"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Family recipes and hobbies",
+     "Film and entertainment reviews",
+     "Indian election politics",
+     "Social media and gaming culture",
+     "Adult content and scams",
+     "Concert ticket sales",
+     "Relaxation and fun",
+     "Premier League football"
+    ],
+    "dup": 0,
+    "dist": 0.75
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "gemma",
+  "k": 8,
+  "seed": 1,
+  "sizes": [
+   14,
+   15,
+   18,
+   8,
+   7,
+   10,
+   2,
+   6
+  ],
+  "purity": 0.6997023809523809,
+  "buckets": [
+   [
+    [
+     "cooking",
+     5
+    ],
+    [
+     "fitness",
+     3
+    ],
+    [
+     "film_tv",
+     2
+    ]
+   ],
+   [
+    [
+     "politics",
+     10
+    ],
+    [
+     "travel",
+     4
+    ],
+    [
+     "film_tv",
+     1
+    ]
+   ],
+   [
+    [
+     "fitness",
+     6
+    ],
+    [
+     "music",
+     5
+    ],
+    [
+     "travel",
+     3
+    ]
+   ],
+   [
+    [
+     "gaming",
+     6
+    ],
+    [
+     "film_tv",
+     1
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     6
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "sports",
+     8
+    ],
+    [
+     "fitness",
+     1
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "gaming",
+     2
+    ]
+   ],
+   [
+    [
+     "music",
+     5
+    ],
+    [
+     "travel",
+     1
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "Business",
+     "News",
+     "Daily life \u00b7 Music",
+     "Gaming",
+     "Film",
+     "Sports",
+     "Cryptocurrency \u00b7 AI",
+     "Mixed"
+    ],
+    "dup": 0,
+    "dist": 0.625
+   },
+   "luna_default": {
+    "labels": [
+     "Mixed",
+     "News",
+     "Daily life",
+     "Gaming",
+     "Film",
+     "Sports",
+     "Mixed",
+     "Music"
+    ],
+    "dup": 1,
+    "dist": 0.5
+   },
+   "qwen9_app": {
+    "labels": [
+     "Family recipes and product launches",
+     "Political debates and election issues",
+     "Humorous stories and concert reviews",
+     "Gaming news and AI integration",
+     "Movie reviews and film discussions",
+     "Sports betting and match predictions",
+     "Enterprise AI and token economics",
+     "Concert tickets and event sales"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_fine": {
+    "labels": [
+     "Mixed",
+     "Politics",
+     "Daily life \u00b7 Music",
+     "Gaming",
+     "Film & TV",
+     "Sports",
+     "Mixed",
+     "Music"
+    ],
+    "dup": 1,
+    "dist": 0.5625
+   },
+   "luna_fine": {
+    "labels": [
+     "Mixed",
+     "Politics",
+     "Mixed",
+     "Gaming",
+     "Film & TV",
+     "Sports",
+     "Mixed",
+     "Music"
+    ],
+    "dup": 2,
+    "dist": 0.625
+   },
+   "jev_two_level": {
+    "labels": [
+     "Business",
+     "News",
+     "Daily life",
+     "Gaming",
+     "Film & TV",
+     "Sports",
+     "Cryptocurrency",
+     "Music"
+    ],
+    "dup": 0,
+    "dist": 0.8125
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Digital product development",
+     "Indian election vote rigging allegations",
+     "Concert and travel memories",
+     "Video game review ethics",
+     "Movie reviews and film analysis",
+     "Premier League match predictions",
+     "Interlink token ecosystem development",
+     "Resale tickets for music tours"
+    ],
+    "dup": 0,
+    "dist": 0.8125
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Digital product development",
+     "Indian election vote rigging allegations",
+     "Concert and travel memories",
+     "Video game review ethics",
+     "Movie reviews and film analysis",
+     "Premier League match predictions",
+     "Enterprise AI compute optimization",
+     "Resale tickets for music tours"
+    ],
+    "dup": 0,
+    "dist": 0.8125
+   }
+  }
+ },
+ {
+  "corpus": "broad",
+  "emb": "gemma",
+  "k": 8,
+  "seed": 2,
+  "sizes": [
+   22,
+   13,
+   3,
+   12,
+   6,
+   7,
+   9,
+   8
+  ],
+  "purity": 0.6013084138084138,
+  "buckets": [
+   [
+    [
+     "politics",
+     10
+    ],
+    [
+     "gaming",
+     4
+    ],
+    [
+     "fitness",
+     2
+    ]
+   ],
+   [
+    [
+     "film_tv",
+     7
+    ],
+    [
+     "cooking",
+     3
+    ],
+    [
+     "travel",
+     2
+    ]
+   ],
+   [
+    [
+     "fitness",
+     2
+    ],
+    [
+     "gaming",
+     1
+    ]
+   ],
+   [
+    [
+     "cooking",
+     5
+    ],
+    [
+     "gaming",
+     2
+    ],
+    [
+     "travel",
+     2
+    ]
+   ],
+   [
+    [
+     "fitness",
+     4
+    ],
+    [
+     "travel",
+     2
+    ]
+   ],
+   [
+    [
+     "music",
+     3
+    ],
+    [
+     "travel",
+     2
+    ],
+    [
+     "gaming",
+     2
+    ]
+   ],
+   [
+    [
+     "sports",
+     8
+    ],
+    [
+     "cooking",
+     1
+    ]
+   ],
+   [
+    [
+     "music",
+     6
+    ],
+    [
+     "film_tv",
+     2
+    ]
+   ]
+  ],
+  "setups": {
+   "jev_default": {
+    "labels": [
+     "News",
+     "Film",
+     "Fitness and health",
+     "Business",
+     "Mixed",
+     "Mixed",
+     "Sports",
+     "Music \u00b7 Celebrities and pop culture"
+    ],
+    "dup": 1,
+    "dist": 0.375
+   },
+   "luna_default": {
+    "error": "502 {\"error\":{\"message\":\"OpenAI refused to answer question \\\"topic\\\"\",\"code\":502}}"
+   },
+   "qwen9_app": {
+    "labels": [
+     "Political vote theft allegations",
+     "Movie reviews and travel memories",
+     "Weekend plans and gym activities",
+     "Product launches and recipes",
+     "NSFW content and flight detention",
+     "Concert disappointments and travel goals",
+     "Premier League match predictions",
+     "Concert and event ticket sales"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   },
+   "jev_fine": {
+    "labels": [
+     "Politics",
+     "Film & TV",
+     "Fitness & health",
+     "Mixed",
+     "Mixed",
+     "Mixed",
+     "Sports",
+     "Music"
+    ],
+    "dup": 2,
+    "dist": 0.375
+   },
+   "luna_fine": {
+    "labels": [
+     "Politics",
+     "Film & TV",
+     "Daily life",
+     "Mixed",
+     "Mixed",
+     "Mixed",
+     "Sports",
+     "Music"
+    ],
+    "dup": 2,
+    "dist": 0.4375
+   },
+   "jev_two_level": {
+    "labels": [
+     "News",
+     "Film & TV",
+     "Fitness & health",
+     "Business",
+     "Daily life",
+     "Daily life",
+     "Sports",
+     "Music"
+    ],
+    "dup": 1,
+    "dist": 0.625
+   },
+   "jev_propose_pick": {
+    "labels": [
+     "Indian election politics",
+     "Entertainment and pop culture",
+     "Weekend leisure activities",
+     "Product launches and reviews",
+     "NSFW and fetish content",
+     "Concert experiences and reviews",
+     "Premier League match predictions",
+     "Music tour and event ticket sales"
+    ],
+    "dup": 0,
+    "dist": 0.9375
+   },
+   "luna_propose_pick": {
+    "labels": [
+     "Indian election politics",
+     "Entertainment and pop culture",
+     "Weekend leisure activities",
+     "Health, fitness, and lifestyle",
+     "NSFW and fetish content",
+     "Concert experiences and reviews",
+     "Premier League match predictions",
+     "Music tour and event ticket sales"
+    ],
+    "dup": 0,
+    "dist": 1.0
+   }
+  }
+ }
+]
