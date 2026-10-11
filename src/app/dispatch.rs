@@ -373,13 +373,18 @@ impl App {
                 } else {
                     // Non-tech timeline (or Jev couldn't tell): the chat
                     // model's own labels beat Jev's picks there.
+                    // Partial labels would leave placeholders; the taxonomy
+                    // can still label every cluster.
                     match chat_labels(&provider, &model, body, num_clusters).await {
-                        Ok(labels) => {
+                        Ok(labels) if labels.iter().all(|l| !l.is_empty()) => {
                             return send(Ok(TopicLabels {
                                 labels,
                                 labeller: provider.name().to_string(),
                             }));
                         }
+                        Ok(_) => tracing::warn!(
+                            "chat labels missed some clusters; using the topic taxonomy"
+                        ),
                         Err(e) => {
                             tracing::warn!("chat labels failed ({e}); using the topic taxonomy")
                         }
