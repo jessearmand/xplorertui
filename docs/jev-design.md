@@ -417,6 +417,14 @@ posts), returned as 502 "refused to answer"; those are no longer retried.
   Chat requests now send `reasoning: { enabled: false }`; models that reject
   that (Sonnet 5.5 returns 400 "Reasoning is mandatory") are retried with
   low-effort hidden reasoning and 2,048 extra tokens.
+- The MLX server takes no reasoning setting; it passes
+  `enable_thinking=False` to the chat template on every request. That is a
+  template variable, so a model whose template does not read it thinks
+  anyway and used to spend the label budget on stripped thinking. On the
+  server, `max_tokens` now caps the answer only: thinking gets up to 2,048
+  extra tokens in the same run, so no second request is needed. The server
+  also reports the real finish reason and
+  `usage.completion_tokens_details.reasoning_tokens`.
 - `cluster_label` still shortens descriptions at the first comma or
   parenthesis, so custom `topics` with long descriptions get clipped labels.
   A3 sidesteps this; a display-name field would fix it for taxonomies.

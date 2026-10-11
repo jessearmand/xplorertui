@@ -82,10 +82,19 @@ class ChatChoice(BaseModel):
     finish_reason: str | None = None
 
 
+class CompletionTokensDetails(BaseModel):
+    # Generated tokens that went to thinking blocks the server stripped from
+    # the answer. They do not count against `max_tokens`.
+    reasoning_tokens: int = 0
+
+
 class ChatUsage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    completion_tokens_details: CompletionTokensDetails = Field(
+        default_factory=CompletionTokensDetails
+    )
 
 
 class ChatCompletionResponse(BaseModel):

@@ -190,6 +190,9 @@ pub struct App {
     pub cluster_result: Option<ClusterResult>,
     pub cluster_loading: bool,
     pub cluster_topics_loading: bool,
+    /// The labeller the running `:topics` request is using right now, once
+    /// it has picked one. Shown in the loading hint.
+    pub cluster_topics_labeller: Option<String>,
     /// Monotonic counter incremented on each cluster/topic-generation request.
     /// Used to discard stale async responses.
     pub cluster_generation: u64,
@@ -299,6 +302,7 @@ impl App {
             cluster_result: None,
             cluster_loading: false,
             cluster_topics_loading: false,
+            cluster_topics_labeller: None,
             cluster_generation: 0,
             selected_cluster: None,
             cluster_source: None,

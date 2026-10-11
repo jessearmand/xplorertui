@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use super::MlxError;
 use crate::openrouter::types::{
-    ChatCompletionRequest, ChatCompletionResponse, ChatMessage, EmbeddingResponse, ReasoningConfig,
+    ChatCompletionRequest, ChatCompletionResponse, ChatMessage, EmbeddingResponse,
 };
 
 /// Client for a local MLX embedding server.
@@ -96,13 +96,16 @@ impl MlxClient {
     }
 
     /// Generate a chat completion via the local MLX server.
+    ///
+    /// There is no reasoning setting to send: the server always asks the
+    /// model's chat template to turn thinking off. `max_tokens` caps the
+    /// answer; a model that thinks anyway gets extra room from the server.
     pub async fn chat_completion(
         &self,
         model: &str,
         messages: Vec<ChatMessage>,
         max_tokens: Option<u32>,
         temperature: Option<f32>,
-        _reasoning: Option<ReasoningConfig>,
     ) -> Result<ChatCompletionResponse, MlxError> {
         let url = format!("{}/v1/chat/completions", self.base_url);
         let request = ChatCompletionRequest {
@@ -110,7 +113,7 @@ impl MlxClient {
             messages,
             max_tokens,
             temperature,
-            reasoning: None, // MLX server does not support reasoning config
+            reasoning: None,
         };
         let resp = self.http.post(&url).json(&request).send().await?;
         self.handle_response(resp).await

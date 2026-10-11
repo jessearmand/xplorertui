@@ -375,8 +375,7 @@ impl App {
                         self.status_message = Some("Clustering complete!".into());
                         // Auto-trigger topic labelling if Jev or a chat provider is available.
                         if self.has_topic_labeller() {
-                            self.cluster_topics_loading = true;
-                            self.dispatch_generate_cluster_topics();
+                            self.start_cluster_topics();
                         }
                     }
                     Err(e) => {
@@ -475,8 +474,12 @@ impl App {
                     return;
                 }
                 self.cluster_generation += 1;
-                self.cluster_topics_loading = true;
-                self.dispatch_generate_cluster_topics();
+                self.start_cluster_topics();
+            }
+            AppEvent::ClusterTopicsLabeller(request_generation, labeller) => {
+                if request_generation == self.cluster_generation && self.cluster_topics_loading {
+                    self.cluster_topics_labeller = Some(labeller);
+                }
             }
             AppEvent::ClusterTopicsGenerated(request_generation, result) => {
                 // Discard stale responses from a previous cluster/generation.
@@ -484,6 +487,7 @@ impl App {
                     return;
                 }
                 self.cluster_topics_loading = false;
+                self.cluster_topics_labeller = None;
                 match result {
                     Ok(TopicLabels { labels, labeller }) => {
                         if let Some(ref mut cr) = self.cluster_result {
@@ -540,5 +544,53 @@ impl App {
             self.push_view(ViewKind::Cluster);
         }
         self.dispatch_cluster_timeline();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::auth::credentials::CredentialSet;
+    use crate::config::AppConfig;
+
+    fn app_labelling_topics(generation: u64) -> App {
+        let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
+        app.cluster_generation = generation;
+        app.cluster_topics_loading = true;
+        app
+    }
+
+    #[tokio::test]
+    async fn topics_hint_follows_the_labeller_the_request_reports() {
+        let mut app = app_labelling_topics(3);
+        assert_eq!(app.cluster_topics_labeller, None);
+
+        app.handle_app_event(AppEvent::ClusterTopicsLabeller(3, "MLX + Jev".into()));
+        assert_eq!(app.cluster_topics_labeller.as_deref(), Some("MLX + Jev"));
+
+        // The proposal fell through to the taxonomy.
+        app.handle_app_event(AppEvent::ClusterTopicsLabeller(3, "Jev".into()));
+        assert_eq!(app.cluster_topics_labeller.as_deref(), Some("Jev"));
+
+        app.handle_app_event(AppEvent::ClusterTopicsGenerated(
+            3,
+            Err(Arc::new("no topic answers".into())),
+        ));
+        assert!(!app.cluster_topics_loading);
+        assert_eq!(app.cluster_topics_labeller, None);
+    }
+
+    #[tokio::test]
+    async fn topics_hint_ignores_an_earlier_request() {
+        let mut app = app_labelling_topics(3);
+        app.handle_app_event(AppEvent::ClusterTopicsLabeller(2, "Jev".into()));
+        assert_eq!(app.cluster_topics_labeller, None);
+
+        // A late report after the labels arrived.
+        app.cluster_topics_loading = false;
+        app.handle_app_event(AppEvent::ClusterTopicsLabeller(3, "MLX".into()));
+        assert_eq!(app.cluster_topics_labeller, None);
     }
 }

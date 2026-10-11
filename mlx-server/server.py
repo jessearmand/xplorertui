@@ -16,7 +16,8 @@ import logging
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, closing
+from dataclasses import dataclass, replace
 from functools import partial
 from typing import Any, TypeVar, cast
 
@@ -39,6 +40,7 @@ from schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
     ChatUsage,
+    CompletionTokensDetails,
     EmbeddingData,
     EmbeddingRequest,
     EmbeddingResponse,
@@ -244,6 +246,7 @@ async def chat_completions(request: ChatCompletionRequest):
         raise HTTPException(status_code=500, detail=f"Failed to load model: {e}")
 
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    # Caps the answer; thinking the model does anyway gets its own headroom.
     max_tokens = request.max_tokens or 512
     temp = request.temperature if request.temperature is not None else 0.0
 
@@ -259,12 +262,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
     try:
         if backend == ChatBackend.MLX_LM:
-            (
-                text,
-                prompt_tokens,
-                completion_tokens,
-                finish_reason,
-            ) = await run_mlx(
+            result = await run_mlx(
                 _generate_mlx_lm,
                 model,
                 tokenizer,
@@ -274,12 +272,7 @@ async def chat_completions(request: ChatCompletionRequest):
                 model_id,
             )
         else:
-            (
-                text,
-                prompt_tokens,
-                completion_tokens,
-                finish_reason,
-            ) = await run_mlx(
+            result = await run_mlx(
                 _generate_mlx_vlm, model, tokenizer, messages, max_tokens, temp
             )
     except Exception as e:
@@ -287,11 +280,14 @@ async def chat_completions(request: ChatCompletionRequest):
         raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
 
     elapsed = time.perf_counter() - t0
-    tps = completion_tokens / elapsed if elapsed > 0 else 0
+    tps = result.completion_tokens / elapsed if elapsed > 0 else 0
     logger.info(
-        "Generation complete: %d prompt + %d completion tokens, %.2fs (%.1f tok/s)",
-        prompt_tokens,
-        completion_tokens,
+        "Generation complete: %d prompt + %d completion tokens (%d reasoning), "
+        "finish=%s, %.2fs (%.1f tok/s)",
+        result.prompt_tokens,
+        result.completion_tokens,
+        result.reasoning_tokens,
+        result.finish_reason,
         elapsed,
         tps,
     )
@@ -299,15 +295,18 @@ async def chat_completions(request: ChatCompletionRequest):
     return ChatCompletionResponse(
         choices=[
             ChatChoice(
-                message=ChatChoiceMessage(content=text),
-                finish_reason=finish_reason,
+                message=ChatChoiceMessage(content=result.text),
+                finish_reason=result.finish_reason,
             )
         ],
         model=model_id,
         usage=ChatUsage(
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            total_tokens=result.prompt_tokens + result.completion_tokens,
+            completion_tokens_details=CompletionTokensDetails(
+                reasoning_tokens=result.reasoning_tokens
+            ),
         ),
     )
 
@@ -383,6 +382,22 @@ def _embed_multimodal(model, processor, texts: list[str], images) -> list[list[f
     return all_embeddings
 
 
+# Extra tokens a chat reply may spend on thinking, on top of `max_tokens`.
+THINKING_HEADROOM_TOKENS = 2048
+
+
+@dataclass(frozen=True)
+class ChatGeneration:
+    """One chat reply, with thinking blocks already stripped from `text`."""
+
+    text: str
+    prompt_tokens: int
+    # Every generated token, thinking included.
+    completion_tokens: int
+    reasoning_tokens: int
+    finish_reason: str
+
+
 def _generate_mlx_lm(
     model,
     tokenizer,
@@ -390,9 +405,9 @@ def _generate_mlx_lm(
     max_tokens: int,
     temp: float,
     model_id: str,
-) -> tuple[str, int, int, str]:
+) -> ChatGeneration:
     """Generate text using mlx-lm (text-only LLMs). Runs on the MLX thread."""
-    from mlx_lm import generate
+    from mlx_lm import stream_generate
     from mlx_lm.sample_utils import make_sampler
 
     prompt = tokenizer.apply_chat_template(
@@ -404,32 +419,22 @@ def _generate_mlx_lm(
     sampler = make_sampler(temp=temp)
     generate_kwargs = {
         "prompt": prompt,
-        "max_tokens": max_tokens,
+        "max_tokens": max_tokens + THINKING_HEADROOM_TOKENS,
         "sampler": sampler,
     }
     prompt_cache = _maybe_build_optiq_prompt_cache(model, model_id)
     if prompt_cache is not None:
         generate_kwargs["prompt_cache"] = prompt_cache
 
-    generate_fn = cast(Any, generate)
-    text = generate_fn(model, tokenizer, **generate_kwargs)
-
-    text = _strip_thinking(text)
-    prompt_tokens = len(tokenizer.encode(prompt))
-    completion_tokens = len(tokenizer.encode(text))
-    return (
-        text,
-        prompt_tokens,
-        completion_tokens,
-        _infer_finish_reason(completion_tokens, max_tokens),
-    )
+    stream = cast(Any, stream_generate)(model, tokenizer, **generate_kwargs)
+    return _collect_reply(stream, prompt, max_tokens)
 
 
 def _generate_mlx_vlm(
     model, processor, messages: list[dict], max_tokens: int, temp: float
-) -> tuple[str, int, int, str]:
+) -> ChatGeneration:
     """Generate text using mlx-vlm (vision-language models). Runs on the MLX thread."""
-    from mlx_vlm import generate
+    from mlx_vlm import stream_generate
     from mlx_vlm.prompt_utils import apply_chat_template
 
     prompt = cast(
@@ -437,29 +442,68 @@ def _generate_mlx_vlm(
         apply_chat_template(processor, model.config, messages, enable_thinking=False),
     )
 
-    result = generate(
+    # `mlx_vlm.generate` does these two steps around its own stream.
+    tokenizer = getattr(processor, "tokenizer", processor)
+    tokenizer.stopping_criteria.reset(model.config.eos_token_id)
+    stream = stream_generate(
         model,
         processor,
         prompt,
-        max_tokens=max_tokens,
+        max_tokens=max_tokens + THINKING_HEADROOM_TOKENS,
         temperature=temp,
         enable_thinking=False,
     )
+    reply = _collect_reply(stream, prompt, max_tokens)
+    clean_output = getattr(processor, "clean_output", None)
+    if callable(clean_output):
+        reply = replace(reply, text=_strip_thinking(clean_output(reply.text)))
+    return reply
 
-    text = _strip_thinking(result.text)
-    return (
-        text,
-        result.prompt_tokens,
-        result.generation_tokens,
-        _infer_finish_reason(result.generation_tokens, max_tokens),
+
+def _collect_reply(stream, prompt: str, max_tokens: int) -> ChatGeneration:
+    """Read one reply from a token stream, stopping at `max_tokens` of answer.
+
+    `enable_thinking=False` only works when the model's chat template reads
+    it. A model that thinks anyway would spend the budget on text that is
+    stripped from the answer, so thinking tokens are not counted against
+    `max_tokens`. The caller caps the stream at `max_tokens` plus
+    `THINKING_HEADROOM_TOKENS`, which bounds the thinking.
+    """
+    # Some templates end the prompt with an open thinking block, so the
+    # output starts inside it and carries only the closing tag.
+    raw = "<think>" if prompt.rstrip().endswith("<think>") else ""
+    answer_chars = 0
+    prompt_tokens = generated = reasoning_tokens = 0
+    finish_reason = None
+
+    with closing(stream):
+        for response in stream:
+            if getattr(response, "is_draft", False):
+                continue
+            raw += response.text
+            step = response.generation_tokens - generated
+            generated = response.generation_tokens
+            prompt_tokens = response.prompt_tokens
+            finish_reason = response.finish_reason
+
+            # A token is thinking when thinking has been seen and the token
+            # added nothing to the answer.
+            answer = _remove_thinking(raw)
+            if answer != raw and len(answer) <= answer_chars:
+                reasoning_tokens += step
+            answer_chars = len(answer)
+
+            if generated - reasoning_tokens >= max_tokens:
+                finish_reason = finish_reason or "length"
+                break
+
+    return ChatGeneration(
+        _strip_thinking(raw),
+        prompt_tokens,
+        generated,
+        reasoning_tokens,
+        finish_reason or "stop",
     )
-
-
-def _infer_finish_reason(completion_tokens: int, max_tokens: int) -> str:
-    """Best-effort OpenAI-style finish reason for MLX backends."""
-    if completion_tokens >= max_tokens:
-        return "length"
-    return "stop"
 
 
 def _maybe_build_optiq_prompt_cache(model, model_id: str):
@@ -535,6 +579,11 @@ def _strip_thinking(text: str) -> str:
     - <think>...</think> (Qwen, DeepSeek)
     - <channel|>...<|channel> and <|channel>...<channel|> (Gemma 4)
     """
+    return _remove_thinking(text).strip()
+
+
+def _remove_thinking(text: str) -> str:
+    """`_strip_thinking` without trimming the whitespace around the answer."""
     import re
 
     # <think>...</think> — greedy within blocks, DOTALL for multiline
@@ -542,8 +591,7 @@ def _strip_thinking(text: str) -> str:
     # Unclosed <think> at the start — strip everything from <think> onward
     if "<think>" in text:
         text = text[: text.index("<think>")]
-    text = _strip_gemma_channel_blocks(text)
-    return text.strip()
+    return _strip_gemma_channel_blocks(text)
 
 
 def _strip_gemma_channel_blocks(text: str) -> str:
