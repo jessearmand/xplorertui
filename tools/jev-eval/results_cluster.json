@@ -157,28 +157,28 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Local development workflows",
-     "Rewriting software in Rust",
-     "Local LLM deployment strategies",
-     "Bitcoin volatility and trading signals",
-     "Nvidia and semiconductor industry news"
+     "Developer terminal tools",
+     "Open source Rust rewrites",
+     "AI model reasoning",
+     "Crypto trading signals",
+     "Venture capital in AI"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.75,
+    "dist": 1.0,
     "n_scored": 4
    },
    "luna_propose_pick": {
     "labels": [
-     "Local development workflows",
-     "Rewriting software in Rust",
-     "Local LLM deployment strategies",
-     "Bitcoin volatility and trading signals",
-     "Venture capital funding trends"
+     "Developer terminal tools",
+     "Rust language adoption",
+     "AI model reasoning",
+     "Crypto trading signals",
+     "Venture capital in AI"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.875,
+    "dist": 1.0,
     "n_scored": 4
    }
   }
@@ -341,11 +341,11 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "AI startup funding rounds",
-     "Developer workflow optimization",
-     "NVIDIA GPU market dominance",
-     "Large language model governance",
-     "Cryptocurrency trading signals"
+     "AI startup fundraising",
+     "Coding workflows",
+     "NVIDIA stock analysis",
+     "Generative AI models",
+     "Crypto trading signals"
     ],
     "dup": 0,
     "mixed": 0,
@@ -354,15 +354,15 @@
    },
    "luna_propose_pick": {
     "labels": [
-     "AI startup funding rounds",
-     "Developer workflow optimization",
-     "NVIDIA GPU market dominance",
-     "AI infrastructure bottlenecks",
-     "Cryptocurrency trading signals"
+     "Tech venture capital",
+     "Coding workflows",
+     "Semiconductor industry",
+     "Tech industry trends",
+     "Crypto trading signals"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.75,
+    "dist": 1.0,
     "n_scored": 4
    }
   }
@@ -529,11 +529,11 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Offline AI inference",
-     "Crypto market analysis",
+     "Decentralized AI infrastructure",
+     "Crypto market updates",
      "Local LLM optimization",
      "Semiconductor industry news",
-     "Developer workflow tools"
+     "Developer tooling and workflows"
     ],
     "dup": 0,
     "mixed": 0,
@@ -542,16 +542,16 @@
    },
    "luna_propose_pick": {
     "labels": [
-     "Mixed",
-     "Crypto market analysis",
+     "Decentralized AI infrastructure",
+     "Crypto market updates",
      "Local LLM optimization",
      "Semiconductor industry news",
-     "Developer workflow tools"
+     "Developer tooling and workflows"
     ],
     "dup": 0,
-    "mixed": 1,
-    "dist": 0.25,
-    "n_scored": 4
+    "mixed": 0,
+    "dist": 0.8,
+    "n_scored": 5
    }
   }
  },
@@ -764,14 +764,14 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Neovim migration",
-     "AI regulation policy",
-     "AI startup funding",
-     "Crypto trading signals",
-     "AI developer tools",
-     "Coding agent integration",
-     "Rust language adoption",
-     "Open-weight models"
+     "Neovim Adoption",
+     "AI Regulation Policy",
+     "Venture Capital Funding",
+     "Crypto Market Analysis",
+     "AI-Assisted Development",
+     "Coding Agent Integration",
+     "Rust Programming Language",
+     "Open-Weight Models"
     ],
     "dup": 0,
     "mixed": 0,
@@ -780,14 +780,14 @@
    },
    "luna_propose_pick": {
     "labels": [
-     "Neovim migration",
-     "India AI governance",
-     "AI startup funding",
-     "Crypto trading signals",
-     "Coding agent integration",
-     "AI developer tools",
-     "Rust language adoption",
-     "Open-weight models"
+     "Developer Environment Shifts",
+     "AI Regulation Policy",
+     "Venture Capital Funding",
+     "Crypto Market Analysis",
+     "AI Developer Tools",
+     "AI-Assisted Development",
+     "Rust Programming Language",
+     "Open-Weight Models"
     ],
     "dup": 0,
     "mixed": 0,
@@ -1025,34 +1025,34 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "AI industry trends",
-     "AI coding agent limitations",
-     "AI startup fundraising news",
-     "Developer agent tooling & plugins",
-     "AI regulation & safety policies",
-     "Local LLM optimization & speed",
-     "AI decision model launches",
-     "Developer workflow tools"
+     "AI Industry News & Trends",
+     "AI Coding Agents & Developer Workflows",
+     "AI Startup Fundraising & Valuations",
+     "AI Agent Integration & Automation",
+     "Global AI Governance & Regulation",
+     "Local LLM Optimization & Inference",
+     "AI Chip Stocks & Market Signals",
+     "Developer Tooling & Terminal Environments"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.625,
+    "dist": 0.5,
     "n_scored": 8
    },
    "luna_propose_pick": {
     "labels": [
-     "AI industry trends",
-     "AI coding agent architecture",
-     "AI startup fundraising news",
-     "Developer agent tooling & plugins",
-     "AI regulation & safety policies",
-     "Local LLM optimization & speed",
-     "AI decision model launches",
-     "Developer workflow tools"
+     "AI Industry News & Trends",
+     "AI Coding Agents & Developer Workflows",
+     "AI Startup Fundraising & Valuations",
+     "AI Agent Integration & Automation",
+     "Global AI Governance & Regulation",
+     "Local LLM Optimization & Inference",
+     "Microsoft AI Model Launches",
+     "Developer Tools & IDEs"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.5625,
+    "dist": 0.5,
     "n_scored": 8
    }
   }
@@ -1274,34 +1274,34 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Terminal-based AI workflows",
-     "Open-weight model alternatives",
-     "AI chip export controls",
-     "Record-breaking AI Series A funding",
-     "India's AI regulation draft",
-     "Local development environment optimization",
-     "AI-native software engineering",
-     "Crypto market technical analysis"
+     "AI hardware and software releases",
+     "AI infrastructure challenges",
+     "Semiconductor industry news",
+     "AI startup funding",
+     "AI regulation and governance",
+     "Local developer environment setup",
+     "AI coding agents",
+     "Crypto market updates"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.9,
+    "dist": 0.8,
     "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
-     "AI-native software engineering",
-     "AI infrastructure scaling",
-     "Global AI regulatory frameworks",
-     "Record-breaking AI Series A funding",
-     "India's AI regulation draft",
-     "Terminal-based AI workflows",
-     "Rust programming challenges",
-     "Crypto market technical analysis"
+     "AI hardware and software releases",
+     "AI infrastructure challenges",
+     "Semiconductor industry news",
+     "AI startup funding",
+     "India AI regulation",
+     "Terminal development workflows",
+     "AI coding agents",
+     "Crypto market updates"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.7,
+    "dist": 0.8,
     "n_scored": 5
    }
   }
@@ -1464,11 +1464,11 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Developer environment setup",
-     "AI-native software rebuilding",
-     "Open-weight reasoning models",
-     "AI startup venture capital",
-     "Crypto trading bot signals"
+     "Local Dev Environment Setup",
+     "Rust Programming Language Trends",
+     "Open-Weight AI Models",
+     "AI Startup Funding News",
+     "Cryptocurrency Trading Signals"
     ],
     "dup": 0,
     "mixed": 0,
@@ -1477,11 +1477,11 @@
    },
    "luna_propose_pick": {
     "labels": [
-     "Developer environment setup",
-     "Rust language adoption",
-     "Open-weight reasoning models",
-     "AI startup venture capital",
-     "Crypto trading bot signals"
+     "Developer Workflow Optimization",
+     "AI-Powered Development Tools",
+     "Large Language Model Releases",
+     "AI Startup Funding News",
+     "Cryptocurrency Trading Signals"
     ],
     "dup": 0,
     "mixed": 0,
@@ -1652,11 +1652,11 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Venture capital market activity",
-     "AI infrastructure challenges",
+     "Startup funding rounds",
+     "Generative AI trends",
      "Cryptocurrency market signals",
-     "AI coding agent workflows",
-     "Linux command line workflows"
+     "AI coding agents",
+     "Terminal development workflows"
     ],
     "dup": 0,
     "mixed": 0,
@@ -1665,15 +1665,15 @@
    },
    "luna_propose_pick": {
     "labels": [
-     "Venture capital market activity",
-     "Global AI governance policies",
+     "Startup funding rounds",
+     "Generative AI trends",
      "Cryptocurrency market signals",
-     "AI coding agent workflows",
-     "Mobile terminal development"
+     "AI coding agents",
+     "Terminal development workflows"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.6,
+    "dist": 1.0,
     "n_scored": 5
    }
   }
@@ -1836,28 +1836,28 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "AI coding agents",
-     "Semiconductor industry",
-     "Rust programming projects",
-     "LLM infrastructure",
-     "Developer workflow tools"
+     "AI coding agents and tools",
+     "AI startup funding and tech",
+     "Rust programming language projects",
+     "Global AI regulation discussions",
+     "Terminal development workflows"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.7,
+    "dist": 0.8,
     "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
-     "AI coding agents",
-     "Semiconductor industry",
-     "Rust programming projects",
-     "LLM infrastructure",
-     "Developer workflow tools"
+     "AI coding agents and tools",
+     "Semiconductor industry news",
+     "Rust programming language projects",
+     "AI model performance benchmarks",
+     "Terminal development workflows"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.7,
+    "dist": 0.8,
     "n_scored": 5
    }
   }
@@ -2073,32 +2073,32 @@
     "labels": [
      "Dev environment setup",
      "Rust programming",
-     "AI infrastructure investing",
+     "Venture capital",
      "AI coding agents",
-     "AI industry regulation",
-     "Open-weight models",
-     "Blockchain infrastructure",
-     "Cryptocurrency signals"
+     "Tech industry news",
+     "AI model releases",
+     "Blockchain news",
+     "Crypto trading signals"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.8333333333333334,
+    "dist": 0.9166666666666667,
     "n_scored": 6
    },
    "luna_propose_pick": {
     "labels": [
-     "Developer productivity tools",
+     "Developer workflows",
      "Rust programming",
-     "Venture capital trends",
-     "Developer AI tooling",
-     "AI industry regulation",
-     "Open-weight models",
-     "Blockchain infrastructure",
-     "Cryptocurrency signals"
+     "Venture capital",
+     "AI coding agents",
+     "Tech industry news",
+     "AI model releases",
+     "Cryptocurrency trading",
+     "Crypto trading signals"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.75,
+    "dist": 0.8333333333333334,
     "n_scored": 6
    }
   }
@@ -2317,33 +2317,33 @@
    "jev_propose_pick": {
     "labels": [
      "AI startup funding rounds",
-     "Generative AI content creation trends",
-     "Rust programming language adoption",
-     "Semiconductor stock market analysis",
-     "Developer productivity tools and agents",
-     "Crypto trading signals and alerts",
-     "Local AI model optimization",
-     "Linux dotfiles and configuration management"
+     "Artificial intelligence industry",
+     "Rust programming language",
+     "AI chip stock market",
+     "Coding agent workflows",
+     "Cryptocurrency trading signals",
+     "Local AI model deployment",
+     "Dotfiles management"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.7857142857142857,
+    "dist": 0.8571428571428571,
     "n_scored": 7
    },
    "luna_propose_pick": {
     "labels": [
      "AI startup funding rounds",
-     "AI infrastructure bottlenecks",
-     "Rust programming language adoption",
-     "Semiconductor stock market analysis",
-     "Developer productivity tools and agents",
-     "Crypto trading signals and alerts",
-     "Local AI model optimization",
-     "Linux dotfiles and configuration management"
+     "Artificial intelligence industry",
+     "Rust programming language",
+     "Tech sector investment",
+     "Software development tools",
+     "Cryptocurrency trading signals",
+     "AI model development trends",
+     "Developer configuration files"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.7142857142857143,
+    "dist": 0.9285714285714286,
     "n_scored": 7
    }
   }
@@ -2565,30 +2565,30 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Local AI agent workflows & CLI tools",
-     "Tech investment trends & hardware news",
-     "Open-weight model deployment & optimization",
-     "Coding agent integration & remote control",
-     "Crypto market signals & trading bots",
-     "AI regulation & governance challenges",
-     "Rust programming & system rewrites",
-     "Developer productivity & terminal environments"
+     "Developer tools and models",
+     "Tech investment and hardware",
+     "AI model performance",
+     "AI coding agents",
+     "Digital asset market updates",
+     "AI regulation and compliance",
+     "Rust programming projects",
+     "Developer environment setup"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.9375,
+    "dist": 0.875,
     "n_scored": 8
    },
    "luna_propose_pick": {
     "labels": [
-     "Software development workflows & productivity",
-     "Tech investment trends & hardware news",
-     "Open-weight model deployment & optimization",
-     "Coding agent integration & remote control",
-     "Digital asset flows & technical analysis",
-     "AI regulation & governance challenges",
-     "Rust programming & system rewrites",
-     "Developer productivity & terminal environments"
+     "Developer tools and models",
+     "Tech investment and hardware",
+     "AI model performance",
+     "Developer productivity tools",
+     "Digital asset market updates",
+     "AI regulation and compliance",
+     "Rust programming projects",
+     "Developer environment setup"
     ],
     "dup": 0,
     "mixed": 0,
@@ -2759,28 +2759,28 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Live event ticket scalping",
-     "Pop culture media consumption",
-     "Indian election integrity",
-     "Concert experience sharing",
-     "Tech industry ethics"
+     "Concert ticket scalping",
+     "Entertainment media consumption",
+     "Indian election politics",
+     "Gaming, music, and lifestyle",
+     "Tech industry criticism"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.4,
+    "dist": 0.5,
     "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
-     "Music tour ticket sales",
-     "Movie and film discussions",
-     "Indian election integrity",
-     "Concert experience sharing",
-     "Pop culture media consumption"
+     "Pop culture discussions",
+     "Entertainment media consumption",
+     "Indian democracy and protests",
+     "Concert experiences and memories",
+     "Online content manipulation"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.4,
+    "dist": 0.5,
     "n_scored": 5
    }
   }
@@ -2943,29 +2943,29 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Health and fitness nutrition",
-     "Mixed",
-     "Concert ticket resale and scalping",
-     "Electoral integrity and vote theft accusations",
-     "Movie reviews and entertainment news"
+     "Food and fitness",
+     "Entertainment and lifestyle",
+     "Concert ticket sales",
+     "Indian politics and elections",
+     "Movie and media reviews"
     ],
     "dup": 0,
-    "mixed": 1,
-    "dist": 0.5,
-    "n_scored": 3
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "luna_propose_pick": {
     "labels": [
-     "Health and fitness nutrition",
-     "Mixed",
-     "Concert ticket resale and scalping",
-     "Electoral integrity and vote theft accusations",
-     "Movie reviews and entertainment news"
+     "Food and fitness",
+     "Entertainment and lifestyle",
+     "Concert ticket sales",
+     "Indian politics and elections",
+     "Movie and media reviews"
     ],
     "dup": 0,
-    "mixed": 1,
-    "dist": 0.5,
-    "n_scored": 3
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    }
   }
  },
@@ -3129,8 +3129,8 @@
     "labels": [
      "Political and sports news",
      "Mixed",
-     "Ticket sales and event promotions",
-     "Pop culture and media reviews",
+     "Concert and event experiences",
+     "Social commentary and lifestyle",
      "Gaming and collectibles"
     ],
     "dup": 0,
@@ -3140,10 +3140,10 @@
    },
    "luna_propose_pick": {
     "labels": [
-     "Electoral integrity controversies",
+     "Political and sports news",
      "Academic writing services",
-     "Live event experiences",
-     "Personal reflection and memories",
+     "Concert and event experiences",
+     "Personal reflections and memories",
      "Personal anecdotes and stories"
     ],
     "dup": 0,
@@ -3358,34 +3358,34 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Gym workouts and fitness routines",
-     "Movie reviews and film appreciation",
-     "Academic writing services and crypto tokens",
-     "Electoral integrity and vote theft",
+     "Sports and leisure",
+     "Pop culture",
      "Mixed",
+     "Electoral integrity",
      "Mixed",
-     "Match predictions and betting picks",
-     "Reselling concert and event tickets"
+     "Personal life updates",
+     "Premier League predictions",
+     "Ticket sales"
     ],
     "dup": 0,
     "mixed": 2,
     "dist": 0.5,
-    "n_scored": 2
+    "n_scored": 3
    },
    "luna_propose_pick": {
     "labels": [
-     "Gym workouts and fitness routines",
-     "Movie reviews and film appreciation",
-     "Academic writing services and crypto tokens",
-     "Electoral integrity and vote theft",
-     "Social media algorithms and content creation",
-     "Personal wellness and leisure activities",
-     "Match predictions and betting picks",
-     "Reselling concert and event tickets"
+     "Gym workouts",
+     "Movie reviews",
+     "Academic writing services",
+     "Indian democracy",
+     "Pop culture",
+     "Personal life updates",
+     "Sports and leisure",
+     "Ticket sales"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.5,
+    "dist": 0.625,
     "n_scored": 4
    }
   }
@@ -3599,33 +3599,33 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Product Iteration & Feedback",
-     "Gaming & MMORPG Reviews",
-     "Concert Day Experiences",
+     "Product Iteration Story",
+     "Gaming News & Reviews",
+     "Personal Life Anecdotes",
      "Movie & Film Reviews",
-     "Mixed",
-     "Premier League Match Predictions",
+     "Ticket Resale Offers",
+     "Football Fan Discussions",
      "Indian Election Allegations",
-     "Mixed"
+     "Diverse Social Media Updates"
     ],
     "dup": 0,
-    "mixed": 2,
-    "dist": 0.5,
-    "n_scored": 2
+    "mixed": 0,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    },
    "luna_propose_pick": {
     "labels": [
-     "Product Iteration & Feedback",
-     "Gaming & MMORPG Reviews",
-     "Concert Day Experiences",
+     "Product Iteration Story",
+     "Gaming News & Reviews",
+     "Personal Life Anecdotes",
      "Movie & Film Reviews",
-     "Ticket Resale & Scams",
-     "Premier League Match Predictions",
-     "Indian Election Allegations",
-     "Mixed"
+     "Ticket Resale Offers",
+     "Football Fan Discussions",
+     "Electoral Integrity Debates",
+     "Diverse Social Media Updates"
     ],
     "dup": 0,
-    "mixed": 1,
+    "mixed": 0,
     "dist": 0.3333333333333333,
     "n_scored": 3
    }
@@ -3844,14 +3844,14 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Election integrity concerns",
+     "Politics",
      "Mixed",
-     "Personal travel journals",
+     "Travel and Photography",
      "Mixed",
-     "Premier League predictions",
-     "Indian political corruption",
-     "Fitness and gym routines",
-     "Indian election rigging claims"
+     "Premier League Betting",
+     "Anti-Congress Sentiment",
+     "Gym and Fitness Routines",
+     "Indian Election Rigging Claims"
     ],
     "dup": 0,
     "mixed": 2,
@@ -3860,19 +3860,19 @@
    },
    "luna_propose_pick": {
     "labels": [
-     "Election integrity concerns",
-     "Academic writing services",
-     "Personal travel journals",
+     "Politics",
+     "Academic Writing Services",
      "Mixed",
-     "Premier League predictions",
-     "Indian political corruption",
-     "Fitness and gym routines",
-     "Indian election rigging claims"
+     "Mixed",
+     "Premier League Betting",
+     "Anti-Congress Sentiment",
+     "Gym and Fitness Routines",
+     "Indian Election Rigging Claims"
     ],
     "dup": 0,
-    "mixed": 1,
+    "mixed": 2,
     "dist": 0.0,
-    "n_scored": 2
+    "n_scored": 1
    }
   }
  },
@@ -4038,29 +4038,29 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Sports news and fan interactions",
-     "Personal concert and travel experiences",
-     "Indian election controversies and protests",
-     "Mixed",
-     "Gaming industry reviews and news"
+     "Concert & Sports Tickets",
+     "Random Life Stories",
+     "Indian Election Politics",
+     "Personal Anecdotes",
+     "Tech & Gaming News"
     ],
     "dup": 0,
-    "mixed": 1,
-    "dist": 0.25,
+    "mixed": 0,
+    "dist": 0.75,
     "n_scored": 4
    },
    "luna_propose_pick": {
     "labels": [
-     "Sports news and fan interactions",
-     "Mixed",
-     "Indian election controversies and protests",
-     "Mixed",
-     "Gaming industry reviews and news"
+     "Concert & Sports Tickets",
+     "Random Life Stories",
+     "Indian Election Politics",
+     "Personal Anecdotes",
+     "Tech & Gaming News"
     ],
     "dup": 0,
-    "mixed": 2,
-    "dist": 0.3333333333333333,
-    "n_scored": 3
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    }
   }
  },
@@ -4227,10 +4227,10 @@
    "jev_propose_pick": {
     "labels": [
      "Mixed",
-     "Indian election vote theft allegations",
+     "Political election controversies",
      "Mixed",
-     "Football match predictions & fan celebrations",
-     "Thesis and essay writing commissions"
+     "Sports match predictions",
+     "Freelance writing commissions"
     ],
     "dup": 0,
     "mixed": 2,
@@ -4240,15 +4240,15 @@
    "luna_propose_pick": {
     "labels": [
      "Mixed",
-     "Indian election vote theft allegations",
-     "Celebrity concert ticket sales",
-     "Football match predictions & fan celebrations",
-     "AI enterprise compute cost optimization"
+     "Political election controversies",
+     "Mixed",
+     "Sports match predictions",
+     "Freelance writing commissions"
     ],
     "dup": 0,
-    "mixed": 1,
-    "dist": 0.5,
-    "n_scored": 3
+    "mixed": 2,
+    "dist": 0.75,
+    "n_scored": 2
    }
   }
  },
@@ -4419,28 +4419,28 @@
    "jev_propose_pick": {
     "labels": [
      "Mixed",
-     "Entertainment reviews",
-     "Indian election integrity",
+     "Life events and memories",
+     "Indian election controversies",
      "Sports match predictions",
      "Mixed"
     ],
     "dup": 0,
     "mixed": 2,
-    "dist": 0.16666666666666666,
+    "dist": 0.0,
     "n_scored": 3
    },
    "luna_propose_pick": {
     "labels": [
      "Mixed",
-     "Entertainment reviews",
-     "Indian election integrity",
-     "Sports match predictions",
-     "Personal lifestyle updates"
+     "Life events and memories",
+     "Indian election controversies",
+     "Mixed",
+     "Mixed"
     ],
     "dup": 0,
-    "mixed": 1,
+    "mixed": 3,
     "dist": 0.0,
-    "n_scored": 4
+    "n_scored": 2
    }
   }
  },
@@ -4654,33 +4654,33 @@
    "jev_propose_pick": {
     "labels": [
      "Weekend leisure activities",
-     "Film and entertainment reviews",
-     "Indian election politics",
-     "Social media and gaming culture",
+     "Random social posts",
+     "Indian politics and elections",
+     "Gaming hardware and software",
      "Adult content and scams",
-     "Concert ticket sales",
-     "Fitness and wellness",
-     "Premier League football"
+     "Concert and event tickets",
+     "Lifestyle and personal hobbies",
+     "Sports news and predictions"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 1.0,
+    "dist": 0.8,
     "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
-     "Family recipes and hobbies",
-     "Film and entertainment reviews",
-     "Indian election politics",
-     "Social media and gaming culture",
+     "Daily life and recipes",
+     "Random social posts",
+     "Indian politics and elections",
+     "Gaming hardware and software",
      "Adult content and scams",
-     "Concert ticket sales",
-     "Relaxation and fun",
-     "Premier League football"
+     "Concert and event tickets",
+     "Lifestyle and personal hobbies",
+     "Sports news and predictions"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.9,
+    "dist": 0.8,
     "n_scored": 5
    }
   }
@@ -4899,34 +4899,34 @@
    "jev_propose_pick": {
     "labels": [
      "Mixed",
-     "Indian election vote rigging allegations",
-     "Concert and travel memories",
-     "Video game review ethics",
+     "Indian election politics and Congress",
+     "Concert reviews and travel memories",
+     "Gaming news and reviews",
      "Movie reviews and film analysis",
-     "Premier League match predictions",
-     "Interlink token ecosystem development",
-     "Resale tickets for music tours"
+     "Premier League and NFL betting",
+     "Technology business and digital assets",
+     "Ticket resale and event access"
     ],
     "dup": 0,
     "mixed": 1,
-    "dist": 0.6666666666666666,
+    "dist": 0.5,
     "n_scored": 3
    },
    "luna_propose_pick": {
     "labels": [
-     "Mixed",
-     "Indian election vote rigging allegations",
-     "Concert and travel memories",
-     "Video game review ethics",
+     "Food and cooking products",
+     "Indian election politics and Congress",
+     "Lifestyle and entertainment experiences",
+     "Gaming news and reviews",
      "Movie reviews and film analysis",
-     "Premier League match predictions",
-     "Enterprise AI compute optimization",
-     "Resale tickets for music tours"
+     "Football and American football coverage",
+     "Technology business and digital assets",
+     "Concert and event ticket sales"
     ],
     "dup": 0,
-    "mixed": 1,
-    "dist": 0.6666666666666666,
-    "n_scored": 3
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    }
   }
  },
@@ -5130,30 +5130,30 @@
    },
    "jev_propose_pick": {
     "labels": [
-     "Indian election politics",
-     "Entertainment and pop culture",
-     "Weekend leisure activities",
-     "Product launches and reviews",
-     "NSFW and fetish content",
-     "Concert experiences and reviews",
+     "Indian politics and elections",
+     "Film and pop culture discussions",
+     "Weekend plans and leisure activities",
+     "Consumer goods and brand promotions",
+     "NSFW content and adult themes",
+     "Concert experiences and travel plans",
      "Premier League match predictions",
-     "Music tour and event ticket sales"
+     "Concert and event ticket sales"
     ],
     "dup": 0,
     "mixed": 0,
-    "dist": 0.75,
+    "dist": 1.0,
     "n_scored": 4
    },
    "luna_propose_pick": {
     "labels": [
-     "Indian election politics",
-     "Entertainment and pop culture",
-     "Weekend leisure activities",
-     "Health, fitness, and lifestyle",
-     "NSFW and fetish content",
-     "Concert experiences and reviews",
+     "Indian politics and elections",
+     "Film and pop culture discussions",
+     "Weekend plans and leisure activities",
+     "Consumer goods and brand promotions",
+     "NSFW content and adult themes",
+     "Concert experiences and travel plans",
      "Premier League match predictions",
-     "Music tour and event ticket sales"
+     "Concert and event ticket sales"
     ],
     "dup": 0,
     "mixed": 0,

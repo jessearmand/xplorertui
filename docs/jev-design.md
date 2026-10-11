@@ -335,7 +335,8 @@ are noise.
 | Qwen3.5-9B writes labels (reasoning off) | 0 / 0 / 0.92 | 0 / 0 / 0.77 | 0 / 0 / 0.63 | 0 / 0 / 0.67 |
 | Jev, 30-topic taxonomy | 0 / 0.2 / 0.83 | 0 / 0.3 / 0.66 | 0.2 / 1.5 / 0.55 | 0.3 / 1.8 / 0.46 |
 | Jev, two-level taxonomy (re-ask colliding parents) | 0 / 0 / 0.78 | 0.5 / 0 / 0.75 | 0.2 / 0 / 0.59 | 1.5 / 0 / 0.55 |
-| **Qwen3.5-9B proposes, Jev picks (A3, as shipped)** | 0 / 0 / 0.88 | 0 / 0 / 0.84 | 0 / 1.2 / 0.39 | 0 / 1.2 / 0.57 |
+| **Qwen3.5-9B proposes, Jev picks (A3, as shipped)** | 0 / 0 / 0.93 | 0 / 0 / 0.81 | 0 / 0.8 / 0.50 | 0 / 0.8 / 0.52 |
+| Qwen3.5-9B proposes, Luna picks | 0 / 0 / 0.93 | 0 / 0 / 0.77 | 0 / 0.8 / 0.54 | 0 / 0.3 / 0.58 |
 
 An earlier version of this table scored clusters of 8 or fewer posts on the
 same posts the labeller saw, which inflated every *dist*, most on the broad
@@ -354,11 +355,12 @@ model is available. Proposing from the whole corpus instead of cluster
 samples gave labels that were too niche.
 
 **Where A3 stands.** On tech-heavy timelines (this app's main use), A3
-roughly matches labels the chat model writes itself and is far ahead of the
-taxonomy. On broad timelines, it still beats the taxonomy, but letting the
-chat model write the labels directly scores higher (0.63–0.67 vs
-0.39–0.57). Part of the gap is that A3 marks about one junk cluster per run
-"Mixed" and the chat model names every cluster, junk included. For mostly
+matches or slightly beats labels the chat model writes itself (0.93 / 0.81
+vs 0.92 / 0.77) and is far ahead of the taxonomy. On broad timelines it
+still beats the taxonomy, but letting the chat model write the labels
+directly scores higher (0.63–0.67 vs 0.50–0.52). Part of the gap is that
+A3 marks about one junk cluster per run "Mixed", while the chat model names
+every cluster, junk included. For mostly
 broad timelines, leaving out the `[jev]` section (so the chat model writes
 the labels) is the better setting.
 
@@ -370,6 +372,13 @@ Those clusters now show "Mixed" and take no candidate, the same 0.5 cut-off
 the taxonomy path uses. A proposal is accepted only if every cluster got at
 least one candidate and the pool has one candidate per cluster; otherwise
 the taxonomy is used.
+
+The proposal prompt asks for the last of the three labels to fit every
+tweet in the cluster. Without that, Qwen sometimes proposed only narrow
+labels ("Neovim dotfiles" for a cluster about Neovim, Ghostty and zsh) and
+Jev rejected them all, turning a clean cluster "Mixed": 4 of 45 clusters in
+a repeated live test, against 0 of 45 with the requirement. The table above
+uses the final prompt.
 
 **Per-post topic accuracy** (30-topic taxonomy, one post per request,
 reference labels from Claude Sonnet 5.5):
