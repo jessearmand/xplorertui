@@ -471,8 +471,9 @@ def _collect_reply(stream, prompt: str, max_tokens: int) -> ChatGeneration:
     """
     # Some templates end the prompt with an open thinking block, so the
     # output starts inside it and carries only the closing tag.
-    raw = "<think>" if prompt.rstrip().endswith("<think>") else ""
-    answer_chars = 0
+    opened_by_prompt = prompt.rstrip().endswith("<think>")
+    thinking = _ThinkingTracker(inside=opened_by_prompt)
+    segments = ["<think>"] if opened_by_prompt else []
     prompt_tokens = generated = reasoning_tokens = 0
     finish_reason = None
 
@@ -480,30 +481,76 @@ def _collect_reply(stream, prompt: str, max_tokens: int) -> ChatGeneration:
         for response in stream:
             if getattr(response, "is_draft", False):
                 continue
-            raw += response.text
+            segments.append(response.text)
             step = response.generation_tokens - generated
             generated = response.generation_tokens
             prompt_tokens = response.prompt_tokens
             finish_reason = response.finish_reason
 
-            # A token is thinking when thinking has been seen and the token
-            # added nothing to the answer.
-            answer = _remove_thinking(raw)
-            if answer != raw and len(answer) <= answer_chars:
+            if thinking.feed(response.text):
                 reasoning_tokens += step
-            answer_chars = len(answer)
-
             if generated - reasoning_tokens >= max_tokens:
                 finish_reason = finish_reason or "length"
                 break
 
     return ChatGeneration(
-        _strip_thinking(raw),
+        _strip_thinking("".join(segments)),
         prompt_tokens,
         generated,
         reasoning_tokens,
         finish_reason or "stop",
     )
+
+
+# Opening tag of a thinking block -> the tag that closes it. Gemma 4 emits
+# its channel tokens in either order (see `_strip_gemma_channel_blocks`).
+_THINKING_TAGS = {
+    "<think>": "</think>",
+    "<|channel>": "<channel|>",
+    "<channel|>": "<|channel>",
+}
+_LONGEST_THINKING_TAG = max(len(tag) for pair in _THINKING_TAGS.items() for tag in pair)
+
+
+class _ThinkingTracker:
+    """Tells, segment by segment, whether a stream is inside a thinking block.
+
+    Looks only at each new segment plus a few carried characters (a tag can
+    be split across segments), so the work per token does not grow with the
+    length of the reply.
+    """
+
+    def __init__(self, inside: bool = False) -> None:
+        self._closing_tag = "</think>" if inside else None
+        self._carry = ""
+
+    def feed(self, segment: str) -> bool:
+        """Add a segment; True if any of it belongs to a thinking block."""
+        text = self._carry + segment
+        thinking = self._closing_tag is not None
+        pos = 0
+        while True:
+            if self._closing_tag is None:
+                found = [
+                    (at, tag)
+                    for tag in _THINKING_TAGS
+                    if (at := text.find(tag, pos)) != -1
+                ]
+                if not found:
+                    break
+                at, tag = min(found)
+                self._closing_tag = _THINKING_TAGS[tag]
+                pos = at + len(tag)
+                thinking = True
+            else:
+                at = text.find(self._closing_tag, pos)
+                if at == -1:
+                    break
+                pos = at + len(self._closing_tag)
+                self._closing_tag = None
+        # Keep only what could still be the start of a tag.
+        self._carry = text[pos:][-(_LONGEST_THINKING_TAG - 1) :]
+        return thinking
 
 
 def _maybe_build_optiq_prompt_cache(model, model_id: str):

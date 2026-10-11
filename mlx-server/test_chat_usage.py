@@ -167,3 +167,24 @@ def test_no_generated_tokens_is_an_empty_stop(chat):
         "completion_tokens": 0,
         "reasoning_tokens": 0,
     }
+
+
+def test_thinking_tags_split_across_tokens(chat):
+    segments = ["<th", "ink>", "hm", "</", "think>", "Rust ", "tooling"]
+    result = chat(segments)
+    assert result["content"] == "Rust tooling"
+    assert result["finish_reason"] == "stop"
+    # The first fragment cannot be told from answer text yet.
+    assert result["reasoning_tokens"] == 4
+
+
+def test_tracking_work_does_not_grow_with_the_reply():
+    # Each token is checked against a few carried characters, not the reply
+    # so far: the carry stays shorter than a tag however long the reply is.
+    tracker = server._ThinkingTracker()
+    assert tracker.feed("<think>")
+    for _ in range(10_000):
+        assert tracker.feed("still thinking ")
+        assert len(tracker._carry) < server._LONGEST_THINKING_TAG
+    assert tracker.feed("</think>")
+    assert not tracker.feed("Rust")
