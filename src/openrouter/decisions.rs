@@ -144,15 +144,27 @@ impl DecisionResponse {
 // ---------------------------------------------------------------------------
 
 impl OpenRouterClient {
-    /// Send one Decisions request, retrying on rate limits and transient
-    /// server errors (honouring `Retry-After` when present).
+    /// Send one Decisions request, retrying on rate limits, transient
+    /// server errors (honouring `Retry-After` when present) and dropped
+    /// connections.
     pub async fn decide(
         &self,
         request: &DecisionRequest,
     ) -> Result<DecisionResponse, OpenRouterError> {
         let mut attempt = 0;
         loop {
-            let resp = self.http().post(DECISIONS_URL).json(request).send().await?;
+            let resp = match self.http().post(DECISIONS_URL).json(request).send().await {
+                Ok(resp) => resp,
+                // Dropped or reset connections are transient; a decision
+                // request is safe to resend.
+                Err(e) if attempt < MAX_RETRIES && (e.is_connect() || e.is_request()) => {
+                    tracing::debug!("jev request failed ({e}), retrying");
+                    tokio::time::sleep(Duration::from_millis(500 << attempt)).await;
+                    attempt += 1;
+                    continue;
+                }
+                Err(e) => return Err(e.into()),
+            };
             let status = resp.status();
             if status.is_success() {
                 let body = resp.text().await?;
@@ -393,10 +405,13 @@ pub fn relevance_request(model: &str, query: &str, post: &str) -> DecisionReques
 /// System prompt asking a chat model for candidate labels per cluster.
 /// Proposing from the clusters' own posts keeps candidates at the
 /// clusters' granularity (corpus-wide candidates came out too niche).
+/// The last label must fit the whole cluster: with only narrow candidates,
+/// Jev often answers "None of these" for a clean cluster.
 pub const PROPOSE_LABELS_PROMPT: &str = "For each cluster of tweets, propose 3 distinct candidate \
-     topic labels (2-5 words each), ordered from most specific to most general. Reply with one \
-     line per cluster in the format `Cluster <index>: label A | label B | label C`. Include every \
-     cluster 0 through N-1. No preamble, no explanations.";
+     topic labels (2-5 words each), ordered from most specific to most general. The last label \
+     must fit every tweet in the cluster. Reply with one line per cluster in the format \
+     `Cluster <index>: label A | label B | label C`. Include every cluster 0 through N-1. No \
+     preamble, no explanations.";
 
 /// Longest candidate label kept from a proposal.
 const MAX_CANDIDATE_CHARS: usize = 60;

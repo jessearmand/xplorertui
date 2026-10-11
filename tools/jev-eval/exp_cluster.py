@@ -50,9 +50,11 @@ def parse_lines(content, k, pat=r"^\s*\**\s*Cluster\s+(\d+)\s*\**\s*[:\-–]\s*(
 def label_chat(model, clusters):
     return parse_lines(chat(model, APP_SYS, cluster_block(clusters), max_tokens=60 * len(clusters) + 200), len(clusters))
 
+# Same text as decisions::PROPOSE_LABELS_PROMPT.
 PROP_SYS = ("For each cluster of tweets, propose 3 distinct candidate topic labels (2-5 words each), ordered from most "
-            "specific to most general. Reply with one line per cluster: `Cluster <index>: label A | label B | label C`. "
-            "No preamble.")
+            "specific to most general. The last label must fit every tweet in the cluster. Reply with one line per "
+            "cluster in the format `Cluster <index>: label A | label B | label C`. Include every cluster 0 through N-1. "
+            "No preamble, no explanations.")
 def label_propose_pick(model, clusters, gen=QWEN9):
     k = len(clusters)
     raw = parse_lines(chat(gen, PROP_SYS, cluster_block(clusters), max_tokens=80 * k + 200), k)
