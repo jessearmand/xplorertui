@@ -153,11 +153,27 @@ impl OpenRouterClient {
     ) -> Result<DecisionResponse, OpenRouterError> {
         let mut attempt = 0;
         loop {
-            let resp = match self.http().post(DECISIONS_URL).json(request).send().await {
-                Ok(resp) => resp,
+            // Send and read the whole body, so a connection dropped after
+            // the headers is handled like one dropped before them.
+            let exchange = async {
+                let resp = self.http().post(DECISIONS_URL).json(request).send().await?;
+                let status = resp.status();
+                let retry_after = resp
+                    .headers()
+                    .get(reqwest::header::RETRY_AFTER)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.trim().parse::<u64>().ok());
+                let body = resp.text().await?;
+                Ok::<_, reqwest::Error>((status, retry_after, body))
+            };
+            let (status, retry_after, body) = match exchange.await {
+                Ok(parts) => parts,
                 // Dropped or reset connections are transient; a decision
                 // request is safe to resend.
-                Err(e) if attempt < MAX_RETRIES && (e.is_connect() || e.is_request()) => {
+                Err(e)
+                    if attempt < MAX_RETRIES
+                        && (e.is_connect() || e.is_request() || e.is_body() || e.is_decode()) =>
+                {
                     tracing::debug!("jev request failed ({e}), retrying");
                     tokio::time::sleep(Duration::from_millis(500 << attempt)).await;
                     attempt += 1;
@@ -165,19 +181,10 @@ impl OpenRouterClient {
                 }
                 Err(e) => return Err(e.into()),
             };
-            let status = resp.status();
             if status.is_success() {
-                let body = resp.text().await?;
                 tracing::debug!("jev response: {body}");
                 return Ok(serde_json::from_str(&body)?);
             }
-
-            let retry_after = resp
-                .headers()
-                .get(reqwest::header::RETRY_AFTER)
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.trim().parse::<u64>().ok());
-            let body = resp.text().await.unwrap_or_default();
 
             if attempt < MAX_RETRIES && is_retryable(status.as_u16(), &body) {
                 let delay = retry_after
