@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import enum
 import os
+from dataclasses import dataclass, field
 from typing import Any
 
 import logging
 
 import mlx.core as mx
 import numpy as np
+
+from prompts import load_prompt_catalog
 
 logger = logging.getLogger("mlx-server")
 
@@ -34,22 +37,83 @@ class ChatBackend(enum.Enum):
     MLX_VLM = "mlx_vlm"
 
 
+class EmbedBackend(enum.Enum):
+    """Which library loaded a text embedding model."""
+
+    MLX_EMBEDDINGS = "mlx_embeddings"
+    MLX_VLM = "mlx_vlm"
+
+
+@dataclass(frozen=True)
+class TextEmbedder:
+    """A loaded text embedding model and what is needed to call it."""
+
+    backend: EmbedBackend
+    model: Any
+    tokenizer: Any
+    # Prompt name -> text to prepend; see ``prompts.py``.
+    prompts: dict[str, str] = field(default_factory=dict)
+
+
+# Encoders that embed other modalities. A text embedder drops them at load.
+_NON_TEXT_TOWERS = ("vision_config", "audio_config")
+
+
+def _load_text_embedder_mlx_vlm(model_id: str) -> tuple[Any, Any]:
+    """Load a text embedding model through mlx-vlm, without its media towers.
+
+    Weights keep the dtype stored in the checkpoint. Do not cast them:
+    EmbeddingGemma 2 overflows float16 and returns NaN or degraded vectors.
+    """
+    from mlx_vlm.embedding_loader import load_embedding_model
+    from mlx_vlm.utils import get_model_path, load_config
+    from transformers import AutoTokenizer
+
+    path = get_model_path(model_id)
+    config = load_config(path)
+    for tower in _NON_TEXT_TOWERS:
+        if config.get(tower) is not None:
+            config[tower] = None
+    model = load_embedding_model(path, config=config)
+    tokenizer = AutoTokenizer.from_pretrained(path)
+    return model, tokenizer
+
+
 class ModelRegistry:
     """Manages loaded MLX models with lazy initialization."""
 
     def __init__(self, default_model: str | None = None) -> None:
-        self._text_models: dict[str, tuple[Any, Any]] = {}
+        self._text_models: dict[str, TextEmbedder] = {}
         self._vl_models: dict[str, tuple[Any, Any]] = {}
         self._chat_models: dict[str, tuple[ChatBackend, Any, Any]] = {}
         self.default_model = default_model
 
-    def get_text_model(self, model_id: str) -> tuple[Any, Any]:
-        """Return (model, tokenizer) for a text embedding model."""
-        if model_id not in self._text_models:
-            from mlx_embeddings import load
+    def get_text_model(self, model_id: str) -> TextEmbedder:
+        """Return the loaded text embedding model for ``model_id``.
 
-            model, tokenizer = load(model_id)
-            self._text_models[model_id] = (model, tokenizer)
+        Tries mlx_embeddings first. If the model architecture is unsupported,
+        falls back to mlx_vlm (e.g. EmbeddingGemma 2).
+        """
+        if model_id not in self._text_models:
+            try:
+                from mlx_embeddings import load
+
+                logger.info("Trying mlx_embeddings for: %s", model_id)
+                model, tokenizer = load(model_id)
+                backend = EmbedBackend.MLX_EMBEDDINGS
+            except (ValueError, KeyError) as exc:
+                # Architecture not supported by mlx_embeddings — try mlx_vlm
+                logger.info(
+                    "mlx_embeddings unsupported for %s (%s), falling back to mlx_vlm",
+                    model_id,
+                    exc,
+                )
+                model, tokenizer = _load_text_embedder_mlx_vlm(model_id)
+                backend = EmbedBackend.MLX_VLM
+            logger.info("Loaded %s via %s", model_id, backend.value)
+            self._text_models[model_id] = TextEmbedder(
+                backend, model, tokenizer, load_prompt_catalog(model_id)
+            )
         return self._text_models[model_id]
 
     def get_chat_model(self, model_id: str) -> tuple[ChatBackend, Any, Any]:

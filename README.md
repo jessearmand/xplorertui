@@ -50,6 +50,7 @@ openrouter_callback_port = 3000 # OpenRouter OAuth localhost callback port
 model = "typesafe/jev-1.13" # pin a version; thresholds shift between releases
 concurrency = 8
 # topics = { rust = "Rust language and ecosystem", ai_ml = "AI, ML, LLMs" }  # default: built-in taxonomy; `other` is always added
+propose_labels = true # with a chat model available, use it for :topics labels (Jev routes; see below)
 ```
 
 ## Authentication
@@ -194,7 +195,16 @@ Type `:cluster` to cluster the tweets in the current view (following, mentions, 
 
 If no embedding model is available (the MLX server is not reachable and no OpenRouter embedding model is selected), a prompt offers to open the embedding model picker, or to sign in to OpenRouter first. Clustering starts when you pick a model.
 
-Each cluster is labeled with the tweet closest to its centroid. `:topics` replaces those placeholders with short topic labels: with a `[jev]` config section it asks Jev to pick one topic per cluster from a fixed taxonomy (one request per cluster, sent concurrently, no text generation), and otherwise it asks the selected chat model to write labels. Clusters without a clear topic show as "Mixed".
+Each cluster is labeled with the tweet closest to its centroid. `:topics` replaces those placeholders with short topic labels:
+
+- With a `[jev]` config section and a chat model (MLX or a selected OpenRouter model), Jev first checks whether each cluster is about technology.
+  - If at least half the posts are in tech clusters, the chat model proposes three candidate labels per cluster and Jev picks the best one for each cluster. No two clusters get the same label, and a cluster that none of the candidates fit shows as "Mixed".
+  - Otherwise the chat model writes the labels itself, which works better on non-tech timelines.
+  - Set `propose_labels = false` to skip the chat model.
+- With `[jev]` and no chat model (or if the chat steps fail), Jev picks one topic per cluster from the fixed taxonomy. Clusters without a clear topic show as "Mixed". On a timeline dominated by one area, several clusters can land on the same broad topic; a finer `topics` list helps.
+- Without `[jev]`, the chat model writes the labels.
+
+Jev requests go out one per cluster, concurrently. Chat requests turn reasoning off so the short label budget isn't used up by hidden reasoning; models that require reasoning get low-effort reasoning and a larger budget instead.
 
 ## CLI Mode
 

@@ -1,6 +1,6 @@
 """MLX Server — OpenAI-compatible REST API for local embedding and chat inference.
 
-Supports text embeddings via mlx-embeddings, multimodal (image+text)
+Supports text embeddings via mlx-embeddings (or mlx-vlm), multimodal (image+text)
 embeddings via mlx-vlm, and chat completions via mlx-lm.
 Designed to be called from the xplorertui Rust TUI.
 
@@ -27,9 +27,12 @@ from registry import (
     DEFAULT_CHAT_MODEL,
     DEFAULT_MODEL,
     ChatBackend,
+    EmbedBackend,
     ModelRegistry,
+    TextEmbedder,
     mx_to_list,
 )
+from prompts import apply_task_prompt
 from schemas import (
     ChatChoice,
     ChatChoiceMessage,
@@ -146,14 +149,15 @@ async def create_embeddings(request: EmbeddingRequest):
 
     try:
         logger.info("Loading embedding model: %s", model_id)
-        model, tokenizer = await run_mlx(registry.get_text_model, model_id)
+        embedder = await run_mlx(registry.get_text_model, model_id)
     except Exception as e:
         logger.error("Failed to load embedding model %s: %s", model_id, e)
         raise HTTPException(status_code=500, detail=f"Failed to load model: {e}")
 
     try:
         t0 = time.perf_counter()
-        embeddings = await run_mlx(_embed_texts, model, tokenizer, request.input)
+        texts = apply_task_prompt(embedder.prompts, request.task, request.input)
+        embeddings = await run_mlx(_embed_texts, embedder, texts)
         elapsed = time.perf_counter() - t0
         logger.info(
             "Embedding complete: %d texts, %.2fs, model=%s",
@@ -308,8 +312,48 @@ async def chat_completions(request: ChatCompletionRequest):
     )
 
 
-def _embed_texts(model, tokenizer, texts: list[str]) -> list[list[float]]:
-    """Text embeddings via mlx-embeddings. Runs on the MLX thread."""
+# Texts per forward pass on the mlx-vlm path. A batch is padded to its longest
+# text, so this bounds memory when a request carries many or long texts.
+_EMBED_BATCH_SIZE = 32
+
+
+def _embed_texts(embedder: TextEmbedder, texts: list[str]) -> list[list[float]]:
+    """Text embeddings, one vector per text. Runs on the MLX thread."""
+    if not texts:
+        return []
+    if embedder.backend == EmbedBackend.MLX_VLM:
+        return _embed_texts_mlx_vlm(embedder.model, embedder.tokenizer, texts)
+    return _embed_texts_mlx_embeddings(embedder.model, embedder.tokenizer, texts)
+
+
+def _embed_texts_mlx_vlm(model, tokenizer, texts: list[str]) -> list[list[float]]:
+    """Text embeddings via an mlx-vlm embedding model (e.g. EmbeddingGemma 2).
+
+    The model mean-pools over the attention mask and L2-normalizes, so
+    ``text_embeds`` is ready for cosine similarity.
+    """
+    import mlx.core as mx
+
+    embeddings: list[list[float]] = []
+    for start in range(0, len(texts), _EMBED_BATCH_SIZE):
+        inputs = tokenizer(
+            texts[start : start + _EMBED_BATCH_SIZE],
+            padding=True,
+            truncation=True,
+            return_tensors="np",
+        )
+        output = model(
+            input_ids=mx.array(inputs["input_ids"]),
+            attention_mask=mx.array(inputs["attention_mask"]),
+        )
+        embeddings.extend(mx_to_list(output.text_embeds))
+    return embeddings
+
+
+def _embed_texts_mlx_embeddings(
+    model, tokenizer, texts: list[str]
+) -> list[list[float]]:
+    """Text embeddings via mlx-embeddings."""
     from mlx_embeddings import generate
     from mlx_embeddings.models.base import BaseModelOutput
 

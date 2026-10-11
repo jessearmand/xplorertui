@@ -149,7 +149,16 @@ pub enum AppEvent {
     /// OpenRouter embedding model); prompts the user to select one.
     EmbeddingProviderMissing(ClusterSource),
     GenerateClusterTopics,
-    ClusterTopicsGenerated(u64, ApiResult<Vec<String>>),
+    ClusterTopicsGenerated(u64, ApiResult<TopicLabels>),
+}
+
+/// Cluster labels from `:topics`, with the backend that produced them.
+#[derive(Clone, Debug)]
+pub struct TopicLabels {
+    /// One label per cluster; empty keeps the placeholder.
+    pub labels: Vec<String>,
+    /// Shown in the status bar, e.g. "OpenRouter + Jev".
+    pub labeller: String,
 }
 
 /// API result type using `Arc<String>` so errors are `Clone`.

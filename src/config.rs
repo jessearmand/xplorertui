@@ -47,6 +47,12 @@ pub struct JevConfig {
     /// unset; an `other` option is always added.
     #[serde(default)]
     pub topics: Option<std::collections::BTreeMap<String, String>>,
+    /// When a chat model is available, use it for `:topics`: on a mostly
+    /// tech timeline it proposes labels and Jev picks a distinct one per
+    /// cluster; otherwise it writes the labels itself. When off, Jev picks
+    /// from `topics`.
+    #[serde(default = "default_true")]
+    pub propose_labels: bool,
 }
 
 impl Default for JevConfig {
@@ -55,6 +61,7 @@ impl Default for JevConfig {
             model: default_jev_model(),
             concurrency: default_jev_concurrency(),
             topics: None,
+            propose_labels: true,
         }
     }
 }
@@ -72,6 +79,10 @@ impl JevConfig {
 
 fn default_jev_model() -> String {
     crate::openrouter::decisions::DEFAULT_JEV_MODEL.to_string()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_jev_concurrency() -> usize {
@@ -134,4 +145,17 @@ pub fn load_config() -> AppConfig {
     };
 
     toml::from_str(&contents).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jev_proposes_labels_by_default() {
+        let config: AppConfig = toml::from_str("[jev]\nmodel = \"typesafe/jev-1.13\"\n").unwrap();
+        assert!(config.jev.unwrap().propose_labels);
+        let config: AppConfig = toml::from_str("[jev]\npropose_labels = false\n").unwrap();
+        assert!(!config.jev.unwrap().propose_labels);
+    }
 }

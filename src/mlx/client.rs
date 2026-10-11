@@ -15,6 +15,28 @@ pub struct MlxClient {
     base_url: String,
 }
 
+/// What a batch of embeddings is for. The MLX server maps it to the task
+/// prompt the loaded model expects (e.g. EmbeddingGemma 2's
+/// `task: clustering | query: `); models without task prompts ignore it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EmbedTask {
+    /// Texts that will be grouped by similarity.
+    Clustering,
+    /// A search query, scored against `Document` embeddings.
+    SearchQuery,
+    /// A text that search queries are scored against.
+    Document,
+}
+
+/// Request body for the text embedding endpoint.
+#[derive(Debug, Serialize)]
+struct TextEmbeddingRequest<'a> {
+    model: &'a str,
+    input: &'a [String],
+    task: EmbedTask,
+}
+
 /// Request body for the multimodal embedding endpoint.
 #[derive(Debug, Serialize)]
 pub struct MultimodalEmbeddingRequest {
@@ -61,11 +83,13 @@ impl MlxClient {
         &self,
         model: &str,
         texts: &[String],
+        task: EmbedTask,
     ) -> Result<EmbeddingResponse, MlxError> {
         let url = format!("{}/v1/embeddings", self.base_url);
-        let request = crate::openrouter::types::EmbeddingRequest {
-            model: model.to_string(),
-            input: texts.to_vec(),
+        let request = TextEmbeddingRequest {
+            model,
+            input: texts,
+            task,
         };
         let resp = self.http.post(&url).json(&request).send().await?;
         self.handle_response(resp).await
@@ -122,5 +146,30 @@ impl MlxClient {
             });
         }
         Ok(resp.json().await?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedding_request_names_the_task_in_snake_case() {
+        let input = vec!["hello".to_string()];
+        for (task, name) in [
+            (EmbedTask::Clustering, "clustering"),
+            (EmbedTask::SearchQuery, "search_query"),
+            (EmbedTask::Document, "document"),
+        ] {
+            let request = TextEmbeddingRequest {
+                model: "some/model",
+                input: &input,
+                task,
+            };
+            assert_eq!(
+                serde_json::to_value(&request).unwrap(),
+                serde_json::json!({"model": "some/model", "input": ["hello"], "task": name}),
+            );
+        }
     }
 }
