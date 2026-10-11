@@ -353,9 +353,9 @@ impl App {
                         decisions::propose_max_tokens(num_clusters),
                     )
                     .await
-                    .map(|content| decisions::parse_label_candidates(&content));
+                    .map(|content| decisions::parse_label_candidates(&content, num_clusters));
                 match candidates {
-                    Ok(candidates) if candidates.len() >= 2 => {
+                    Ok(Some(candidates)) => {
                         let requests = (0..num_clusters)
                             .map(|c| {
                                 decisions::pick_label_request(&jev.model, &posts(c), &candidates)
@@ -379,9 +379,8 @@ impl App {
                         )));
                         return;
                     }
-                    Ok(candidates) => tracing::warn!(
-                        "label proposal gave {} candidates; using the topic taxonomy",
-                        candidates.len()
+                    Ok(None) => tracing::warn!(
+                        "label proposal did not cover every cluster; using the topic taxonomy"
                     ),
                     Err(e) => {
                         tracing::warn!("label proposal failed ({e}); using the topic taxonomy")
@@ -1160,8 +1159,7 @@ mod tests {
             )
             .await
             .expect("proposal");
-        let candidates = decisions::parse_label_candidates(&content);
-        assert!(candidates.len() >= 3, "{content}");
+        let candidates = decisions::parse_label_candidates(&content, 3).expect(&content);
 
         let requests = clusters
             .iter()

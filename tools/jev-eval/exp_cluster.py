@@ -61,17 +61,26 @@ def label_propose_pick(model, clusters, gen=QWEN9):
         for c in line.split("|"):
             c = c.strip().strip("*`\"")
             if c and c.lower() not in seen: seen.add(c.lower()); cands.append(c)
-    if len(cands) < 2: raise RuntimeError(f"generator gave {len(cands)} candidates: {raw}")
+    # Same acceptance rule as the app: every cluster proposed something and
+    # the pool can give each cluster its own label.
+    if any(not line for line in raw) or len(cands) < k:
+        raise RuntimeError(f"proposal did not cover every cluster: {raw}")
     crit = {f"c{i}": c for i, c in enumerate(cands)}
     crit["other"] = "None of these"
     def one(texts):
         r = decide(model, {"posts": reps(texts)},
                    {"topic": {"type": "choice", "instructions": "Which label best describes the topic most of these posts share?", "criteria": crit}})
         return r["answers"]["topic"]["probabilities"]
-    P = np.array([[pr.get(f"c{i}", 0.0) for i in range(len(cands))] for pr in pmap(one, clusters)])
-    rows, cols = linear_sum_assignment(-np.log(P + 1e-6))  # unique labels
+    probs = pmap(one, clusters)
     out = [""] * k
-    for r_, c_ in zip(rows, cols): out[r_] = cands[c_]
+    # As in the app: P(none of these) >= 0.5 -> Mixed, left out of the assignment.
+    rows = [c for c in range(k) if probs[c].get("other", 0.0) < 0.5]
+    for c in range(k):
+        if c not in rows: out[c] = "Mixed"
+    if rows:
+        P = np.array([[probs[c].get(f"c{i}", 0.0) for i in range(len(cands))] for c in rows])
+        r_idx, cols = linear_sum_assignment(-np.log(P + 1e-6))  # unique labels
+        for r_, c_ in zip(r_idx, cols): out[rows[r_]] = cands[c_]
     return out, len(cands)
 
 def label_two_level(model, clusters):
@@ -98,8 +107,12 @@ def label_two_level(model, clusters):
 # ---- metric -------------------------------------------------------------
 REFUSALS = []
 def distinguish(labels, held_out, matchers=(JEV, LUNA)):
-    """For each cluster, can a matcher pick its own label (by index) from all k labels?"""
+    """For each cluster with held-out posts (more than the 8 the labeller saw)
+    and a non-Mixed label, can a matcher pick its own label (by index) from
+    all k labels? Returns (score, number of clusters scored)."""
     crit = {f"l{i}": (l or "(empty)") for i, l in enumerate(labels)}
+    scored = [c for c in range(len(labels)) if held_out[c] and labels[c] != "Mixed"]
+    if not scored: return float("nan"), 0
     scores = []
     for m in matchers:
         def one(c):
@@ -109,8 +122,8 @@ def distinguish(labels, held_out, matchers=(JEV, LUNA)):
             return r["answers"]["label"]["choice"] == f"l{c}"
           except RuntimeError as e:
             REFUSALS.append(str(e)[:120]); return False
-        scores.append(np.mean(pmap(one, range(len(labels)))))
-    return float(np.mean(scores))
+        scores.append(np.mean(pmap(one, scored)))
+    return float(np.mean(scores)), len(scored)
 
 def run(corp, emb, k, seed):
     order = timeline(corp, seed)
@@ -118,7 +131,8 @@ def run(corp, emb, k, seed):
     lab = KMeans(k, n_init=1, random_state=seed).fit_predict(X)
     clusters = [[corpus[order[i]]["text"] for i in range(len(order)) if lab[i] == c] for c in range(k)]
     # held-out sample for the matcher: posts after the first 8 when possible
-    held = [(c[8:] + c[:8])[:8] if len(c) > 8 else c for c in clusters]
+    # Matcher sees only posts the labeller did not (labellers get the first 8).
+    held = [c[8:16] for c in clusters]
     purity = float(np.mean([Counter(corpus[order[i]]["label"] for i in range(len(order)) if lab[i] == c).most_common(1)[0][1]
                              / max(1, sum(lab == c)) for c in range(k)]))
     res = {"corpus": corp, "emb": emb, "k": k, "seed": seed, "sizes": [len(c) for c in clusters], "purity": purity,
@@ -139,8 +153,10 @@ def run(corp, emb, k, seed):
             labels = fn()
         except Exception as e:
             res["setups"][name] = {"error": str(e)[:200]}; continue
-        dup = k - len(set(l.lower() for l in labels))
-        res["setups"][name] = {"labels": labels, "dup": dup, "dist": distinguish(labels, held)}
+        named = [l.lower() for l in labels if l != "Mixed"]
+        dist, n_scored = distinguish(labels, held)
+        res["setups"][name] = {"labels": labels, "dup": len(named) - len(set(named)),
+                               "mixed": labels.count("Mixed"), "dist": dist, "n_scored": n_scored}
     print(corp, emb, k, seed, {n: (s.get("dup"), round(s.get("dist", -1), 2)) for n, s in res["setups"].items()}, flush=True)
     return res
 

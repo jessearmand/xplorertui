@@ -411,39 +411,42 @@ pub fn propose_max_tokens(num_clusters: usize) -> u32 {
 
 /// Parse `Cluster <n>: a | b | c` lines into one candidate pool,
 /// deduplicated case-insensitively. Lines without the prefix (preamble,
-/// explanations) are ignored.
-pub fn parse_label_candidates(content: &str) -> Vec<String> {
+/// explanations) are ignored. Returns `None` unless every cluster
+/// `0..num_clusters` has a usable candidate and the pool has at least one
+/// candidate per cluster: a truncated or partial proposal would otherwise
+/// leave clusters unlabelled instead of falling back to the taxonomy.
+pub fn parse_label_candidates(content: &str, num_clusters: usize) -> Option<Vec<String>> {
     let mut pool: Vec<String> = Vec::new();
+    let mut covered = vec![false; num_clusters];
     for line in content.lines() {
         let line = line.trim().trim_start_matches(['-', '*', ' ']);
         let Some((head, rest)) = line.split_once(':') else {
             continue;
         };
         let head = head.trim().trim_end_matches('*').to_ascii_lowercase();
-        let is_cluster = head
+        let Some(cluster) = head
             .strip_prefix("cluster")
-            .is_some_and(|n| n.trim().parse::<usize>().is_ok());
-        if !is_cluster {
+            .and_then(|n| n.trim().parse::<usize>().ok())
+        else {
             continue;
-        }
+        };
         for candidate in rest.split('|') {
             let c = candidate
                 .trim()
                 .trim_matches(|ch| matches!(ch, '*' | '`' | '"'))
                 .trim();
-            if c.is_empty()
-                || c.chars().count() > MAX_CANDIDATE_CHARS
-                || pool.iter().any(|p| p.eq_ignore_ascii_case(c))
-            {
+            if c.is_empty() || c.chars().count() > MAX_CANDIDATE_CHARS {
                 continue;
             }
-            pool.push(c.to_string());
-            if pool.len() == MAX_CANDIDATES {
-                return pool;
+            if let Some(slot) = covered.get_mut(cluster) {
+                *slot = true;
+            }
+            if pool.len() < MAX_CANDIDATES && !pool.iter().any(|p| p.eq_ignore_ascii_case(c)) {
+                pool.push(c.to_string());
             }
         }
     }
-    pool
+    (covered.iter().all(|&c| c) && pool.len() >= num_clusters).then_some(pool)
 }
 
 /// Option key for candidate `i` in `pick_label_request`.
@@ -774,7 +777,7 @@ mod tests {
             Note: these are short labels.\n\
             Cluster 3: This candidate is far too long to be a short topic label for any cluster at all";
         assert_eq!(
-            parse_label_candidates(content),
+            parse_label_candidates(content, 3).unwrap(),
             [
                 "Rust TUI tools",
                 "Terminal apps",
@@ -785,6 +788,21 @@ mod tests {
                 "Finance",
             ]
         );
+        // Cluster 3 has no usable candidate.
+        assert_eq!(parse_label_candidates(content, 4), None);
+    }
+
+    #[test]
+    fn rejects_partial_proposals() {
+        // Truncated reply: cluster 1 never appears.
+        let truncated = "Cluster 0: Rust | Terminal apps | Programming\nCluster 2: Crypto";
+        assert_eq!(parse_label_candidates(truncated, 3), None);
+        // Every cluster present, but only two distinct labels for three clusters.
+        let thin = "Cluster 0: Rust\nCluster 1: rust\nCluster 2: Crypto";
+        assert_eq!(parse_label_candidates(thin, 3), None);
+        // A cluster whose labels all duplicate another's still counts as covered.
+        let dup = "Cluster 0: Rust | Crypto\nCluster 1: rust\n";
+        assert_eq!(parse_label_candidates(dup, 2).unwrap(), ["Rust", "Crypto"]);
     }
 
     #[test]

@@ -86,7 +86,9 @@
      "Mixed"
     ],
     "dup": 1,
-    "dist": 0.4
+    "mixed": 1,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    },
    "luna_default": {
     "labels": [
@@ -97,7 +99,9 @@
      "Business"
     ],
     "dup": 1,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.875,
+    "n_scored": 4
    },
    "qwen9_app": {
     "labels": [
@@ -108,7 +112,9 @@
      "AI startup funding and Nvidia"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 4
    },
    "jev_fine": {
     "labels": [
@@ -119,7 +125,9 @@
      "AI chips & datacenters \u00b7 Business news"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 4
    },
    "luna_fine": {
     "labels": [
@@ -130,7 +138,9 @@
      "Startup funding"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 1,
+    "dist": 0.6666666666666666,
+    "n_scored": 3
    },
    "jev_two_level": {
     "labels": [
@@ -141,7 +151,9 @@
      "Business"
     ],
     "dup": 0,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.875,
+    "n_scored": 4
    },
    "jev_propose_pick": {
     "labels": [
@@ -152,7 +164,9 @@
      "Nvidia and semiconductor industry news"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "luna_propose_pick": {
     "labels": [
@@ -163,7 +177,9 @@
      "Venture capital funding trends"
     ],
     "dup": 0,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.875,
+    "n_scored": 4
    }
   }
  },
@@ -254,7 +270,9 @@
      "Cryptocurrency"
     ],
     "dup": 0,
-    "dist": 0.6
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 4
    },
    "luna_default": {
     "labels": [
@@ -265,7 +283,9 @@
      "Cryptocurrency"
     ],
     "dup": 0,
-    "dist": 0.6
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 4
    },
    "qwen9_app": {
     "labels": [
@@ -276,7 +296,9 @@
      "Crypto trading signals and token trends"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 4
    },
    "jev_fine": {
     "labels": [
@@ -287,7 +309,9 @@
      "Crypto markets"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "luna_fine": {
     "labels": [
@@ -298,7 +322,9 @@
      "Crypto markets"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "jev_two_level": {
     "labels": [
@@ -309,7 +335,9 @@
      "Cryptocurrency"
     ],
     "dup": 0,
-    "dist": 0.6
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 4
    },
    "jev_propose_pick": {
     "labels": [
@@ -320,7 +348,9 @@
      "Cryptocurrency trading signals"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 4
    },
    "luna_propose_pick": {
     "labels": [
@@ -331,7 +361,9 @@
      "Cryptocurrency trading signals"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    }
   }
  },
@@ -426,7 +458,9 @@
      "Software engineering"
     ],
     "dup": 1,
-    "dist": 0.4
+    "mixed": 1,
+    "dist": 0.25,
+    "n_scored": 4
    },
    "luna_default": {
     "labels": [
@@ -437,7 +471,9 @@
      "Software engineering"
     ],
     "dup": 1,
-    "dist": 0.2
+    "mixed": 0,
+    "dist": 0.2,
+    "n_scored": 5
    },
    "qwen9_app": {
     "labels": [
@@ -448,7 +484,9 @@
      "Developer Tools and Coding Agents"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 0,
+    "dist": 0.7,
+    "n_scored": 5
    },
    "jev_fine": {
     "labels": [
@@ -459,7 +497,9 @@
      "AI coding agents"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 0,
+    "dist": 0.7,
+    "n_scored": 5
    },
    "luna_fine": {
     "labels": [
@@ -469,8 +509,10 @@
      "AI chips & datacenters",
      "Mixed"
     ],
-    "dup": 1,
-    "dist": 0.5
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 3
    },
    "jev_two_level": {
     "labels": [
@@ -481,7 +523,9 @@
      "Software engineering"
     ],
     "dup": 0,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 5
    },
    "jev_propose_pick": {
     "labels": [
@@ -492,18 +536,22 @@
      "Developer workflow tools"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.8,
+    "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
-     "AI infrastructure constraints",
+     "Mixed",
      "Crypto market analysis",
      "Local LLM optimization",
      "Semiconductor industry news",
      "Developer workflow tools"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 1,
+    "dist": 0.25,
+    "n_scored": 4
    }
   }
  },
@@ -630,7 +678,9 @@
      "AI"
     ],
     "dup": 3,
-    "dist": 0.625
+    "mixed": 0,
+    "dist": 0.5714285714285714,
+    "n_scored": 7
    },
    "luna_default": {
     "labels": [
@@ -644,7 +694,9 @@
      "AI"
     ],
     "dup": 4,
-    "dist": 0.5625
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 7
    },
    "qwen9_app": {
     "labels": [
@@ -658,7 +710,9 @@
      "Open-Weight Model Releases and Security"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 0,
+    "dist": 0.8571428571428571,
+    "n_scored": 7
    },
    "jev_fine": {
     "labels": [
@@ -672,7 +726,9 @@
      "AI model releases"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 0,
+    "dist": 0.9285714285714286,
+    "n_scored": 7
    },
    "luna_fine": {
     "labels": [
@@ -686,7 +742,9 @@
      "AI model releases \u00b7 Local AI inference"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 0,
+    "dist": 0.9285714285714286,
+    "n_scored": 7
    },
    "jev_two_level": {
     "labels": [
@@ -700,7 +758,9 @@
      "AI model releases"
     ],
     "dup": 1,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.8571428571428571,
+    "n_scored": 7
    },
    "jev_propose_pick": {
     "labels": [
@@ -714,7 +774,9 @@
      "Open-weight models"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 0,
+    "dist": 0.9285714285714286,
+    "n_scored": 7
    },
    "luna_propose_pick": {
     "labels": [
@@ -728,7 +790,9 @@
      "Open-weight models"
     ],
     "dup": 0,
-    "dist": 0.6875
+    "mixed": 0,
+    "dist": 0.7857142857142857,
+    "n_scored": 7
    }
   }
  },
@@ -875,7 +939,9 @@
      "Software engineering"
     ],
     "dup": 4,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.4375,
+    "n_scored": 8
    },
    "luna_default": {
     "labels": [
@@ -889,7 +955,9 @@
      "Software engineering"
     ],
     "dup": 3,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.4375,
+    "n_scored": 8
    },
    "qwen9_app": {
     "labels": [
@@ -903,7 +971,9 @@
      "Developer Tools and Rust"
     ],
     "dup": 0,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.6875,
+    "n_scored": 8
    },
    "jev_fine": {
     "labels": [
@@ -917,7 +987,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 0.25
+    "mixed": 1,
+    "dist": 0.14285714285714285,
+    "n_scored": 7
    },
    "luna_fine": {
     "labels": [
@@ -931,7 +1003,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 1,
-    "dist": 0.6875
+    "mixed": 0,
+    "dist": 0.6875,
+    "n_scored": 8
    },
    "jev_two_level": {
     "labels": [
@@ -945,7 +1019,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 1,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.6875,
+    "n_scored": 8
    },
    "jev_propose_pick": {
     "labels": [
@@ -959,7 +1035,9 @@
      "Developer workflow tools"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.625,
+    "n_scored": 8
    },
    "luna_propose_pick": {
     "labels": [
@@ -973,7 +1051,9 @@
      "Developer workflow tools"
     ],
     "dup": 0,
-    "dist": 0.6875
+    "mixed": 0,
+    "dist": 0.5625,
+    "n_scored": 8
    }
   }
  },
@@ -1108,7 +1188,9 @@
      "Cryptocurrency"
     ],
     "dup": 4,
-    "dist": 0.4375
+    "mixed": 0,
+    "dist": 0.6,
+    "n_scored": 5
    },
    "luna_default": {
     "labels": [
@@ -1122,7 +1204,9 @@
      "Cryptocurrency"
     ],
     "dup": 3,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 5
    },
    "qwen9_app": {
     "labels": [
@@ -1136,7 +1220,9 @@
      "Crypto Markets and Trading Signals"
     ],
     "dup": 0,
-    "dist": 0.6875
+    "mixed": 0,
+    "dist": 0.7,
+    "n_scored": 5
    },
    "jev_fine": {
     "labels": [
@@ -1150,7 +1236,9 @@
      "Crypto markets"
     ],
     "dup": 0,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.9,
+    "n_scored": 5
    },
    "luna_fine": {
     "labels": [
@@ -1163,8 +1251,10 @@
      "Mixed",
      "Crypto markets"
     ],
-    "dup": 2,
-    "dist": 0.5625
+    "dup": 0,
+    "mixed": 3,
+    "dist": 1.0,
+    "n_scored": 3
    },
    "jev_two_level": {
     "labels": [
@@ -1178,7 +1268,9 @@
      "Cryptocurrency"
     ],
     "dup": 0,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.9,
+    "n_scored": 5
    },
    "jev_propose_pick": {
     "labels": [
@@ -1192,7 +1284,9 @@
      "Crypto market technical analysis"
     ],
     "dup": 0,
-    "dist": 0.8125
+    "mixed": 0,
+    "dist": 0.9,
+    "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
@@ -1206,7 +1300,9 @@
      "Crypto market technical analysis"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.7,
+    "n_scored": 5
    }
   }
  },
@@ -1297,7 +1393,9 @@
      "Cryptocurrency"
     ],
     "dup": 1,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.8,
+    "n_scored": 5
    },
    "luna_default": {
     "labels": [
@@ -1308,7 +1406,9 @@
      "Cryptocurrency"
     ],
     "dup": 1,
-    "dist": 0.6
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 5
    },
    "qwen9_app": {
     "labels": [
@@ -1319,7 +1419,9 @@
      "Crypto trading signals and market updates"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "jev_fine": {
     "labels": [
@@ -1330,7 +1432,9 @@
      "Crypto markets"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "luna_fine": {
     "labels": [
@@ -1341,7 +1445,9 @@
      "Crypto markets"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "jev_two_level": {
     "labels": [
@@ -1352,7 +1458,9 @@
      "Cryptocurrency"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "jev_propose_pick": {
     "labels": [
@@ -1363,7 +1471,9 @@
      "Crypto trading bot signals"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
@@ -1374,7 +1484,9 @@
      "Crypto trading bot signals"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    }
   }
  },
@@ -1469,7 +1581,9 @@
      "Software engineering"
     ],
     "dup": 1,
-    "dist": 0.4
+    "mixed": 1,
+    "dist": 0.25,
+    "n_scored": 4
    },
    "luna_default": {
     "labels": [
@@ -1480,7 +1594,9 @@
      "Software engineering"
     ],
     "dup": 1,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.8,
+    "n_scored": 5
    },
    "qwen9_app": {
     "labels": [
@@ -1491,7 +1607,9 @@
      "Mobile coding and terminal workflows"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "jev_fine": {
     "labels": [
@@ -1502,7 +1620,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "luna_fine": {
     "labels": [
@@ -1513,7 +1633,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "jev_two_level": {
     "labels": [
@@ -1524,7 +1646,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.9,
+    "n_scored": 5
    },
    "jev_propose_pick": {
     "labels": [
@@ -1535,7 +1659,9 @@
      "Linux command line workflows"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
@@ -1546,7 +1672,9 @@
      "Mobile terminal development"
     ],
     "dup": 0,
-    "dist": 0.6
+    "mixed": 0,
+    "dist": 0.6,
+    "n_scored": 5
    }
   }
  },
@@ -1637,7 +1765,9 @@
      "Software engineering"
     ],
     "dup": 2,
-    "dist": 0.4
+    "mixed": 0,
+    "dist": 0.4,
+    "n_scored": 5
    },
    "luna_default": {
     "labels": [
@@ -1648,7 +1778,9 @@
      "Software engineering"
     ],
     "dup": 1,
-    "dist": 0.6
+    "mixed": 1,
+    "dist": 0.5,
+    "n_scored": 4
    },
    "qwen9_app": {
     "labels": [
@@ -1659,7 +1791,9 @@
      "Developer Workflows and Terminals"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.8,
+    "n_scored": 5
    },
    "jev_fine": {
     "labels": [
@@ -1670,7 +1804,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 0.5
+    "mixed": 1,
+    "dist": 0.5,
+    "n_scored": 4
    },
    "luna_fine": {
     "labels": [
@@ -1681,7 +1817,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.8,
+    "n_scored": 5
    },
    "jev_two_level": {
     "labels": [
@@ -1692,7 +1830,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.9,
+    "n_scored": 5
    },
    "jev_propose_pick": {
     "labels": [
@@ -1703,7 +1843,9 @@
      "Developer workflow tools"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 0,
+    "dist": 0.7,
+    "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
@@ -1714,7 +1856,9 @@
      "Developer workflow tools"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 0,
+    "dist": 0.7,
+    "n_scored": 5
    }
   }
  },
@@ -1841,7 +1985,9 @@
      "Cryptocurrency"
     ],
     "dup": 4,
-    "dist": 0.375
+    "mixed": 1,
+    "dist": 0.2,
+    "n_scored": 5
    },
    "luna_default": {
     "labels": [
@@ -1855,7 +2001,9 @@
      "Cryptocurrency"
     ],
     "dup": 4,
-    "dist": 0.5625
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 6
    },
    "qwen9_app": {
     "labels": [
@@ -1869,7 +2017,9 @@
      "Cryptocurrency market signals and analysis"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 0,
+    "dist": 0.9166666666666667,
+    "n_scored": 6
    },
    "jev_fine": {
     "labels": [
@@ -1883,7 +2033,9 @@
      "Crypto markets"
     ],
     "dup": 0,
-    "dist": 0.5625
+    "mixed": 1,
+    "dist": 0.4,
+    "n_scored": 5
    },
    "luna_fine": {
     "labels": [
@@ -1897,7 +2049,9 @@
      "Crypto markets"
     ],
     "dup": 0,
-    "dist": 0.6875
+    "mixed": 1,
+    "dist": 0.7,
+    "n_scored": 5
    },
    "jev_two_level": {
     "labels": [
@@ -1911,7 +2065,9 @@
      "Crypto markets"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.6666666666666666,
+    "n_scored": 6
    },
    "jev_propose_pick": {
     "labels": [
@@ -1925,7 +2081,9 @@
      "Cryptocurrency signals"
     ],
     "dup": 0,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.8333333333333334,
+    "n_scored": 6
    },
    "luna_propose_pick": {
     "labels": [
@@ -1939,7 +2097,9 @@
      "Cryptocurrency signals"
     ],
     "dup": 0,
-    "dist": 0.8125
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 6
    }
   }
  },
@@ -2070,7 +2230,9 @@
      "Software engineering"
     ],
     "dup": 3,
-    "dist": 0.5625
+    "mixed": 0,
+    "dist": 0.5714285714285714,
+    "n_scored": 7
    },
    "luna_default": {
     "labels": [
@@ -2084,7 +2246,9 @@
      "Software engineering"
     ],
     "dup": 3,
-    "dist": 0.5625
+    "mixed": 0,
+    "dist": 0.5714285714285714,
+    "n_scored": 7
    },
    "qwen9_app": {
     "labels": [
@@ -2098,7 +2262,9 @@
      "Developer Dotfiles and Termux"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.7142857142857143,
+    "n_scored": 7
    },
    "jev_fine": {
     "labels": [
@@ -2112,7 +2278,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 0.8125
+    "mixed": 0,
+    "dist": 0.8571428571428571,
+    "n_scored": 7
    },
    "luna_fine": {
     "labels": [
@@ -2126,7 +2294,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 0.8125
+    "mixed": 0,
+    "dist": 0.8571428571428571,
+    "n_scored": 7
    },
    "jev_two_level": {
     "labels": [
@@ -2140,7 +2310,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.7142857142857143,
+    "n_scored": 7
    },
    "jev_propose_pick": {
     "labels": [
@@ -2154,7 +2326,9 @@
      "Linux dotfiles and configuration management"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.7857142857142857,
+    "n_scored": 7
    },
    "luna_propose_pick": {
     "labels": [
@@ -2168,7 +2342,9 @@
      "Linux dotfiles and configuration management"
     ],
     "dup": 0,
-    "dist": 0.6875
+    "mixed": 0,
+    "dist": 0.7142857142857143,
+    "n_scored": 7
    }
   }
  },
@@ -2303,7 +2479,9 @@
      "Software engineering"
     ],
     "dup": 3,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 8
    },
    "luna_default": {
     "labels": [
@@ -2317,7 +2495,9 @@
      "Software engineering"
     ],
     "dup": 3,
-    "dist": 0.4375
+    "mixed": 0,
+    "dist": 0.4375,
+    "n_scored": 8
    },
    "qwen9_app": {
     "labels": [
@@ -2331,7 +2511,9 @@
      "Developer dotfiles and terminal"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 8
    },
    "jev_fine": {
     "labels": [
@@ -2345,7 +2527,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 8
    },
    "luna_fine": {
     "labels": [
@@ -2359,7 +2543,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 1,
-    "dist": 0.5625
+    "mixed": 1,
+    "dist": 0.42857142857142855,
+    "n_scored": 7
    },
    "jev_two_level": {
     "labels": [
@@ -2373,7 +2559,9 @@
      "Terminal & CLI tools"
     ],
     "dup": 1,
-    "dist": 0.8125
+    "mixed": 0,
+    "dist": 0.6875,
+    "n_scored": 8
    },
    "jev_propose_pick": {
     "labels": [
@@ -2387,7 +2575,9 @@
      "Developer productivity & terminal environments"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 0,
+    "dist": 0.9375,
+    "n_scored": 8
    },
    "luna_propose_pick": {
     "labels": [
@@ -2401,7 +2591,9 @@
      "Developer productivity & terminal environments"
     ],
     "dup": 0,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 8
    }
   }
  },
@@ -2495,8 +2687,10 @@
      "Mixed",
      "Mixed"
     ],
-    "dup": 1,
-    "dist": 0.30000000000000004
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    },
    "luna_default": {
     "labels": [
@@ -2507,7 +2701,9 @@
      "Mixed"
     ],
     "dup": 0,
-    "dist": 0.30000000000000004
+    "mixed": 1,
+    "dist": 0.5,
+    "n_scored": 4
    },
    "qwen9_app": {
     "labels": [
@@ -2518,7 +2714,9 @@
      "AI ethics and tech industry"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 0,
+    "dist": 0.4,
+    "n_scored": 5
    },
    "jev_fine": {
     "labels": [
@@ -2528,8 +2726,10 @@
      "Mixed",
      "Mixed"
     ],
-    "dup": 1,
-    "dist": 0.5
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.6666666666666666,
+    "n_scored": 3
    },
    "luna_fine": {
     "labels": [
@@ -2539,8 +2739,10 @@
      "Mixed",
      "Mixed"
     ],
-    "dup": 2,
-    "dist": 0.5
+    "dup": 0,
+    "mixed": 3,
+    "dist": 1.0,
+    "n_scored": 2
    },
    "jev_two_level": {
     "labels": [
@@ -2551,7 +2753,9 @@
      "Software engineering"
     ],
     "dup": 0,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.6,
+    "n_scored": 5
    },
    "jev_propose_pick": {
     "labels": [
@@ -2562,7 +2766,9 @@
      "Tech industry ethics"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 0,
+    "dist": 0.4,
+    "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
@@ -2573,7 +2779,9 @@
      "Pop culture media consumption"
     ],
     "dup": 0,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.4,
+    "n_scored": 5
    }
   }
  },
@@ -2664,7 +2872,9 @@
      "Film"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "luna_default": {
     "labels": [
@@ -2674,8 +2884,10 @@
      "News",
      "Mixed"
     ],
-    "dup": 2,
-    "dist": 0.4
+    "dup": 0,
+    "mixed": 3,
+    "dist": 0.5,
+    "n_scored": 2
    },
    "qwen9_app": {
     "labels": [
@@ -2686,7 +2898,9 @@
      "Movie Reviews and Crypto Scams"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 0,
+    "dist": 0.625,
+    "n_scored": 4
    },
    "jev_fine": {
     "labels": [
@@ -2696,8 +2910,10 @@
      "Politics",
      "Film & TV \u00b7 Pop culture"
     ],
-    "dup": 1,
-    "dist": 0.4
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 3
    },
    "luna_fine": {
     "labels": [
@@ -2707,8 +2923,10 @@
      "Politics",
      "Mixed"
     ],
-    "dup": 2,
-    "dist": 0.5
+    "dup": 0,
+    "mixed": 3,
+    "dist": 0.5,
+    "n_scored": 2
    },
    "jev_two_level": {
     "labels": [
@@ -2719,29 +2937,35 @@
      "Film & TV"
     ],
     "dup": 0,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.625,
+    "n_scored": 4
    },
    "jev_propose_pick": {
     "labels": [
      "Health and fitness nutrition",
-     "Charity shop pranks and AI compute costs",
+     "Mixed",
      "Concert ticket resale and scalping",
      "Electoral integrity and vote theft accusations",
      "Movie reviews and entertainment news"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 1,
+    "dist": 0.5,
+    "n_scored": 3
    },
    "luna_propose_pick": {
     "labels": [
      "Health and fitness nutrition",
-     "Cooking recipes and comfort food",
+     "Mixed",
      "Concert ticket resale and scalping",
      "Electoral integrity and vote theft accusations",
      "Movie reviews and entertainment news"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 1,
+    "dist": 0.5,
+    "n_scored": 3
    }
   }
  },
@@ -2832,7 +3056,9 @@
      "Gaming"
     ],
     "dup": 0,
-    "dist": 0.2
+    "mixed": 1,
+    "dist": 0.0,
+    "n_scored": 2
    },
    "luna_default": {
     "labels": [
@@ -2843,7 +3069,9 @@
      "Fitness and health"
     ],
     "dup": 0,
-    "dist": 0.2
+    "mixed": 1,
+    "dist": 0.0,
+    "n_scored": 2
    },
    "qwen9_app": {
     "labels": [
@@ -2854,7 +3082,9 @@
      "Gaming, gym, and adult humor"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 0.6666666666666666,
+    "n_scored": 3
    },
    "jev_fine": {
     "labels": [
@@ -2865,7 +3095,9 @@
      "Gaming"
     ],
     "dup": 0,
-    "dist": 0.4
+    "mixed": 1,
+    "dist": 0.25,
+    "n_scored": 2
    },
    "luna_fine": {
     "labels": [
@@ -2875,8 +3107,10 @@
      "Daily life",
      "Mixed"
     ],
-    "dup": 1,
-    "dist": 0.30000000000000004
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.25,
+    "n_scored": 2
    },
    "jev_two_level": {
     "labels": [
@@ -2887,18 +3121,22 @@
      "Gaming"
     ],
     "dup": 0,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.16666666666666666,
+    "n_scored": 3
    },
    "jev_propose_pick": {
     "labels": [
      "Political and sports news",
-     "AI hardware and enterprise computing",
+     "Mixed",
      "Ticket sales and event promotions",
      "Pop culture and media reviews",
      "Gaming and collectibles"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 1,
+    "dist": 0.25,
+    "n_scored": 2
    },
    "luna_propose_pick": {
     "labels": [
@@ -2909,7 +3147,9 @@
      "Personal anecdotes and stories"
     ],
     "dup": 0,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 3
    }
   }
  },
@@ -3031,8 +3271,10 @@
      "Sports",
      "Music \u00b7 Celebrities and pop culture"
     ],
-    "dup": 1,
-    "dist": 0.5
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 3
    },
    "luna_default": {
     "labels": [
@@ -3046,7 +3288,9 @@
      "Celebrities and pop culture"
     ],
     "dup": 0,
-    "dist": 0.5
+    "mixed": 1,
+    "dist": 0.375,
+    "n_scored": 4
    },
    "qwen9_app": {
     "labels": [
@@ -3060,7 +3304,9 @@
      "Concert and event ticket sales"
     ],
     "dup": 0,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "jev_fine": {
     "labels": [
@@ -3073,8 +3319,10 @@
      "Sports",
      "Music"
     ],
-    "dup": 1,
-    "dist": 0.375
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 3
    },
    "luna_fine": {
     "labels": [
@@ -3087,8 +3335,10 @@
      "Sports",
      "Music"
     ],
-    "dup": 1,
-    "dist": 0.375
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 3
    },
    "jev_two_level": {
     "labels": [
@@ -3102,7 +3352,9 @@
      "Music"
     ],
     "dup": 1,
-    "dist": 0.8125
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 4
    },
    "jev_propose_pick": {
     "labels": [
@@ -3110,13 +3362,15 @@
      "Movie reviews and film appreciation",
      "Academic writing services and crypto tokens",
      "Electoral integrity and vote theft",
-     "Social media algorithms and content creation",
-     "Concert experiences and personal memories",
+     "Mixed",
+     "Mixed",
      "Match predictions and betting picks",
      "Reselling concert and event tickets"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 2
    },
    "luna_propose_pick": {
     "labels": [
@@ -3130,7 +3384,9 @@
      "Reselling concert and event tickets"
     ],
     "dup": 0,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 4
    }
   }
  },
@@ -3256,8 +3512,10 @@
      "News",
      "News"
     ],
-    "dup": 2,
-    "dist": 0.5625
+    "dup": 1,
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 2
    },
    "luna_default": {
     "labels": [
@@ -3271,7 +3529,9 @@
      "News"
     ],
     "dup": 1,
-    "dist": 0.5
+    "mixed": 1,
+    "dist": 0.5,
+    "n_scored": 2
    },
    "qwen9_app": {
     "labels": [
@@ -3285,7 +3545,9 @@
      "Sports analysis and political opinions"
     ],
     "dup": 0,
-    "dist": 0.875
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 3
    },
    "jev_fine": {
     "labels": [
@@ -3298,8 +3560,10 @@
      "Politics",
      "Mixed"
     ],
-    "dup": 1,
-    "dist": 0.6875
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 2
    },
    "luna_fine": {
     "labels": [
@@ -3312,8 +3576,10 @@
      "Politics",
      "Mixed"
     ],
-    "dup": 3,
-    "dist": 0.6875
+    "dup": 0,
+    "mixed": 4,
+    "dist": 1.0,
+    "n_scored": 1
    },
    "jev_two_level": {
     "labels": [
@@ -3327,7 +3593,9 @@
      "Politics"
     ],
     "dup": 2,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.6666666666666666,
+    "n_scored": 3
    },
    "jev_propose_pick": {
     "labels": [
@@ -3335,13 +3603,15 @@
      "Gaming & MMORPG Reviews",
      "Concert Day Experiences",
      "Movie & Film Reviews",
-     "Ticket Resale & Scams",
+     "Mixed",
      "Premier League Match Predictions",
      "Indian Election Allegations",
-     "Election Strategy & Voting"
+     "Mixed"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 2,
+    "dist": 0.5,
+    "n_scored": 2
    },
    "luna_propose_pick": {
     "labels": [
@@ -3352,10 +3622,12 @@
      "Ticket Resale & Scams",
      "Premier League Match Predictions",
      "Indian Election Allegations",
-     "Election Strategy & Voting"
+     "Mixed"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 1,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    }
   }
  },
@@ -3485,8 +3757,10 @@
      "Mixed",
      "News"
     ],
-    "dup": 3,
-    "dist": 0.25
+    "dup": 2,
+    "mixed": 2,
+    "dist": 0.0,
+    "n_scored": 2
    },
    "luna_default": {
     "labels": [
@@ -3499,8 +3773,10 @@
      "Fitness and health",
      "News"
     ],
-    "dup": 3,
-    "dist": 0.1875
+    "dup": 2,
+    "mixed": 2,
+    "dist": 0.0,
+    "n_scored": 2
    },
    "qwen9_app": {
     "labels": [
@@ -3514,7 +3790,9 @@
      "Indian election integrity and protests"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 3
    },
    "jev_fine": {
     "labels": [
@@ -3528,7 +3806,9 @@
      "Politics"
     ],
     "dup": 2,
-    "dist": 0.375
+    "mixed": 1,
+    "dist": 0.16666666666666666,
+    "n_scored": 3
    },
    "luna_fine": {
     "labels": [
@@ -3541,8 +3821,10 @@
      "Fitness & health",
      "Politics"
     ],
-    "dup": 3,
-    "dist": 0.3125
+    "dup": 2,
+    "mixed": 2,
+    "dist": 0.0,
+    "n_scored": 2
    },
    "jev_two_level": {
     "labels": [
@@ -3556,35 +3838,41 @@
      "Politics"
     ],
     "dup": 3,
-    "dist": 0.3125
+    "mixed": 0,
+    "dist": 0.0,
+    "n_scored": 3
    },
    "jev_propose_pick": {
     "labels": [
      "Election integrity concerns",
-     "Academic writing services",
+     "Mixed",
      "Personal travel journals",
-     "Adult content and scams",
+     "Mixed",
      "Premier League predictions",
      "Indian political corruption",
      "Fitness and gym routines",
      "Indian election rigging claims"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 2,
+    "dist": 0.0,
+    "n_scored": 2
    },
    "luna_propose_pick": {
     "labels": [
      "Election integrity concerns",
      "Academic writing services",
      "Personal travel journals",
-     "Family baking recipes",
+     "Mixed",
      "Premier League predictions",
      "Indian political corruption",
      "Fitness and gym routines",
      "Indian election rigging claims"
     ],
     "dup": 0,
-    "dist": 0.8125
+    "mixed": 1,
+    "dist": 0.0,
+    "n_scored": 2
    }
   }
  },
@@ -3679,7 +3967,9 @@
      "Gaming"
     ],
     "dup": 1,
-    "dist": 0.4
+    "mixed": 1,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    },
    "luna_default": {
     "labels": [
@@ -3690,7 +3980,9 @@
      "Gaming"
     ],
     "dup": 1,
-    "dist": 0.5
+    "mixed": 0,
+    "dist": 0.5,
+    "n_scored": 4
    },
    "qwen9_app": {
     "labels": [
@@ -3701,7 +3993,9 @@
      "Technology, Gaming, and Social Media"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "jev_fine": {
     "labels": [
@@ -3712,7 +4006,9 @@
      "Gaming"
     ],
     "dup": 1,
-    "dist": 0.9
+    "mixed": 0,
+    "dist": 0.875,
+    "n_scored": 4
    },
    "luna_fine": {
     "labels": [
@@ -3723,7 +4019,9 @@
      "Gaming"
     ],
     "dup": 1,
-    "dist": 0.4
+    "mixed": 1,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    },
    "jev_two_level": {
     "labels": [
@@ -3734,29 +4032,35 @@
      "Gaming"
     ],
     "dup": 1,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.875,
+    "n_scored": 4
    },
    "jev_propose_pick": {
     "labels": [
      "Sports news and fan interactions",
      "Personal concert and travel experiences",
      "Indian election controversies and protests",
-     "Gym etiquette and fitness humor",
+     "Mixed",
      "Gaming industry reviews and news"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 1,
+    "dist": 0.25,
+    "n_scored": 4
    },
    "luna_propose_pick": {
     "labels": [
      "Sports news and fan interactions",
-     "Personal concert and travel experiences",
+     "Mixed",
      "Indian election controversies and protests",
-     "Gym etiquette and fitness humor",
+     "Mixed",
      "Gaming industry reviews and news"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 2,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    }
   }
  },
@@ -3851,7 +4155,9 @@
      "Mixed"
     ],
     "dup": 0,
-    "dist": 0.30000000000000004
+    "mixed": 1,
+    "dist": 0.25,
+    "n_scored": 4
    },
    "luna_default": {
     "labels": [
@@ -3862,7 +4168,9 @@
      "Mixed"
     ],
     "dup": 0,
-    "dist": 0.5
+    "mixed": 1,
+    "dist": 0.375,
+    "n_scored": 4
    },
    "qwen9_app": {
     "labels": [
@@ -3873,7 +4181,9 @@
      "AI costs and academic ghostwriting"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "jev_fine": {
     "labels": [
@@ -3883,8 +4193,10 @@
      "Sports",
      "Mixed"
     ],
-    "dup": 1,
-    "dist": 0.7
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.8333333333333333,
+    "n_scored": 3
    },
    "luna_fine": {
     "labels": [
@@ -3894,8 +4206,10 @@
      "Sports",
      "Mixed"
     ],
-    "dup": 2,
-    "dist": 0.5
+    "dup": 0,
+    "mixed": 3,
+    "dist": 0.75,
+    "n_scored": 2
    },
    "jev_two_level": {
     "labels": [
@@ -3906,29 +4220,35 @@
      "Education"
     ],
     "dup": 0,
-    "dist": 0.7
+    "mixed": 0,
+    "dist": 0.875,
+    "n_scored": 4
    },
    "jev_propose_pick": {
     "labels": [
-     "Family-friendly baking & recipes",
+     "Mixed",
      "Indian election vote theft allegations",
-     "Concert ticket scalping & sales",
+     "Mixed",
      "Football match predictions & fan celebrations",
      "Thesis and essay writing commissions"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 2,
+    "dist": 0.75,
+    "n_scored": 2
    },
    "luna_propose_pick": {
     "labels": [
-     "Family-friendly baking & recipes",
+     "Mixed",
      "Indian election vote theft allegations",
      "Celebrity concert ticket sales",
      "Football match predictions & fan celebrations",
      "AI enterprise compute cost optimization"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 1,
+    "dist": 0.5,
+    "n_scored": 3
    }
   }
  },
@@ -4027,7 +4347,9 @@
      "Business"
     ],
     "dup": 0,
-    "dist": 0.30000000000000004
+    "mixed": 1,
+    "dist": 0.0,
+    "n_scored": 4
    },
    "luna_default": {
     "labels": [
@@ -4037,8 +4359,10 @@
      "Sports \u00b7 Daily life",
      "Mixed"
     ],
-    "dup": 1,
-    "dist": 0.30000000000000004
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.0,
+    "n_scored": 3
    },
    "qwen9_app": {
     "labels": [
@@ -4049,7 +4373,9 @@
      "Product launches and achievements"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 0,
+    "dist": 0.6,
+    "n_scored": 5
    },
    "jev_fine": {
     "labels": [
@@ -4059,8 +4385,10 @@
      "Sports",
      "Mixed"
     ],
-    "dup": 1,
-    "dist": 0.2
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.16666666666666666,
+    "n_scored": 3
    },
    "luna_fine": {
     "labels": [
@@ -4070,8 +4398,10 @@
      "Sports",
      "Mixed"
     ],
-    "dup": 2,
-    "dist": 0.3
+    "dup": 0,
+    "mixed": 3,
+    "dist": 0.25,
+    "n_scored": 2
    },
    "jev_two_level": {
     "labels": [
@@ -4082,29 +4412,35 @@
      "Business"
     ],
     "dup": 0,
-    "dist": 0.6
+    "mixed": 0,
+    "dist": 0.4,
+    "n_scored": 5
    },
    "jev_propose_pick": {
     "labels": [
-     "Global current events",
+     "Mixed",
      "Entertainment reviews",
      "Indian election integrity",
      "Sports match predictions",
-     "Product development stories"
+     "Mixed"
     ],
     "dup": 0,
-    "dist": 0.9
+    "mixed": 2,
+    "dist": 0.16666666666666666,
+    "n_scored": 3
    },
    "luna_propose_pick": {
     "labels": [
-     "Life events and memories",
+     "Mixed",
      "Entertainment reviews",
      "Indian election integrity",
      "Sports match predictions",
      "Personal lifestyle updates"
     ],
     "dup": 0,
-    "dist": 0.8
+    "mixed": 1,
+    "dist": 0.0,
+    "n_scored": 4
    }
   }
  },
@@ -4231,7 +4567,9 @@
      "Sports"
     ],
     "dup": 1,
-    "dist": 0.5
+    "mixed": 1,
+    "dist": 0.6,
+    "n_scored": 5
    },
    "luna_default": {
     "labels": [
@@ -4245,7 +4583,9 @@
      "Sports"
     ],
     "dup": 0,
-    "dist": 0.3125
+    "mixed": 1,
+    "dist": 0.5,
+    "n_scored": 5
    },
    "qwen9_app": {
     "labels": [
@@ -4259,7 +4599,9 @@
      "Premier League football predictions"
     ],
     "dup": 0,
-    "dist": 0.625
+    "mixed": 0,
+    "dist": 0.4,
+    "n_scored": 5
    },
    "jev_fine": {
     "labels": [
@@ -4273,7 +4615,9 @@
      "Sports"
     ],
     "dup": 0,
-    "dist": 0.5
+    "mixed": 1,
+    "dist": 0.6,
+    "n_scored": 5
    },
    "luna_fine": {
     "labels": [
@@ -4286,8 +4630,10 @@
      "Daily life",
      "Sports"
     ],
-    "dup": 2,
-    "dist": 0.625
+    "dup": 0,
+    "mixed": 3,
+    "dist": 0.875,
+    "n_scored": 4
    },
    "jev_two_level": {
     "labels": [
@@ -4301,7 +4647,9 @@
      "Sports"
     ],
     "dup": 2,
-    "dist": 0.8125
+    "mixed": 0,
+    "dist": 0.9,
+    "n_scored": 5
    },
    "jev_propose_pick": {
     "labels": [
@@ -4315,7 +4663,9 @@
      "Premier League football"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 5
    },
    "luna_propose_pick": {
     "labels": [
@@ -4329,7 +4679,9 @@
      "Premier League football"
     ],
     "dup": 0,
-    "dist": 0.75
+    "mixed": 0,
+    "dist": 0.9,
+    "n_scored": 5
    }
   }
  },
@@ -4460,7 +4812,9 @@
      "Mixed"
     ],
     "dup": 0,
-    "dist": 0.625
+    "mixed": 1,
+    "dist": 0.25,
+    "n_scored": 4
    },
    "luna_default": {
     "labels": [
@@ -4473,8 +4827,10 @@
      "Mixed",
      "Music"
     ],
-    "dup": 1,
-    "dist": 0.5
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    },
    "qwen9_app": {
     "labels": [
@@ -4488,7 +4844,9 @@
      "Concert tickets and event sales"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 0.875,
+    "n_scored": 4
    },
    "jev_fine": {
     "labels": [
@@ -4501,8 +4859,10 @@
      "Mixed",
      "Music"
     ],
-    "dup": 1,
-    "dist": 0.5625
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.6666666666666666,
+    "n_scored": 3
    },
    "luna_fine": {
     "labels": [
@@ -4515,8 +4875,10 @@
      "Mixed",
      "Music"
     ],
-    "dup": 2,
-    "dist": 0.625
+    "dup": 0,
+    "mixed": 3,
+    "dist": 1.0,
+    "n_scored": 2
    },
    "jev_two_level": {
     "labels": [
@@ -4530,11 +4892,13 @@
      "Music"
     ],
     "dup": 0,
-    "dist": 0.8125
+    "mixed": 0,
+    "dist": 0.625,
+    "n_scored": 4
    },
    "jev_propose_pick": {
     "labels": [
-     "Digital product development",
+     "Mixed",
      "Indian election vote rigging allegations",
      "Concert and travel memories",
      "Video game review ethics",
@@ -4544,11 +4908,13 @@
      "Resale tickets for music tours"
     ],
     "dup": 0,
-    "dist": 0.8125
+    "mixed": 1,
+    "dist": 0.6666666666666666,
+    "n_scored": 3
    },
    "luna_propose_pick": {
     "labels": [
-     "Digital product development",
+     "Mixed",
      "Indian election vote rigging allegations",
      "Concert and travel memories",
      "Video game review ethics",
@@ -4558,7 +4924,9 @@
      "Resale tickets for music tours"
     ],
     "dup": 0,
-    "dist": 0.8125
+    "mixed": 1,
+    "dist": 0.6666666666666666,
+    "n_scored": 3
    }
   }
  },
@@ -4688,8 +5056,10 @@
      "Sports",
      "Music \u00b7 Celebrities and pop culture"
     ],
-    "dup": 1,
-    "dist": 0.375
+    "dup": 0,
+    "mixed": 2,
+    "dist": 0.25,
+    "n_scored": 4
    },
    "luna_default": {
     "error": "502 {\"error\":{\"message\":\"OpenAI refused to answer question \\\"topic\\\"\",\"code\":502}}"
@@ -4706,7 +5076,9 @@
      "Concert and event ticket sales"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 4
    },
    "jev_fine": {
     "labels": [
@@ -4719,8 +5091,10 @@
      "Sports",
      "Music"
     ],
-    "dup": 2,
-    "dist": 0.375
+    "dup": 0,
+    "mixed": 3,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    },
    "luna_fine": {
     "labels": [
@@ -4733,8 +5107,10 @@
      "Sports",
      "Music"
     ],
-    "dup": 2,
-    "dist": 0.4375
+    "dup": 0,
+    "mixed": 3,
+    "dist": 0.3333333333333333,
+    "n_scored": 3
    },
    "jev_two_level": {
     "labels": [
@@ -4748,7 +5124,9 @@
      "Music"
     ],
     "dup": 1,
-    "dist": 0.625
+    "mixed": 0,
+    "dist": 0.625,
+    "n_scored": 4
    },
    "jev_propose_pick": {
     "labels": [
@@ -4762,7 +5140,9 @@
      "Music tour and event ticket sales"
     ],
     "dup": 0,
-    "dist": 0.9375
+    "mixed": 0,
+    "dist": 0.75,
+    "n_scored": 4
    },
    "luna_propose_pick": {
     "labels": [
@@ -4776,7 +5156,9 @@
      "Music tour and event ticket sales"
     ],
     "dup": 0,
-    "dist": 1.0
+    "mixed": 0,
+    "dist": 1.0,
+    "n_scored": 4
    }
   }
  }

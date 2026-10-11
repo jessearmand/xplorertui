@@ -319,18 +319,27 @@ shuffled to stand in for a timeline, embedded locally with
 k-means (k = 5 and 8, 3 seeds each, so 6 runs per cell). Clusters were only
 about 60% one query bucket: real posts mix.
 
-**Metrics.** *dup* = how many labels repeat within a run. *dist* = for each
-cluster, whether a matcher (Jev and Luna, averaged) shown up to 8 other posts
-from that cluster picks the cluster's own label out of all k labels.
+**Metrics.** *dup* = how many labels repeat within a run, not counting
+"Mixed". *mixed* = clusters labelled "Mixed" per run. *dist* = for each
+cluster with posts the labeller didn't see (labellers get a cluster's first
+8 posts, so only clusters with more than 8 count) and a label other than
+"Mixed", whether a matcher (Jev and Luna, averaged) shown those held-out
+posts picks the cluster's own label out of all k labels. Each cell scores
+about 18–28 clusters (tech k=8: about 40), so differences under about 0.1
+are noise.
 
-| Labeller | Tech k=5 dup / dist | Tech k=8 | Broad k=5 | Broad k=8 |
+| Labeller | Tech k=5 dup / mixed / dist | Tech k=8 | Broad k=5 | Broad k=8 |
 |---|---|---|---|---|
-| Jev, default taxonomy (old behaviour) | 1.0 / 0.52 | 3.5 / 0.50 | 0.3 / 0.42 | 1.3 / 0.47 |
-| Luna, default taxonomy | 0.8 / 0.62 | 3.3 / 0.52 | 0.7 / 0.37 | 1.0 / 0.40 |
-| Qwen3.5-9B writes labels (reasoning off) | 0 / 0.92 | 0 / 0.82 | 0 / 0.83 | 0 / 0.85 |
-| Jev, 30-topic taxonomy | 0 / 0.83 | 0 / 0.74 | 0.8 / 0.52 | 1.2 / 0.48 |
-| Jev, two-level taxonomy (re-ask colliding parents) | 0 / 0.80 | 0.5 / 0.80 | 0.2 / 0.67 | 1.5 / 0.69 |
-| **Qwen3.5-9B proposes, Jev picks, unique assignment (A3)** | 0 / 0.88 | 0 / 0.84 | 0 / 0.80 | 0 / 0.93 |
+| Jev, default taxonomy (old behaviour) | 1.0 / 0.5 / 0.42 | 3.5 / 0.2 / 0.48 | 0.2 / 1.0 / 0.28 | 0.7 / 1.7 / 0.35 |
+| Luna, default taxonomy | 0.8 / 0.2 / 0.56 | 3.3 / 0 / 0.49 | 0.2 / 1.3 / 0.31 | 0.6 / 1.4 / 0.34 |
+| Qwen3.5-9B writes labels (reasoning off) | 0 / 0 / 0.92 | 0 / 0 / 0.77 | 0 / 0 / 0.63 | 0 / 0 / 0.67 |
+| Jev, 30-topic taxonomy | 0 / 0.2 / 0.83 | 0 / 0.3 / 0.66 | 0.2 / 1.5 / 0.55 | 0.3 / 1.8 / 0.46 |
+| Jev, two-level taxonomy (re-ask colliding parents) | 0 / 0 / 0.78 | 0.5 / 0 / 0.75 | 0.2 / 0 / 0.59 | 1.5 / 0 / 0.55 |
+| **Qwen3.5-9B proposes, Jev picks (A3, as shipped)** | 0 / 0 / 0.88 | 0 / 0 / 0.84 | 0 / 1.2 / 0.39 | 0 / 1.2 / 0.57 |
+
+An earlier version of this table scored clusters of 8 or fewer posts on the
+same posts the labeller saw, which inflated every *dist*, most on the broad
+corpus (where clusters are smaller).
 
 **Why the taxonomy collides.** Jev can only choose from the options it's
 given. A tech-heavy timeline has many real subtopics, but they fall into
@@ -340,16 +349,27 @@ topic" doesn't change that, and forcing unique labels on the coarse list
 gives unique but wrong labels. A finer taxonomy fixes tech timelines but not
 broad ones: real broad posts split into, for example, three politics
 clusters, and no fixed list anticipates that. Labels proposed from the
-clusters' own posts do, so A3 is now the default whenever a chat model is
-available. Proposing from the whole corpus instead of cluster samples gave
-labels that were too niche.
+clusters' own posts never collide, so A3 is now the default whenever a chat
+model is available. Proposing from the whole corpus instead of cluster
+samples gave labels that were too niche.
 
-In 14 of the 156 propose-then-pick assignments in the sweep, Jev put at
-least 0.5 on "None of these". All 14 were junk or mixed clusters (ticket
-resale, commission spam, adult content, unrelated posts), and forcing a
-candidate on them gave labels like "Election Strategy & Voting". Those
-clusters now show "Mixed" and take no candidate, the same 0.5 cut-off the
-taxonomy path uses.
+**Where A3 stands.** On tech-heavy timelines (this app's main use), A3
+roughly matches labels the chat model writes itself and is far ahead of the
+taxonomy. On broad timelines, it still beats the taxonomy, but letting the
+chat model write the labels directly scores higher (0.63–0.67 vs
+0.39–0.57). Part of the gap is that A3 marks about one junk cluster per run
+"Mixed" and the chat model names every cluster, junk included. For mostly
+broad timelines, leaving out the `[jev]` section (so the chat model writes
+the labels) is the better setting.
+
+In 14 of the 156 propose-then-pick assignments in the original sweep, Jev
+put at least 0.5 on "None of these". All 14 were junk or mixed clusters
+(ticket resale, commission spam, adult content, unrelated posts), and
+forcing a candidate on them gave labels like "Election Strategy & Voting".
+Those clusters now show "Mixed" and take no candidate, the same 0.5 cut-off
+the taxonomy path uses. A proposal is accepted only if every cluster got at
+least one candidate and the pool has one candidate per cluster; otherwise
+the taxonomy is used.
 
 **Per-post topic accuracy** (30-topic taxonomy, one post per request,
 reference labels from Claude Sonnet 5.5):
