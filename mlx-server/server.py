@@ -427,7 +427,8 @@ def _generate_mlx_lm(
         generate_kwargs["prompt_cache"] = prompt_cache
 
     stream = cast(Any, stream_generate)(model, tokenizer, **generate_kwargs)
-    return _collect_reply(stream, prompt, max_tokens)
+    # `tokenizer.detokenizer` is a new detokenizer on each access.
+    return _collect_reply(stream, prompt, max_tokens, lambda: tokenizer.detokenizer)
 
 
 def _generate_mlx_vlm(
@@ -436,6 +437,7 @@ def _generate_mlx_vlm(
     """Generate text using mlx-vlm (vision-language models). Runs on the MLX thread."""
     from mlx_vlm import stream_generate
     from mlx_vlm.prompt_utils import apply_chat_template
+    from mlx_vlm.tokenizer_utils import make_streaming_detokenizer
 
     prompt = cast(
         str,
@@ -453,14 +455,21 @@ def _generate_mlx_vlm(
         temperature=temp,
         enable_thinking=False,
     )
-    reply = _collect_reply(stream, prompt, max_tokens)
+    reply = _collect_reply(
+        stream, prompt, max_tokens, lambda: make_streaming_detokenizer(processor)
+    )
     clean_output = getattr(processor, "clean_output", None)
     if callable(clean_output):
         reply = replace(reply, text=_strip_thinking(clean_output(reply.text)))
     return reply
 
 
-def _collect_reply(stream, prompt: str, max_tokens: int) -> ChatGeneration:
+def _collect_reply(
+    stream,
+    prompt: str,
+    max_tokens: int,
+    new_detokenizer: Callable[[], Any],
+) -> ChatGeneration:
     """Read one reply from a token stream, stopping at `max_tokens` of answer.
 
     `enable_thinking=False` only works when the model's chat template reads
@@ -468,14 +477,21 @@ def _collect_reply(stream, prompt: str, max_tokens: int) -> ChatGeneration:
     stripped from the answer, so thinking tokens are not counted against
     `max_tokens`. The caller caps the stream at `max_tokens` plus
     `THINKING_HEADROOM_TOKENS`, which bounds the thinking.
+
+    `new_detokenizer` returns a fresh streaming detokenizer of the kind the
+    stream uses. It is needed when the reply is stopped here: see
+    `_detokenize`.
     """
     # Some templates end the prompt with an open thinking block, so the
     # output starts inside it and carries only the closing tag.
     opened_by_prompt = prompt.rstrip().endswith("<think>")
+    prefix = "<think>" if opened_by_prompt else ""
     thinking = _ThinkingTracker(inside=opened_by_prompt)
-    segments = ["<think>"] if opened_by_prompt else []
+    segments: list[str] = []
+    tokens: list[Any] = []
     prompt_tokens = generated = reasoning_tokens = 0
     finish_reason = None
+    stopped_here = False
 
     with closing(stream):
         for response in stream:
@@ -486,20 +502,40 @@ def _collect_reply(stream, prompt: str, max_tokens: int) -> ChatGeneration:
             generated = response.generation_tokens
             prompt_tokens = response.prompt_tokens
             finish_reason = response.finish_reason
-
             if thinking.feed(response.text):
                 reasoning_tokens += step
+            if finish_reason is not None:
+                # The stream's last response: it has flushed its text.
+                break
+            tokens.append(response.token)
             if generated - reasoning_tokens >= max_tokens:
-                finish_reason = finish_reason or "length"
+                stopped_here = True
+                finish_reason = "length"
                 break
 
+    raw = _detokenize(new_detokenizer(), tokens) if stopped_here else "".join(segments)
     return ChatGeneration(
-        _strip_thinking("".join(segments)),
+        _strip_thinking(prefix + raw),
         prompt_tokens,
         generated,
         reasoning_tokens,
         finish_reason or "stop",
     )
+
+
+def _detokenize(detokenizer, tokens: list[Any]) -> str:
+    """The full text of `tokens`.
+
+    A streaming detokenizer can hold back the text of the newest tokens (an
+    unfinished word or UTF-8 sequence) until a later token or the end of the
+    stream. A stream that is closed early never flushes that text, so its
+    segments can be short of the tokens it generated.
+    """
+    detokenizer.reset()
+    for token in tokens:
+        detokenizer.add_token(token)
+    detokenizer.finalize()
+    return detokenizer.text
 
 
 # Opening tag of a thinking block -> the tag that closes it. Gemma 4 emits

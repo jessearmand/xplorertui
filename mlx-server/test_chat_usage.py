@@ -21,36 +21,79 @@ MAX_TOKENS = 4
 HEADROOM = 6
 
 
+class FakeDetokenizer:
+    """Token `i` is `segments[i]`."""
+
+    def __init__(self, segments: list[str]):
+        self.segments = segments
+        self.text = ""
+
+    def reset(self):
+        self.text = ""
+
+    def add_token(self, token):
+        self.text += self.segments[token]
+
+    def finalize(self):
+        pass
+
+
 class FakeTokenizer:
-    def __init__(self, prompt_suffix: str = ""):
+    def __init__(self, segments: list[str], prompt_suffix: str):
+        self.segments = segments
         self.prompt_suffix = prompt_suffix
 
     def apply_chat_template(self, messages, **kwargs):
         return " ".join(m["content"] for m in messages) + self.prompt_suffix
 
+    @property
+    def detokenizer(self):
+        return FakeDetokenizer(self.segments)
+
+
+def fake_stream(segments: list[str], cap: int, lag: int):
+    """`mlx_lm.stream_generate` for a model that wants to generate `segments`,
+    one token each, then stop.
+
+    Like the real one: a response per token, then a last response that has
+    the finish reason and any text not sent yet. At the cap it stops with
+    "length"; otherwise the end-of-sequence token counts as generated. With
+    `lag`, the text of the newest `lag` tokens is held back, as a streaming
+    detokenizer does with an unfinished word.
+    """
+    held: list[str] = []
+    for token, segment in enumerate(segments):
+        held.append(segment)
+        if token + 1 == cap:
+            break
+        ready = len(held) - lag
+        text = "".join(held[:ready]) if ready > 0 else ""
+        del held[: max(ready, 0)]
+        yield SimpleNamespace(
+            text=text,
+            token=token,
+            prompt_tokens=3,
+            generation_tokens=token + 1,
+            finish_reason=None,
+        )
+    at_cap = len(segments) >= cap
+    yield SimpleNamespace(
+        text="".join(held),
+        token=None,
+        prompt_tokens=3,
+        generation_tokens=cap if at_cap else len(segments) + 1,
+        finish_reason="length" if at_cap else "stop",
+    )
+
 
 @pytest.fixture
 def chat(monkeypatch):
-    """Post a chat request to a model that wants to generate `segments`,
-    one token each. Like mlx-lm, the model stops at the `max_tokens` it is
-    given, or when the segments run out."""
+    """Post a chat request to a model that wants to generate `segments`."""
 
-    def post(segments: list[str], prompt_suffix: str = "") -> dict:
+    def post(segments: list[str], prompt_suffix: str = "", lag: int = 0) -> dict:
         def stream_generate(model, tokenizer, prompt, **kwargs):
-            cap = kwargs["max_tokens"]
-            assert cap == MAX_TOKENS + HEADROOM
-            for i, segment in enumerate(segments[:cap], start=1):
-                finish_reason = None
-                if i == cap:
-                    finish_reason = "length"
-                elif i == len(segments):
-                    finish_reason = "stop"
-                yield SimpleNamespace(
-                    text=segment,
-                    prompt_tokens=3,
-                    generation_tokens=i,
-                    finish_reason=finish_reason,
-                )
+            assert kwargs["max_tokens"] == MAX_TOKENS + HEADROOM
+            return fake_stream(segments, kwargs["max_tokens"], lag)
 
         monkeypatch.setattr(mlx_lm, "stream_generate", stream_generate)
         monkeypatch.setattr(
@@ -59,7 +102,7 @@ def chat(monkeypatch):
             lambda model_id: (
                 ChatBackend.MLX_LM,
                 object(),
-                FakeTokenizer(prompt_suffix),
+                FakeTokenizer(segments, prompt_suffix),
             ),
         )
         with TestClient(server.app) as client:
@@ -91,7 +134,7 @@ def test_short_answer_stops_on_its_own(chat):
     assert chat(["Rust ", "tooling"]) == {
         "content": "Rust tooling",
         "finish_reason": "stop",
-        "completion_tokens": 2,
+        "completion_tokens": 3,
         "reasoning_tokens": 0,
     }
 
@@ -106,12 +149,12 @@ def test_long_answer_is_cut_at_max_tokens_without_using_the_headroom(chat):
 
 
 def test_thinking_does_not_use_the_answer_budget(chat):
-    # 5 thinking tokens (tags included) and a 4-token answer: more than
+    # 5 thinking tokens (tags included) and a 3-token answer: more than
     # max_tokens in total, and the answer is whole.
     segments = ["<think>", "about ", "Rust ", "then", "</think>"]
-    segments += ["Cluster ", "0: ", "Rust ", "tools"]
+    segments += ["Cluster ", "0: ", "Rust"]
     assert chat(segments) == {
-        "content": "Cluster 0: Rust tools",
+        "content": "Cluster 0: Rust",
         "finish_reason": "stop",
         "completion_tokens": 9,
         "reasoning_tokens": 5,
@@ -145,7 +188,7 @@ def test_thinking_block_opened_by_the_prompt(chat):
     assert chat(segments, prompt_suffix="\nassistant: <think>\n") == {
         "content": "Rust tooling",
         "finish_reason": "stop",
-        "completion_tokens": 5,
+        "completion_tokens": 6,
         "reasoning_tokens": 3,
     }
 
@@ -155,16 +198,16 @@ def test_gemma_channel_thinking(chat):
     assert chat(segments) == {
         "content": "Rust",
         "finish_reason": "stop",
-        "completion_tokens": 5,
+        "completion_tokens": 6,
         "reasoning_tokens": 4,
     }
 
 
-def test_no_generated_tokens_is_an_empty_stop(chat):
+def test_model_that_stops_at_once_gives_an_empty_answer(chat):
     assert chat([]) == {
         "content": "",
         "finish_reason": "stop",
-        "completion_tokens": 0,
+        "completion_tokens": 1,
         "reasoning_tokens": 0,
     }
 
@@ -188,3 +231,25 @@ def test_tracking_work_does_not_grow_with_the_reply():
         assert len(tracker._carry) < server._LONGEST_THINKING_TAG
     assert tracker.feed("</think>")
     assert not tracker.feed("Rust")
+
+
+def test_text_held_back_by_the_stream_is_kept_at_the_answer_cap(chat):
+    # The stream is one token behind when the server stops it, and a closed
+    # stream never sends the rest.
+    assert chat(["a ", "b ", "c ", "d ", "e ", "f ", "g"], lag=1) == {
+        "content": "a b c d",
+        "finish_reason": "length",
+        "completion_tokens": MAX_TOKENS,
+        "reasoning_tokens": 0,
+    }
+
+
+def test_held_back_text_after_thinking_is_kept_at_the_answer_cap(chat):
+    segments = ["<think>", "hm", "</think>", "a ", "b ", "c ", "d ", "e ", "f"]
+    result = chat(segments, lag=1)
+    assert result["content"] == "a b c d"
+    assert result["finish_reason"] == "length"
+
+
+def test_held_back_text_is_sent_when_the_model_stops_itself(chat):
+    assert chat(["Rust ", "tooling"], lag=1)["content"] == "Rust tooling"
