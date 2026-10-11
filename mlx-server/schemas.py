@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
@@ -12,9 +13,27 @@ from pydantic import BaseModel, Field, StringConstraints
 # ---------------------------------------------------------------------------
 
 
+class EmbeddingTask(str, enum.Enum):
+    """What the embeddings are for.
+
+    Instruction-tuned embedding models (EmbeddingGemma 2, Qwen3-Embedding)
+    expect a task prompt in front of each text. The server looks the prompt up
+    in the model's own catalog, so clients name the task and stay
+    model-agnostic. See ``prompts.py``.
+    """
+
+    CLUSTERING = "clustering"
+    SEARCH_QUERY = "search_query"
+    DOCUMENT = "document"
+    CLASSIFICATION = "classification"
+    SIMILARITY = "similarity"
+
+
 class EmbeddingRequest(BaseModel):
     model: str
     input: list[str]
+    # Extension to the OpenAI schema. Omit it to embed the text as given.
+    task: EmbeddingTask | None = None
 
 
 class EmbeddingData(BaseModel):

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::{App, ClusterSource};
 use crate::api::types::{Includes, Tweet, User};
 use crate::event::{ApiResult, AppEvent, Event, ViewKind};
-use crate::mlx::client::MlxClient;
+use crate::mlx::client::{EmbedTask, MlxClient};
 use crate::openrouter;
 use crate::openrouter::client::OpenRouterClient;
 use crate::openrouter::types::{EmbeddingResponse, Model};
@@ -53,32 +53,14 @@ impl App {
 
         tokio::spawn(async move {
             let result = async {
-                // Build texts: query + all tweet texts
-                let mut texts: Vec<String> = vec![query_clone.clone()];
-                texts.extend(tweets.iter().map(|t| t.text.clone()));
-
-                let resp = provider.embed(&model, &texts).await?;
-
-                if resp.data.len() != texts.len() {
-                    return Err(Arc::new(format!(
-                        "Expected {} embeddings, got {}",
-                        texts.len(),
-                        resp.data.len()
-                    )));
-                }
-
-                // First embedding is the query, rest are tweets.
-                let mut sorted_data: Vec<_> = resp.data;
-                sorted_data.sort_by_key(|d| d.index);
-                let query_emb = &sorted_data[0].embedding;
-                let tweet_embs: Vec<(usize, Vec<f64>)> = sorted_data[1..]
-                    .iter()
-                    .enumerate()
-                    .map(|(i, d)| (i, d.embedding.clone()))
-                    .collect();
+                let texts: Vec<String> = tweets.iter().map(|t| t.text.clone()).collect();
+                let (query_emb, doc_embs) = provider
+                    .embed_query_and_documents(&model, &query_clone, &texts)
+                    .await?;
+                let tweet_embs: Vec<(usize, Vec<f64>)> = doc_embs.into_iter().enumerate().collect();
 
                 let ranked =
-                    crate::embeddings::similarity::rank_by_similarity(query_emb, &tweet_embs);
+                    crate::embeddings::similarity::rank_by_similarity(&query_emb, &tweet_embs);
 
                 let result: Vec<(Tweet, f64)> = ranked
                     .into_iter()
@@ -176,12 +158,9 @@ impl App {
                 let author_ids: Vec<Option<String>> =
                     tweets.iter().map(|t| t.author_id.clone()).collect();
 
-                let resp = provider.embed(&model, &texts).await?;
-
-                let mut sorted_data: Vec<_> = resp.data;
-                sorted_data.sort_by_key(|d| d.index);
-                let embeddings: Vec<Vec<f64>> =
-                    sorted_data.into_iter().map(|d| d.embedding).collect();
+                let embeddings = provider
+                    .embed(&model, &texts, EmbedTask::Clustering)
+                    .await?;
 
                 let k = 5.min(tweets.len());
                 let cluster_result = crate::embeddings::cluster::build_cluster_result(
@@ -749,18 +728,74 @@ enum EmbedProvider {
 }
 
 impl EmbedProvider {
-    async fn embed(&self, model: &str, texts: &[String]) -> Result<EmbeddingResponse, Arc<String>> {
-        match self {
+    /// Embed `texts` for `task`, returning one vector per text in input order.
+    ///
+    /// Only the MLX server takes a task; OpenRouter embeds the text as given.
+    async fn embed(
+        &self,
+        model: &str,
+        texts: &[String],
+        task: EmbedTask,
+    ) -> Result<Vec<Vec<f64>>, Arc<String>> {
+        let resp = match self {
             Self::OpenRouter(client) => client
                 .embed(model, texts)
                 .await
                 .map_err(|e| Arc::new(e.to_string())),
             Self::Mlx(client) => client
-                .embed(model, texts)
+                .embed(model, texts, task)
                 .await
                 .map_err(|e| Arc::new(e.to_string())),
-        }
+        }?;
+        ordered_embeddings(resp, texts.len())
     }
+
+    /// Embed a search query and the documents to score against it.
+    ///
+    /// Queries and documents take different task prompts, so the MLX server
+    /// gets one request for each. OpenRouter has no task prompts and takes
+    /// both in a single batch.
+    async fn embed_query_and_documents(
+        &self,
+        model: &str,
+        query: &str,
+        documents: &[String],
+    ) -> Result<(Vec<f64>, Vec<Vec<f64>>), Arc<String>> {
+        let query = [query.to_string()];
+        let (mut query_embs, doc_embs) = match self {
+            Self::Mlx(_) => tokio::try_join!(
+                self.embed(model, &query, EmbedTask::SearchQuery),
+                self.embed(model, documents, EmbedTask::Document),
+            )?,
+            Self::OpenRouter(_) => {
+                let texts: Vec<String> = query.iter().chain(documents).cloned().collect();
+                let mut embs = self.embed(model, &texts, EmbedTask::Document).await?;
+                let doc_embs = embs.split_off(1);
+                (embs, doc_embs)
+            }
+        };
+        let query_emb = query_embs
+            .pop()
+            .ok_or_else(|| Arc::new("No embedding returned for the query".to_string()))?;
+        Ok((query_emb, doc_embs))
+    }
+}
+
+/// Unpack an embedding response into vectors in input order, checking that
+/// the provider returned one per input.
+fn ordered_embeddings(
+    resp: EmbeddingResponse,
+    expected: usize,
+) -> Result<Vec<Vec<f64>>, Arc<String>> {
+    if resp.data.len() != expected {
+        return Err(Arc::new(format!(
+            "Expected {expected} embeddings, got {}",
+            resp.data.len()
+        )));
+    }
+    let mut data = resp.data;
+    data.sort_by_key(|d| d.index);
+    Ok(data.into_iter().map(|d| d.embedding).collect())
 }
 
 // ---------------------------------------------------------------------------
@@ -1028,6 +1063,38 @@ pub(crate) fn parse_cluster_topic_labels(content: &str, num_clusters: usize) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn embedding_response(data: &[(usize, f64)]) -> EmbeddingResponse {
+        let data: Vec<_> = data
+            .iter()
+            .map(|(index, value)| serde_json::json!({"index": index, "embedding": [value]}))
+            .collect();
+        serde_json::from_value(serde_json::json!({"model": "m", "data": data})).unwrap()
+    }
+
+    #[test]
+    fn ordered_embeddings_sorts_by_index() {
+        let resp = embedding_response(&[(2, 2.0), (0, 0.0), (1, 1.0)]);
+        assert_eq!(
+            ordered_embeddings(resp, 3).unwrap(),
+            vec![vec![0.0], vec![1.0], vec![2.0]]
+        );
+    }
+
+    #[test]
+    fn ordered_embeddings_rejects_a_short_response() {
+        let err = ordered_embeddings(embedding_response(&[(0, 0.0)]), 2).unwrap_err();
+        assert_eq!(*err, "Expected 2 embeddings, got 1");
+    }
+
+    #[test]
+    fn ordered_embeddings_accepts_an_empty_batch() {
+        assert!(
+            ordered_embeddings(embedding_response(&[]), 0)
+                .unwrap()
+                .is_empty()
+        );
+    }
 
     /// Live check of propose-then-pick against OpenRouter, using the same
     /// helpers as `dispatch_jev_cluster_topics`. Run with:
