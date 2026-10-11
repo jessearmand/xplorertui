@@ -307,6 +307,16 @@ fn clean_text(text: &str, max_chars: usize) -> String {
         .replace('\n', " ")
 }
 
+/// State for a cluster question: up to `MAX_POSTS_PER_CLUSTER` posts.
+fn cluster_state(posts: &[&str]) -> serde_json::Value {
+    let posts: Vec<String> = posts
+        .iter()
+        .take(MAX_POSTS_PER_CLUSTER)
+        .map(|p| clean_text(p, 280))
+        .collect();
+    serde_json::json!({ "posts": posts })
+}
+
 /// Label one cluster: a single `choice` over the taxonomy, with up to
 /// `MAX_POSTS_PER_CLUSTER` representative posts as state.
 pub fn cluster_topic_request(
@@ -314,14 +324,9 @@ pub fn cluster_topic_request(
     posts: &[&str],
     topics: &BTreeMap<String, String>,
 ) -> DecisionRequest {
-    let posts: Vec<String> = posts
-        .iter()
-        .take(MAX_POSTS_PER_CLUSTER)
-        .map(|p| clean_text(p, 280))
-        .collect();
     DecisionRequest {
         model: model.to_string(),
-        state: serde_json::json!({ "posts": posts }),
+        state: cluster_state(posts),
         questions: BTreeMap::from([(
             "topic".to_string(),
             Question::Choice {
@@ -330,6 +335,46 @@ pub fn cluster_topic_request(
             },
         )]),
     }
+}
+
+/// Asked of each cluster before labelling, to route `:topics`.
+pub const TECH_QUESTION: &str = "Are most of these posts about technology: software, AI, \
+     computing hardware, crypto, science or the tech industry?";
+
+/// Propose-then-pick runs when at least this share of posts sits in
+/// clusters Jev calls tech. Below it, the chat model writes the labels:
+/// on non-tech timelines its own labels score higher (design note §9).
+pub const MIN_TECH_SHARE: f64 = 0.5;
+
+/// Does this cluster's content count as tech? One `noul` over up to
+/// `MAX_POSTS_PER_CLUSTER` posts.
+pub fn tech_request(model: &str, posts: &[&str]) -> DecisionRequest {
+    DecisionRequest {
+        model: model.to_string(),
+        state: cluster_state(posts),
+        questions: BTreeMap::from([(
+            "tech".to_string(),
+            Question::Noul {
+                instructions: TECH_QUESTION.into(),
+            },
+        )]),
+    }
+}
+
+/// Share of posts in clusters Jev calls tech (P >= 0.5), weighted by
+/// cluster size. Failed requests are left out; `None` if all failed.
+pub fn tech_share(responses: &[Option<&DecisionResponse>], sizes: &[usize]) -> Option<f64> {
+    let (mut total, mut tech) = (0usize, 0usize);
+    for (resp, &size) in responses.iter().zip(sizes) {
+        let Some(p) = resp.and_then(|r| r.noul("tech")) else {
+            continue;
+        };
+        total += size;
+        if p >= 0.5 {
+            tech += size;
+        }
+    }
+    (total > 0).then(|| tech as f64 / total as f64)
 }
 
 /// Classify one post: topic `choice` plus a few `noul` tags. One post per
@@ -825,6 +870,34 @@ mod tests {
         // A cluster whose labels all duplicate another's still counts as covered.
         let dup = "Cluster 0: Rust | Crypto\nCluster 1: rust\n";
         assert_eq!(parse_label_candidates(dup, 2).unwrap(), ["Rust", "Crypto"]);
+    }
+
+    fn noul_resp(key: &str, p: f64) -> DecisionResponse {
+        DecisionResponse {
+            model: "m".into(),
+            answers: HashMap::from([(key.into(), Answer::Noul { noul: p })]),
+            usage: DecisionUsage::default(),
+        }
+    }
+
+    #[test]
+    fn tech_request_asks_one_noul() {
+        let req = tech_request("m", &["post"]);
+        assert_eq!(req.questions.len(), 1);
+        assert!(matches!(req.questions["tech"], Question::Noul { .. }));
+        assert_eq!(req.state["posts"][0], "post");
+    }
+
+    #[test]
+    fn tech_share_weights_by_cluster_size() {
+        let tech = noul_resp("tech", 0.9);
+        let other = noul_resp("tech", 0.1);
+        // 30 tech posts out of 40.
+        let share = tech_share(&[Some(&tech), Some(&other)], &[30, 10]);
+        assert_eq!(share, Some(0.75));
+        // Failed requests drop out of both sides.
+        assert_eq!(tech_share(&[None, Some(&other)], &[30, 10]), Some(0.0));
+        assert_eq!(tech_share(&[None, None], &[30, 10]), None);
     }
 
     #[test]

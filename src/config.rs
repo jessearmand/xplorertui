@@ -47,9 +47,10 @@ pub struct JevConfig {
     /// unset; an `other` option is always added.
     #[serde(default)]
     pub topics: Option<std::collections::BTreeMap<String, String>>,
-    /// When a chat model is available, have it propose labels for `:topics`
-    /// and let Jev pick a distinct one per cluster, instead of picking from
-    /// `topics`.
+    /// When a chat model is available, use it for `:topics`: on a mostly
+    /// tech timeline it proposes labels and Jev picks a distinct one per
+    /// cluster; otherwise it writes the labels itself. When off, Jev picks
+    /// from `topics`.
     #[serde(default = "default_true")]
     pub propose_labels: bool,
 }

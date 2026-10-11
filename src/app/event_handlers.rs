@@ -1,6 +1,6 @@
 use super::{App, ClusterSource, TimelineState};
 use crate::api::types::Tweet;
-use crate::event::{AppEvent, ViewKind};
+use crate::event::{AppEvent, TopicLabels, ViewKind};
 
 impl App {
     // -- App event handling -------------------------------------------------
@@ -485,7 +485,7 @@ impl App {
                 }
                 self.cluster_topics_loading = false;
                 match result {
-                    Ok(labels) => {
+                    Ok(TopicLabels { labels, labeller }) => {
                         if let Some(ref mut cr) = self.cluster_result {
                             let cluster_count = cr.cluster_topics.len();
                             let mut applied = 0usize;
@@ -495,9 +495,8 @@ impl App {
                                     applied += 1;
                                 }
                             }
-                            let provider = self.topic_labeller_name().unwrap_or("LLM");
                             self.status_message = Some(format!(
-                                "{provider} generated {applied}/{cluster_count} topic labels"
+                                "{labeller} generated {applied}/{cluster_count} topic labels"
                             ));
                         }
                     }

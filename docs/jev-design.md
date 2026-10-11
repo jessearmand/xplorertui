@@ -298,7 +298,9 @@ hand-labelled sample.
 - `[jev]` in `config.toml` (`model`, `concurrency`, `topics`,
   `propose_labels`). When it's present and OpenRouter is authenticated,
   `:topics` (and the auto-label after `:cluster`) uses Jev. With a chat model
-  available it runs A3 (see §9); otherwise it picks from the taxonomy.
+  available it routes by a per-cluster tech `noul`: A3 on mostly tech
+  timelines, chat-written labels otherwise (see §9). Without one, it picks
+  from the taxonomy.
 - `xplorertui classify` / `xplorertui rank <query>` read tweet JSONL on stdin, so
   they compose with `home` / `search` and need only OpenRouter credentials.
 - Not yet done: rank in the TUI search view (`:rank jev|embed`), `:classify`
@@ -335,7 +337,8 @@ are noise.
 | Qwen3.5-9B writes labels (reasoning off) | 0 / 0 / 0.92 | 0 / 0 / 0.77 | 0 / 0 / 0.63 | 0 / 0 / 0.67 |
 | Jev, 30-topic taxonomy | 0 / 0.2 / 0.83 | 0 / 0.3 / 0.66 | 0.2 / 1.5 / 0.55 | 0.3 / 1.8 / 0.46 |
 | Jev, two-level taxonomy (re-ask colliding parents) | 0 / 0 / 0.78 | 0.5 / 0 / 0.75 | 0.2 / 0 / 0.59 | 1.5 / 0 / 0.55 |
-| **Qwen3.5-9B proposes, Jev picks (A3, as shipped)** | 0 / 0 / 0.93 | 0 / 0 / 0.81 | 0 / 0.8 / 0.50 | 0 / 0.8 / 0.52 |
+| Qwen3.5-9B proposes, Jev picks (A3) | 0 / 0 / 0.93 | 0 / 0 / 0.81 | 0 / 0.8 / 0.50 | 0 / 0.8 / 0.52 |
+| **Routed: Jev tech check, then A3 or chat labels (as shipped)** | 0 / 0 / 0.93 | 0 / 0 / 0.81 | 0 / 0 / 0.63 | 0 / 0 / 0.67 |
 | Qwen3.5-9B proposes, Luna picks | 0 / 0 / 0.93 | 0 / 0 / 0.77 | 0 / 0.8 / 0.54 | 0 / 0.3 / 0.58 |
 
 An earlier version of this table scored clusters of 8 or fewer posts on the
@@ -360,9 +363,18 @@ vs 0.92 / 0.77) and is far ahead of the taxonomy. On broad timelines it
 still beats the taxonomy, but letting the chat model write the labels
 directly scores higher (0.63–0.67 vs 0.50–0.52). Part of the gap is that
 A3 marks about one junk cluster per run "Mixed", while the chat model names
-every cluster, junk included. For mostly
-broad timelines, leaving out the `[jev]` section (so the chat model writes
-the labels) is the better setting.
+every cluster, junk included.
+
+**Routing.** So `:topics` now asks Jev one `noul` per cluster first: "Are
+most of these posts about technology: software, AI, computing hardware,
+crypto, science or the tech industry?" If at least half the posts sit in
+clusters with P ≥ 0.5, it runs A3; otherwise the chat model writes the
+labels. On the eval corpora the split is clean: the tech share was 1.0 in
+every tech-corpus run and 0–0.16 (mean 0.06) on the broad corpus, so the
+routed setup took the expected branch in all 24 runs and matches the
+better of the two in every cell. It costs one extra round of k concurrent
+Jev requests (about 0.3 s). If the tech check fails entirely, the chat
+model writes the labels.
 
 In 14 of the 156 propose-then-pick assignments in the original sweep, Jev
 put at least 0.5 on "None of these". All 14 were junk or mixed clusters

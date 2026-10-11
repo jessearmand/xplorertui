@@ -85,6 +85,17 @@ def label_propose_pick(model, clusters, gen=QWEN9):
         for r_, c_ in zip(r_idx, cols): out[rows[r_]] = cands[c_]
     return out, len(cands)
 
+# Same text as decisions::TECH_QUESTION.
+TECH_Q = ("Are most of these posts about technology: software, AI, computing hardware, crypto, science or the tech "
+          "industry?")
+def label_routed(model, clusters):
+    """As shipped: Jev asks whether each cluster is tech; if at least half the posts are in tech
+    clusters, propose-then-pick, otherwise the chat model writes the labels."""
+    ps = pmap(lambda t: decide(model, {"posts": reps(t)}, {"tech": {"type": "noul", "instructions": TECH_Q}})["answers"]["tech"]["noul"], clusters)
+    sizes = [len(c) for c in clusters]
+    share = sum(n for n, p in zip(sizes, ps) if p >= 0.5) / sum(sizes)
+    return label_propose_pick(model, clusters)[0] if share >= 0.5 else label_chat(QWEN9, clusters)
+
 def label_two_level(model, clusters):
     """Coarse default taxonomy; clusters that collide on a parent are re-asked with its subtopics."""
     def coarse(texts):
@@ -149,6 +160,7 @@ def run(corp, emb, k, seed):
         "jev_two_level": lambda: label_two_level(JEV, clusters),
         "jev_propose_pick": lambda: label_propose_pick(JEV, clusters)[0],
         "luna_propose_pick": lambda: label_propose_pick(LUNA, clusters)[0],
+        "jev_routed": lambda: label_routed(JEV, clusters),
     }
     for name, fn in setups.items():
         try:

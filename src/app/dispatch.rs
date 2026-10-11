@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::{App, ClusterSource};
 use crate::api::types::{Includes, Tweet, User};
-use crate::event::{ApiResult, AppEvent, Event, ViewKind};
+use crate::event::{ApiResult, AppEvent, Event, TopicLabels, ViewKind};
 use crate::mlx::client::{EmbedTask, MlxClient};
 use crate::openrouter;
 use crate::openrouter::client::OpenRouterClient;
@@ -277,36 +277,29 @@ impl App {
         };
 
         let num_clusters = result.num_clusters();
-        let max_tokens = cluster_topic_max_tokens(num_clusters);
         let user_content = cluster_prompt_body(result);
         let sender = self.events.sender();
 
         tokio::spawn(async move {
-            let result = async {
-                let content = provider
-                    .complete_text(&model, CLUSTER_LABEL_PROMPT, user_content, max_tokens)
-                    .await?;
-                let labels = parse_cluster_topic_labels(&content, num_clusters);
-                if labels.iter().all(|l| l.is_empty()) {
-                    return Err(Arc::new(format!(
-                        "No labels parsed from response: {content}"
-                    )));
-                }
-                Ok(labels)
-            }
-            .await;
-
+            let result = chat_labels(&provider, &model, user_content, num_clusters)
+                .await
+                .map(|labels| TopicLabels {
+                    labels,
+                    labeller: provider.name().to_string(),
+                });
             let _ = sender.send(Event::App(Box::new(AppEvent::ClusterTopicsGenerated(
                 generation, result,
             ))));
         });
     }
 
-    /// Label clusters with Jev. When a chat provider is available (and
-    /// `[jev] propose_labels` is on), the chat model proposes candidate
-    /// labels and Jev picks a distinct one per cluster; otherwise, or if
-    /// the proposal fails, Jev picks from the fixed topic taxonomy. All
-    /// Jev requests go out concurrently.
+    /// Label clusters with Jev's help. With a chat provider available (and
+    /// `[jev] propose_labels` on), Jev first asks whether each cluster is
+    /// tech. On a mostly tech timeline the chat model proposes candidate
+    /// labels and Jev picks a distinct one per cluster; otherwise the chat
+    /// model writes the labels itself, which scores higher there. Without a
+    /// chat provider, or if those steps fail, Jev picks from the fixed
+    /// topic taxonomy. Jev requests go out concurrently.
     fn dispatch_jev_cluster_topics(
         &self,
         client: Arc<OpenRouterClient>,
@@ -325,6 +318,9 @@ impl App {
         };
 
         let num_clusters = result.num_clusters();
+        let cluster_sizes: Vec<usize> = (0..num_clusters)
+            .map(|c| result.tweet_indices_for_cluster(c).len())
+            .collect();
         let cluster_posts: Vec<Vec<String>> = (0..num_clusters)
             .map(|c| {
                 result
@@ -335,55 +331,58 @@ impl App {
                     .collect()
             })
             .collect();
-        let proposer = self
+        let chat = self
             .resolve_chat_provider()
             .filter(|_| jev.propose_labels)
             .map(|(provider, model)| (provider, model, cluster_prompt_body(result)));
 
         tokio::spawn(async move {
+            let send = |result: ApiResult<TopicLabels>| {
+                let _ = sender.send(Event::App(Box::new(AppEvent::ClusterTopicsGenerated(
+                    generation, result,
+                ))));
+            };
             let posts =
                 |c: usize| -> Vec<&str> { cluster_posts[c].iter().map(String::as_str).collect() };
 
-            if let Some((provider, model, body)) = proposer {
-                let candidates = provider
-                    .complete_text(
-                        &model,
-                        decisions::PROPOSE_LABELS_PROMPT,
-                        body,
-                        decisions::propose_max_tokens(num_clusters),
-                    )
-                    .await
-                    .map(|content| decisions::parse_label_candidates(&content, num_clusters));
-                match candidates {
-                    Ok(Some(candidates)) => {
-                        let requests = (0..num_clusters)
-                            .map(|c| {
-                                decisions::pick_label_request(&jev.model, &posts(c), &candidates)
-                            })
-                            .collect();
-                        let responses = client.decide_all(requests, jev.concurrency).await;
-                        let ok: Vec<_> = responses.iter().map(|r| r.as_ref().ok()).collect();
-                        let labels: Vec<String> =
-                            decisions::assign_unique_labels(&ok, candidates.len())
-                                .into_iter()
-                                .map(|pick| match pick {
-                                    decisions::LabelPick::Candidate(i) => candidates[i].clone(),
-                                    decisions::LabelPick::Mixed => "Mixed".to_string(),
-                                    decisions::LabelPick::Unlabelled => String::new(),
-                                })
-                                .collect();
-                        let result =
-                            labels_or_error(labels, responses.into_iter().find_map(Result::err));
-                        let _ = sender.send(Event::App(Box::new(
-                            AppEvent::ClusterTopicsGenerated(generation, result),
-                        )));
-                        return;
+            if let Some((provider, model, body)) = chat {
+                let tech_requests = (0..num_clusters)
+                    .map(|c| decisions::tech_request(&jev.model, &posts(c)))
+                    .collect();
+                let tech = client.decide_all(tech_requests, jev.concurrency).await;
+                let ok: Vec<_> = tech.iter().map(|r| r.as_ref().ok()).collect();
+                let tech_share = decisions::tech_share(&ok, &cluster_sizes);
+
+                if tech_share.is_some_and(|s| s >= decisions::MIN_TECH_SHARE) {
+                    match propose_then_pick(&client, &jev, &provider, &model, body, &cluster_posts)
+                        .await
+                    {
+                        Ok(Some(labels)) => {
+                            return send(labels.map(|labels| TopicLabels {
+                                labels,
+                                labeller: format!("{} + Jev", provider.name()),
+                            }));
+                        }
+                        Ok(None) => tracing::warn!(
+                            "label proposal did not cover every cluster; using the topic taxonomy"
+                        ),
+                        Err(e) => {
+                            tracing::warn!("label proposal failed ({e}); using the topic taxonomy")
+                        }
                     }
-                    Ok(None) => tracing::warn!(
-                        "label proposal did not cover every cluster; using the topic taxonomy"
-                    ),
-                    Err(e) => {
-                        tracing::warn!("label proposal failed ({e}); using the topic taxonomy")
+                } else {
+                    // Non-tech timeline (or Jev couldn't tell): the chat
+                    // model's own labels beat Jev's picks there.
+                    match chat_labels(&provider, &model, body, num_clusters).await {
+                        Ok(labels) => {
+                            return send(Ok(TopicLabels {
+                                labels,
+                                labeller: provider.name().to_string(),
+                            }));
+                        }
+                        Err(e) => {
+                            tracing::warn!("chat labels failed ({e}); using the topic taxonomy")
+                        }
                     }
                 }
             }
@@ -404,10 +403,12 @@ impl App {
                     }
                 })
                 .collect();
-            let result = labels_or_error(labels, first_error);
-            let _ = sender.send(Event::App(Box::new(AppEvent::ClusterTopicsGenerated(
-                generation, result,
-            ))));
+            send(
+                labels_or_error(labels, first_error).map(|labels| TopicLabels {
+                    labels,
+                    labeller: "Jev".to_string(),
+                }),
+            );
         });
     }
 
@@ -670,10 +671,7 @@ impl App {
 
     /// Returns the name of the currently resolved chat provider, if any.
     pub(crate) fn resolved_chat_provider_name(&self) -> Option<&'static str> {
-        self.resolve_chat_provider().map(|(p, _)| match p {
-            ChatProvider::Mlx(_) => "MLX",
-            ChatProvider::OpenRouter(_) => "OpenRouter",
-        })
+        self.resolve_chat_provider().map(|(p, _)| p.name())
     }
 
     /// Returns the model ID of the currently resolved chat provider, if any.
@@ -815,6 +813,13 @@ enum ChatProvider {
 }
 
 impl ChatProvider {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Mlx(_) => "MLX",
+            Self::OpenRouter(_) => "OpenRouter",
+        }
+    }
+
     async fn chat_completion(
         &self,
         model: &str,
@@ -928,6 +933,78 @@ impl ChatProvider {
         }
         Ok(content)
     }
+}
+
+/// The chat model writes one label per cluster.
+async fn chat_labels(
+    provider: &ChatProvider,
+    model: &str,
+    body: String,
+    num_clusters: usize,
+) -> ApiResult<Vec<String>> {
+    let content = provider
+        .complete_text(
+            model,
+            CLUSTER_LABEL_PROMPT,
+            body,
+            cluster_topic_max_tokens(num_clusters),
+        )
+        .await?;
+    let labels = parse_cluster_topic_labels(&content, num_clusters);
+    if labels.iter().all(|l| l.is_empty()) {
+        return Err(Arc::new(format!(
+            "No labels parsed from response: {content}"
+        )));
+    }
+    Ok(labels)
+}
+
+/// The chat model proposes candidate labels and Jev picks a distinct one
+/// per cluster. `Ok(None)` when the proposal doesn't cover every cluster;
+/// `Err` when the chat request fails. The inner result is the Jev outcome.
+async fn propose_then_pick(
+    client: &OpenRouterClient,
+    jev: &crate::config::JevConfig,
+    provider: &ChatProvider,
+    model: &str,
+    body: String,
+    cluster_posts: &[Vec<String>],
+) -> Result<Option<ApiResult<Vec<String>>>, Arc<String>> {
+    use crate::openrouter::decisions;
+
+    let num_clusters = cluster_posts.len();
+    let content = provider
+        .complete_text(
+            model,
+            decisions::PROPOSE_LABELS_PROMPT,
+            body,
+            decisions::propose_max_tokens(num_clusters),
+        )
+        .await?;
+    let Some(candidates) = decisions::parse_label_candidates(&content, num_clusters) else {
+        return Ok(None);
+    };
+    let requests = cluster_posts
+        .iter()
+        .map(|posts| {
+            let posts: Vec<&str> = posts.iter().map(String::as_str).collect();
+            decisions::pick_label_request(&jev.model, &posts, &candidates)
+        })
+        .collect();
+    let responses = client.decide_all(requests, jev.concurrency).await;
+    let ok: Vec<_> = responses.iter().map(|r| r.as_ref().ok()).collect();
+    let labels: Vec<String> = decisions::assign_unique_labels(&ok, candidates.len())
+        .into_iter()
+        .map(|pick| match pick {
+            decisions::LabelPick::Candidate(i) => candidates[i].clone(),
+            decisions::LabelPick::Mixed => "Mixed".to_string(),
+            decisions::LabelPick::Unlabelled => String::new(),
+        })
+        .collect();
+    Ok(Some(labels_or_error(
+        labels,
+        responses.into_iter().find_map(Result::err),
+    )))
 }
 
 /// Partial success still applies (empty labels keep the placeholder);
@@ -1178,6 +1255,41 @@ mod tests {
             })
             .collect();
         eprintln!("candidates: {candidates:?}\npicked: {names:?}");
+
+        // Routing: these clusters are tech; sports and cooking are not.
+        async fn share(client: &OpenRouterClient, sets: &[&[&str]]) -> f64 {
+            let sizes: Vec<usize> = sets.iter().map(|p| p.len()).collect();
+            let requests = sets
+                .iter()
+                .map(|posts| decisions::tech_request(decisions::DEFAULT_JEV_MODEL, posts))
+                .collect();
+            let responses = client.decide_all(requests, 3).await;
+            let ok: Vec<_> = responses.iter().map(|r| r.as_ref().ok()).collect();
+            decisions::tech_share(&ok, &sizes).expect("tech answers")
+        }
+        let tech = share(&client, &clusters).await;
+        assert!(tech >= decisions::MIN_TECH_SHARE, "tech share {tech}");
+        let non_tech = share(
+            &client,
+            &[
+                &[
+                    "Arsenal won 2-0, Saka scored again",
+                    "NBA season tips off tonight, Lakers vs Celtics",
+                    "Marathon PR today, 3:12",
+                ],
+                &[
+                    "Made sourdough with a 48-hour cold proof",
+                    "One-pot unstuffed peppers recipe for busy weeknights",
+                    "Best ramen in Shibuya, no contest",
+                ],
+            ],
+        )
+        .await;
+        assert!(
+            non_tech < decisions::MIN_TECH_SHARE,
+            "non-tech share {non_tech}"
+        );
+        eprintln!("tech share {tech}, non-tech share {non_tech}");
 
         // A model that refuses `reasoning.enabled = false` falls back.
         let short = provider
