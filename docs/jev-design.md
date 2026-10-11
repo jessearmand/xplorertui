@@ -344,6 +344,13 @@ clusters' own posts do, so A3 is now the default whenever a chat model is
 available. Proposing from the whole corpus instead of cluster samples gave
 labels that were too niche.
 
+In 14 of the 156 propose-then-pick assignments in the sweep, Jev put at
+least 0.5 on "None of these". All 14 were junk or mixed clusters (ticket
+resale, commission spam, adult content, unrelated posts), and forcing a
+candidate on them gave labels like "Election Strategy & Voting". Those
+clusters now show "Mixed" and take no candidate, the same 0.5 cut-off the
+taxonomy path uses.
+
 **Per-post topic accuracy** (30-topic taxonomy, one post per request,
 reference labels from Claude Sonnet 5.5):
 

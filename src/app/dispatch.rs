@@ -366,7 +366,11 @@ impl App {
                         let labels: Vec<String> =
                             decisions::assign_unique_labels(&ok, candidates.len())
                                 .into_iter()
-                                .map(|i| i.map(|i| candidates[i].clone()).unwrap_or_default())
+                                .map(|pick| match pick {
+                                    decisions::LabelPick::Candidate(i) => candidates[i].clone(),
+                                    decisions::LabelPick::Mixed => "Mixed".to_string(),
+                                    decisions::LabelPick::Unlabelled => String::new(),
+                                })
                                 .collect();
                         let result =
                             labels_or_error(labels, responses.into_iter().find_map(Result::err));
@@ -1168,10 +1172,12 @@ mod tests {
         let responses = client.decide_all(requests, 3).await;
         let ok: Vec<_> = responses.iter().map(|r| r.as_ref().ok()).collect();
         let picked = decisions::assign_unique_labels(&ok, candidates.len());
-        assert!(picked.iter().all(Option::is_some), "{picked:?}");
         let names: Vec<&str> = picked
             .iter()
-            .map(|i| candidates[i.unwrap()].as_str())
+            .map(|pick| match pick {
+                decisions::LabelPick::Candidate(i) => candidates[*i].as_str(),
+                other => panic!("every cluster here has a clear topic: {other:?}"),
+            })
             .collect();
         eprintln!("candidates: {candidates:?}\npicked: {names:?}");
 

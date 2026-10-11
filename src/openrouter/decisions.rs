@@ -503,21 +503,39 @@ pub fn relevance_key(resp: &DecisionResponse) -> Option<f64> {
     Some(score * substantive)
 }
 
+/// Outcome of `assign_unique_labels` for one cluster.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelPick {
+    /// Index into the candidate pool.
+    Candidate(usize),
+    /// Jev judged none of the candidates to fit (shown as "Mixed").
+    Mixed,
+    /// The request failed, or every remaining candidate went to a
+    /// cluster with a stronger claim.
+    Unlabelled,
+}
+
 /// Pick one distinct candidate per cluster, maximising the joint
 /// probability Jev gave each cluster's label (an optimal assignment on
-/// `-ln p`, so two clusters never share a label). `None` marks a cluster
-/// whose request failed, or a surplus cluster when there are fewer
-/// candidates than clusters.
+/// `-ln p`, so two clusters never share a label). Clusters where Jev puts
+/// at least `MIN_TOPIC_CONFIDENCE` on "None of these" are `Mixed` and take
+/// no candidate: forcing one there gives a confidently wrong label.
 pub fn assign_unique_labels(
     responses: &[Option<&DecisionResponse>],
     num_candidates: usize,
-) -> Vec<Option<usize>> {
-    let rows: Vec<(usize, HashMap<String, f64>)> = responses
-        .iter()
-        .enumerate()
-        .filter_map(|(c, r)| Some((c, (*r)?.choice("topic")?.2.clone())))
-        .collect();
-    let mut out = vec![None; responses.len()];
+) -> Vec<LabelPick> {
+    let mut out = vec![LabelPick::Unlabelled; responses.len()];
+    let mut rows: Vec<(usize, &HashMap<String, f64>)> = Vec::new();
+    for (c, r) in responses.iter().enumerate() {
+        let Some((_, _, probs)) = r.and_then(|r| r.choice("topic")) else {
+            continue;
+        };
+        if probs.get(OTHER_TOPIC).copied().unwrap_or(0.0) >= MIN_TOPIC_CONFIDENCE {
+            out[c] = LabelPick::Mixed;
+        } else {
+            rows.push((c, probs));
+        }
+    }
     if rows.is_empty() || num_candidates == 0 {
         return out;
     }
@@ -542,7 +560,7 @@ pub fn assign_unique_labels(
         .collect();
     for ((cluster, _), col) in rows.iter().zip(min_cost_assignment(&cost)) {
         if col < num_candidates {
-            out[*cluster] = Some(col);
+            out[*cluster] = LabelPick::Candidate(col);
         }
     }
     out
@@ -783,20 +801,40 @@ mod tests {
 
     #[test]
     fn assign_unique_labels_resolves_collisions() {
+        use LabelPick::*;
         // Both clusters prefer c0; cluster 1 cares less, so it moves to c1.
         let a = topic_resp("c0", 0.9, &[("c0", 0.9), ("c1", 0.05), ("c2", 0.05)]);
         let b = topic_resp("c0", 0.6, &[("c0", 0.6), ("c1", 0.35), ("c2", 0.05)]);
         assert_eq!(
             assign_unique_labels(&[Some(&a), Some(&b)], 3),
-            [Some(0), Some(1)]
+            [Candidate(0), Candidate(1)]
         );
         // A failed request gets no label and doesn't block the others.
-        assert_eq!(assign_unique_labels(&[None, Some(&b)], 3), [None, Some(0)]);
+        assert_eq!(
+            assign_unique_labels(&[None, Some(&b)], 3),
+            [Unlabelled, Candidate(0)]
+        );
         // More clusters than candidates: the weakest claim goes unlabelled.
         assert_eq!(
             assign_unique_labels(&[Some(&a), Some(&b)], 1),
-            [Some(0), None]
+            [Candidate(0), Unlabelled]
         );
+    }
+
+    #[test]
+    fn assign_unique_labels_keeps_none_of_these() {
+        use LabelPick::*;
+        // Jev says none of the candidates fit cluster 0: it stays Mixed and
+        // leaves c0 free for cluster 1.
+        let junk = topic_resp(OTHER_TOPIC, 0.85, &[("c0", 0.1), (OTHER_TOPIC, 0.85)]);
+        let b = topic_resp("c0", 0.6, &[("c0", 0.6), ("c1", 0.35), (OTHER_TOPIC, 0.05)]);
+        assert_eq!(
+            assign_unique_labels(&[Some(&junk), Some(&b)], 2),
+            [Mixed, Candidate(0)]
+        );
+        // Below the threshold, "other" doesn't block a label.
+        let unsure = topic_resp("c1", 0.4, &[("c1", 0.4), (OTHER_TOPIC, 0.35)]);
+        assert_eq!(assign_unique_labels(&[Some(&unsure)], 2), [Candidate(1)]);
     }
 
     #[test]
