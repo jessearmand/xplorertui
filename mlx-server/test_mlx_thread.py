@@ -3,12 +3,13 @@
 Since MLX 0.32, a lazy array built on one thread cannot be evaluated on another
 ("There is no Stream(gpu, 0) in current thread"). Gemma 4 hits this through its
 RoPE frequencies, which are computed lazily at load time and first evaluated
-during generation. These tests fake the model and mlx-lm's generate, but use
+during generation. These tests fake the model and mlx-lm's stream_generate, but use
 real MLX arrays, so on MLX >= 0.32 they fail if the server ever loads and
 generates on different threads.
 """
 
 import threading
+from types import SimpleNamespace
 
 import pytest
 
@@ -45,14 +46,19 @@ def fake_chat(monkeypatch):
         seen["load"] = model.load_thread
         return ChatBackend.MLX_LM, model, FakeTokenizer()
 
-    def generate(model, tokenizer, prompt, **kwargs):
+    def stream_generate(model, tokenizer, prompt, **kwargs):
         seen["generate"] = threading.get_ident()
         mx.eval(model.freqs)  # raises across threads on MLX >= 0.32
-        return "topic label"
+        yield SimpleNamespace(
+            text="topic label",
+            prompt_tokens=2,
+            generation_tokens=2,
+            finish_reason="stop",
+        )
 
     monkeypatch.setattr(server.registry, "default_model", None)
     monkeypatch.setattr(server.registry, "get_chat_model", get_chat_model)
-    monkeypatch.setattr(mlx_lm, "generate", generate)
+    monkeypatch.setattr(mlx_lm, "stream_generate", stream_generate)
     return seen
 
 
@@ -78,7 +84,6 @@ def test_preloaded_model_survives_a_lifespan_restart(monkeypatch):
     # are evaluated on the new one. Patch the loader, not the registry, so the
     # registry's own cache is exercised.
     mlx_embeddings = pytest.importorskip("mlx_embeddings")
-    from types import SimpleNamespace
 
     loads = []
 

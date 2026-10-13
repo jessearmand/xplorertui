@@ -27,6 +27,16 @@ const CLUSTER_COLORS: &[(&str, Color)] = &[
     ("#40dde8", Color::Rgb(64, 221, 232)),  // bright cyan
 ];
 
+/// Hint in the cluster list title. While labels are generated it names
+/// the labeller once the request has reported one.
+fn list_hint(topics_loading: bool, labeller: Option<&str>) -> String {
+    match (topics_loading, labeller) {
+        (true, Some(labeller)) => format!("generating labels via {labeller}..."),
+        (true, None) => "generating labels...".to_string(),
+        (false, _) => "Enter to browse, Esc to go back".to_string(),
+    }
+}
+
 /// Scatter plot view for displaying tweet clustering results.
 pub struct ClusterView<'a> {
     pub app: &'a App,
@@ -86,7 +96,7 @@ impl<'a> ClusterView<'a> {
         result: &ClusterResult,
         selected_index: usize,
         topics_loading: bool,
-        chat_provider_name: Option<&str>,
+        labeller: Option<&str>,
         source_label: Option<&str>,
         area: Rect,
         buf: &mut Buffer,
@@ -95,14 +105,10 @@ impl<'a> ClusterView<'a> {
             Some(label) => format!(" — {label}"),
             None => String::new(),
         };
-        let title = if topics_loading {
-            format!(
-                " Topic Clusters{source_suffix} (generating labels via {}...) ",
-                chat_provider_name.unwrap_or("…"),
-            )
-        } else {
-            format!(" Topic Clusters{source_suffix} (Enter to browse, Esc to go back) ")
-        };
+        let title = format!(
+            " Topic Clusters{source_suffix} ({}) ",
+            list_hint(topics_loading, labeller)
+        );
         let block = Block::default().title(title).borders(Borders::ALL);
 
         let num_clusters = result.num_clusters();
@@ -263,11 +269,29 @@ impl Widget for ClusterView<'_> {
                 result,
                 selected_index,
                 self.app.cluster_topics_loading,
-                self.app.topic_labeller_name(),
+                self.app.cluster_topics_labeller.as_deref(),
                 source_label,
                 area,
                 buf,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_hint_names_the_labeller_only_once_known() {
+        assert_eq!(list_hint(true, None), "generating labels...");
+        assert_eq!(
+            list_hint(true, Some("MLX + Jev")),
+            "generating labels via MLX + Jev..."
+        );
+        assert_eq!(
+            list_hint(false, Some("MLX")),
+            "Enter to browse, Esc to go back"
+        );
     }
 }

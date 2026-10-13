@@ -206,6 +206,8 @@ Each cluster is labeled with the tweet closest to its centroid. `:topics` replac
 
 Jev requests go out one per cluster, concurrently. Chat requests turn reasoning off so the short label budget isn't used up by hidden reasoning; models that require reasoning get low-effort reasoning and a larger budget instead.
 
+While labels are generated, the cluster list title names the labeller that is running at that moment (`generating labels via MLX + Jev...`). It names none during Jev's tech check, and it changes if the request falls back to another labeller.
+
 ## CLI Mode
 
 When a subcommand is provided, xplorertui bypasses the TUI and outputs JSONL (one JSON object per line) to stdout. This makes it easy to pipe X API data into other tools.

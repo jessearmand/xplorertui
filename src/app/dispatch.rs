@@ -251,7 +251,15 @@ impl App {
         });
     }
 
-    pub(super) fn dispatch_generate_cluster_topics(&self) {
+    /// Start labelling the current clusters. The loading hint names no
+    /// labeller until the request reports the one it is using.
+    pub(super) fn start_cluster_topics(&mut self) {
+        self.cluster_topics_loading = true;
+        self.cluster_topics_labeller = None;
+        self.dispatch_generate_cluster_topics();
+    }
+
+    fn dispatch_generate_cluster_topics(&self) {
         if let Some((client, jev)) = self.resolve_jev() {
             self.dispatch_jev_cluster_topics(client, jev);
             return;
@@ -280,6 +288,10 @@ impl App {
         let user_content = cluster_prompt_body(result);
         let sender = self.events.sender();
 
+        self.events.send(AppEvent::ClusterTopicsLabeller(
+            generation,
+            provider.name().to_string(),
+        ));
         tokio::spawn(async move {
             let result = chat_labels(&provider, &model, user_content, num_clusters)
                 .await
@@ -299,7 +311,8 @@ impl App {
     /// labels and Jev picks a distinct one per cluster; otherwise the chat
     /// model writes the labels itself, which scores higher there. Without a
     /// chat provider, or if those steps fail, Jev picks from the fixed
-    /// topic taxonomy. Jev requests go out concurrently.
+    /// topic taxonomy. Jev requests go out concurrently. Each step that
+    /// writes labels reports its labeller first, for the loading hint.
     fn dispatch_jev_cluster_topics(
         &self,
         client: Arc<OpenRouterClient>,
@@ -342,6 +355,12 @@ impl App {
                     generation, result,
                 ))));
             };
+            let started = |labeller: &str| {
+                let _ = sender.send(Event::App(Box::new(AppEvent::ClusterTopicsLabeller(
+                    generation,
+                    labeller.to_string(),
+                ))));
+            };
             let posts =
                 |c: usize| -> Vec<&str> { cluster_posts[c].iter().map(String::as_str).collect() };
 
@@ -354,14 +373,13 @@ impl App {
                 let tech_share = decisions::tech_share(&ok, &cluster_sizes);
 
                 if tech_share.is_some_and(|s| s >= decisions::MIN_TECH_SHARE) {
+                    let labeller = format!("{} + Jev", provider.name());
+                    started(&labeller);
                     match propose_then_pick(&client, &jev, &provider, &model, body, &cluster_posts)
                         .await
                     {
                         Ok(Some(labels)) => {
-                            return send(labels.map(|labels| TopicLabels {
-                                labels,
-                                labeller: format!("{} + Jev", provider.name()),
-                            }));
+                            return send(labels.map(|labels| TopicLabels { labels, labeller }));
                         }
                         Ok(None) => tracing::warn!(
                             "label proposal did not cover every cluster; using the topic taxonomy"
@@ -375,6 +393,7 @@ impl App {
                     // model's own labels beat Jev's picks there.
                     // Partial labels would leave placeholders; the taxonomy
                     // can still label every cluster.
+                    started(provider.name());
                     match chat_labels(&provider, &model, body, num_clusters).await {
                         Ok(labels) if labels.iter().all(|l| !l.is_empty()) => {
                             return send(Ok(TopicLabels {
@@ -392,6 +411,7 @@ impl App {
                 }
             }
 
+            started(JEV_LABELLER);
             let topics = jev.topics();
             let requests = (0..num_clusters)
                 .map(|c| decisions::cluster_topic_request(&jev.model, &posts(c), &topics))
@@ -411,7 +431,7 @@ impl App {
             send(
                 labels_or_error(labels, first_error).map(|labels| TopicLabels {
                     labels,
-                    labeller: "Jev".to_string(),
+                    labeller: JEV_LABELLER.to_string(),
                 }),
             );
         });
@@ -612,22 +632,6 @@ impl App {
         self.resolve_jev().is_some() || self.has_chat_provider()
     }
 
-    /// Name of the backend `:topics` will use ("Jev", "MLX + Jev", "MLX",
-    /// "OpenRouter", ...).
-    pub(crate) fn topic_labeller_name(&self) -> Option<&'static str> {
-        let Some((_, jev)) = self.resolve_jev() else {
-            return self.resolved_chat_provider_name();
-        };
-        if !jev.propose_labels {
-            return Some("Jev");
-        }
-        Some(match self.resolved_chat_provider_name() {
-            Some("MLX") => "MLX + Jev",
-            Some(_) => "OpenRouter + Jev",
-            None => "Jev",
-        })
-    }
-
     pub(super) fn has_chat_provider(&self) -> bool {
         self.resolve_chat_provider().is_some()
     }
@@ -825,26 +829,6 @@ impl ChatProvider {
         }
     }
 
-    async fn chat_completion(
-        &self,
-        model: &str,
-        messages: Vec<openrouter::types::ChatMessage>,
-        max_tokens: Option<u32>,
-        temperature: Option<f32>,
-        reasoning: Option<openrouter::types::ReasoningConfig>,
-    ) -> Result<openrouter::types::ChatCompletionResponse, Arc<String>> {
-        match self {
-            Self::OpenRouter(client) => client
-                .chat_completion(model, messages, max_tokens, temperature, reasoning)
-                .await
-                .map_err(|e| Arc::new(e.to_string())),
-            Self::Mlx(client) => client
-                .chat_completion(model, messages, max_tokens, temperature, reasoning)
-                .await
-                .map_err(|e| Arc::new(e.to_string())),
-        }
-    }
-
     /// One system + user turn with reasoning turned off, returning the
     /// answer text. Hiding reasoning (`exclude`) is not enough for short
     /// budgets: hidden reasoning still counts against `max_tokens` and can
@@ -897,10 +881,13 @@ impl ChatProvider {
                 other => other,
             }
             .map_err(|e| Arc::new(e.to_string()))?,
-            Self::Mlx(_) => {
-                self.chat_completion(model, messages, Some(max_tokens), Some(0.3), None)
-                    .await?
-            }
+            // No reasoning setting to send: the MLX server turns thinking
+            // off itself, and gives a model that thinks anyway extra room
+            // on top of `max_tokens`.
+            Self::Mlx(client) => client
+                .chat_completion(model, messages, Some(max_tokens), Some(0.3))
+                .await
+                .map_err(|e| Arc::new(e.to_string()))?,
         };
 
         let choice = resp
@@ -908,16 +895,20 @@ impl ChatProvider {
             .first()
             .ok_or_else(|| Arc::new("Chat model returned no choices".to_string()))?;
 
+        let reason = choice.finish_reason.as_deref().unwrap_or("unknown");
+        let out_of_budget = || {
+            Arc::new(
+                "Model exhausted token budget on reasoning \
+                 before producing content (finish_reason: length)"
+                    .to_string(),
+            )
+        };
+
         // Only use `content` -- reasoning/reasoning_content are
         // chain-of-thought fields and must NOT be treated as output.
         let raw = choice.message.content.clone().ok_or_else(|| {
-            let reason = choice.finish_reason.as_deref().unwrap_or("unknown");
             if reason == "length" {
-                Arc::new(
-                    "Model exhausted token budget on reasoning \
-                     before producing content (finish_reason: length)"
-                        .to_string(),
-                )
+                out_of_budget()
             } else {
                 Arc::new(format!(
                     "Chat model returned null content \
@@ -930,11 +921,17 @@ impl ChatProvider {
         // may embed in content.
         let content = openrouter::strip_think_tags(&raw);
         if content.trim().is_empty() {
-            return Err(Arc::new(
-                "Chat model returned empty content \
-                 (after stripping reasoning tags)"
-                    .to_string(),
-            ));
+            // The MLX server strips reasoning itself and sends "" for a
+            // reply that was all reasoning, even with its extra room.
+            return Err(if reason == "length" {
+                out_of_budget()
+            } else {
+                Arc::new(
+                    "Chat model returned empty content \
+                     (after stripping reasoning tags)"
+                        .to_string(),
+                )
+            });
         }
         Ok(content)
     }
@@ -1027,6 +1024,9 @@ fn labels_or_error(
         Ok(labels)
     }
 }
+
+/// Labeller name when Jev picks from the topic taxonomy on its own.
+const JEV_LABELLER: &str = "Jev";
 
 /// Extra `max_tokens` when a model insists on reasoning (hidden reasoning
 /// counts against the budget).
@@ -1178,6 +1178,137 @@ mod tests {
             ordered_embeddings(embedding_response(&[]), 0)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    /// Local stand-in for the MLX chat endpoint: answers each request with
+    /// the next canned reply and records the request bodies.
+    async fn fake_chat_server(
+        replies: Vec<serde_json::Value>,
+    ) -> (String, Arc<std::sync::Mutex<Vec<serde_json::Value>>>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = Arc::clone(&requests);
+        tokio::spawn(async move {
+            for reply in replies {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut raw = Vec::new();
+                let body = loop {
+                    let mut chunk = [0u8; 4096];
+                    let n = stream.read(&mut chunk).await.unwrap();
+                    assert!(n > 0, "request ended early");
+                    raw.extend_from_slice(&chunk[..n]);
+                    let Some(split) = raw.windows(4).position(|w| w == b"\r\n\r\n") else {
+                        continue;
+                    };
+                    let head = String::from_utf8_lossy(&raw[..split]).to_ascii_lowercase();
+                    let length: usize = head
+                        .lines()
+                        .find_map(|l| l.strip_prefix("content-length:"))
+                        .map(|v| v.trim().parse().unwrap())
+                        .unwrap_or(0);
+                    if raw.len() >= split + 4 + length {
+                        break raw[split + 4..split + 4 + length].to_vec();
+                    }
+                };
+                seen.lock()
+                    .unwrap()
+                    .push(serde_json::from_slice(&body).unwrap());
+                let reply = reply.to_string();
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\
+                     content-length: {}\r\nconnection: close\r\n\r\n{reply}",
+                    reply.len()
+                );
+                stream.write_all(response.as_bytes()).await.unwrap();
+            }
+        });
+        (url, requests)
+    }
+
+    fn chat_reply(content: &str, finish_reason: &str) -> serde_json::Value {
+        serde_json::json!({
+            "choices": [{
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": finish_reason,
+            }],
+        })
+    }
+
+    async fn mlx_complete(
+        reply: serde_json::Value,
+    ) -> (Result<String, Arc<String>>, Vec<serde_json::Value>) {
+        let (url, requests) = fake_chat_server(vec![reply]).await;
+        let provider = ChatProvider::Mlx(Arc::new(MlxClient::new(url)));
+        let result = provider
+            .complete_text("local/model", "Label it.", "posts".into(), 32)
+            .await;
+        let requests = requests.lock().unwrap().clone();
+        (result, requests)
+    }
+
+    #[tokio::test]
+    async fn mlx_chat_sends_the_budget_and_no_reasoning_setting() {
+        let (result, requests) = mlx_complete(chat_reply("Rust tooling", "stop")).await;
+        assert_eq!(result.unwrap(), "Rust tooling");
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0]["max_tokens"], 32);
+        assert!(requests[0].get("reasoning").is_none());
+    }
+
+    #[tokio::test]
+    async fn mlx_reply_that_was_all_reasoning_reports_the_budget() {
+        // The server already gave the reasoning extra room; asking again
+        // would not help.
+        let (result, requests) = mlx_complete(chat_reply("", "length")).await;
+        let error = result.unwrap_err();
+        assert!(error.contains("exhausted token budget"), "{error}");
+        assert_eq!(requests.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn chat_only_topics_report_their_labeller_before_the_labels() {
+        use crate::auth::credentials::CredentialSet;
+        use crate::config::AppConfig;
+        use crate::embeddings::cluster::ClusterResult;
+
+        let (url, _) = fake_chat_server(vec![chat_reply("Cluster 0: Rust", "stop")]).await;
+        let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
+        app.mlx_client = Some(Arc::new(MlxClient::new(url)));
+        app.mlx_chat_supported = true;
+        app.cluster_result = Some(ClusterResult {
+            points: vec![(0.0, 0.0)],
+            labels: vec![0],
+            tweet_ids: vec!["1".into()],
+            tweet_texts: vec!["Async Rust finally clicked".into()],
+            conversation_ids: vec![None],
+            author_ids: vec![None],
+            cluster_topics: vec![String::new()],
+        });
+
+        app.start_cluster_topics();
+        assert!(app.cluster_topics_loading);
+        assert_eq!(app.cluster_topics_labeller, None);
+
+        let mut hints = Vec::new();
+        while app.cluster_topics_loading {
+            let event = tokio::time::timeout(std::time::Duration::from_secs(5), app.events.next())
+                .await
+                .expect("topics finish")
+                .unwrap();
+            if let Event::App(event) = event {
+                app.handle_app_event(*event);
+                hints.push(app.cluster_topics_labeller.clone());
+            }
+        }
+        assert_eq!(hints, vec![Some("MLX".to_string()), None]);
+        assert_eq!(app.cluster_result.unwrap().cluster_topics, vec!["Rust"]);
+        assert_eq!(
+            app.status_message.as_deref(),
+            Some("MLX generated 1/1 topic labels")
         );
     }
 

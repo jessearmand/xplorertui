@@ -73,6 +73,18 @@ MLX_DEFAULT_MODEL=mlx-community/embeddinggemma-2-mxfp8 uv run uvicorn server:app
 
 A model with no catalog, or no prompt for the task, embeds the text as given; so does a request without `task`. Queries and documents take different prompts, so a search sends two requests. xplorertui sends `clustering` for `:cluster`, and `search_query` plus `document` for search ranking.
 
+## Chat models
+
+`ModelRegistry.get_chat_model` tries `mlx-lm` first and falls back to `mlx-vlm`. Thinking is always asked off: the server passes `enable_thinking=False` to the model's chat template and strips any thinking block from the answer. There is no request field for it.
+
+`enable_thinking` is a template variable, so a model whose chat template does not read it thinks anyway. To keep a short budget for the answer, `max_tokens` caps the answer only. Thinking tokens are not counted against it; they have their own limit, `THINKING_HEADROOM_TOKENS` (2,048) in `server.py`. A model that does not think stops at `max_tokens` as before.
+
+The response reports what happened:
+
+- `usage.completion_tokens` counts every generated token, thinking included, so it can be larger than `max_tokens`.
+- `usage.completion_tokens_details.reasoning_tokens` counts the thinking tokens that were stripped.
+- `finish_reason` is `length` when the answer reached `max_tokens` or the thinking used all its headroom. In the second case the content is empty.
+
 ## Module Layout
 
 - **`server.py`** — FastAPI app, lifespan, endpoints

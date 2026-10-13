@@ -149,6 +149,9 @@ pub enum AppEvent {
     /// OpenRouter embedding model); prompts the user to select one.
     EmbeddingProviderMissing(ClusterSource),
     GenerateClusterTopics,
+    /// The labeller the `:topics` run of this generation has started on
+    /// (e.g. "MLX + Jev"). A run can move on to another one.
+    ClusterTopicsLabeller(u64, String),
     ClusterTopicsGenerated(u64, ApiResult<TopicLabels>),
 }
 
