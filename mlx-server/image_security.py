@@ -11,6 +11,7 @@ import os
 import socket
 from collections.abc import Iterable
 from io import BytesIO
+from multiprocessing.connection import Connection
 from typing import cast
 from urllib.parse import urlsplit
 
@@ -244,7 +245,7 @@ def _decode_base64(value: str) -> bytes:
     return result
 
 
-def _decoder_worker(data: bytes, connection: object) -> None:
+def _decoder_worker(data: bytes, connection: Connection) -> None:
     """Parse an image in a disposable, resource-limited child process."""
     try:
         import resource
@@ -268,11 +269,11 @@ def _decoder_worker(data: bytes, connection: object) -> None:
                 raise UnsafeImage("image dimensions exceed limit")
             image.load()
             safe = image.convert("RGB")
-            connection.send((True, safe.size, safe.tobytes()))  # type: ignore[attr-defined]
+            connection.send((True, safe.size, safe.tobytes()))
     except Exception as exc:
-        connection.send((False, str(exc)))  # type: ignore[attr-defined]
+        connection.send((False, str(exc)))
     finally:
-        connection.close()  # type: ignore[attr-defined]
+        connection.close()
 
 
 def _decode_isolated(data: bytes):
