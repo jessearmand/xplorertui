@@ -217,8 +217,41 @@ def test_thinking_tags_split_across_tokens(chat):
     result = chat(segments)
     assert result["content"] == "Rust tooling"
     assert result["finish_reason"] == "stop"
-    # The first fragment cannot be told from answer text yet.
+    # The first fragment is held back, then counted as thinking.
+    assert result["reasoning_tokens"] == 5
+
+
+def test_split_opening_tag_does_not_use_the_answer_budget(chat):
+    # MAX_TOKENS is 4: charging `<th` to the answer would cut "d".
+    segments = ["<th", "ink>", "hm", "</think>", "a ", "b ", "c ", "d"]
+    result = chat(segments)
+    assert result["content"] == "a b c d"
     assert result["reasoning_tokens"] == 4
+
+
+def test_split_closing_tag_with_thinking_opened_by_the_prompt(chat):
+    segments = ["hm", "</th", "ink>", "a ", "b ", "c ", "d"]
+    result = chat(segments, prompt_suffix="\nassistant: <think>\n")
+    assert result["content"] == "a b c d"
+    assert result["reasoning_tokens"] == 3
+
+
+def test_text_that_only_looks_like_a_tag_start_is_answer(chat):
+    result = chat(["a ", "<", "b ", "c ", "d ", "e"])
+    assert result["content"] == "a <b c"
+    assert result["finish_reason"] == "length"
+    assert result["reasoning_tokens"] == 0
+
+
+def test_held_tokens_that_are_answer_text_do_not_pass_the_cap(chat):
+    # `<`, `t`, `h` are held as a possible `<think>`; `x` rules it out and
+    # all four count as answer at once, three more than the cap allows.
+    assert chat(["a ", "b ", "c ", "<", "t", "h", "x ", "y"]) == {
+        "content": "a b c <",
+        "finish_reason": "length",
+        "completion_tokens": MAX_TOKENS,
+        "reasoning_tokens": 0,
+    }
 
 
 def test_tracking_work_does_not_grow_with_the_reply():

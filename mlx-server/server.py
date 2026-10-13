@@ -490,6 +490,9 @@ def _collect_reply(
     segments: list[str] = []
     tokens: list[Any] = []
     prompt_tokens = generated = reasoning_tokens = 0
+    # Tokens whose text may be the start of a thinking tag split across
+    # segments: charged to neither budget until the tag is complete or ruled out.
+    pending = 0
     finish_reason = None
     stopped_here = False
 
@@ -503,12 +506,24 @@ def _collect_reply(
             prompt_tokens = response.prompt_tokens
             finish_reason = response.finish_reason
             if thinking.feed(response.text):
-                reasoning_tokens += step
+                reasoning_tokens += step + pending
+                pending = 0
+            elif thinking.partial_tag:
+                pending += step
+            else:
+                # Not a tag after all: the held tokens were answer text.
+                pending = 0
             if finish_reason is not None:
                 # The stream's last response: it has flushed its text.
                 break
             tokens.append(response.token)
-            if generated - reasoning_tokens >= max_tokens:
+            excess = generated - reasoning_tokens - pending - max_tokens
+            if excess >= 0:
+                # Held tokens that turned out to be answer text are all
+                # counted at once and can pass the cap: drop the extra ones.
+                if excess:
+                    del tokens[-excess:]
+                    generated -= excess
                 stopped_here = True
                 finish_reason = "length"
                 break
@@ -587,6 +602,19 @@ class _ThinkingTracker:
         # Keep only what could still be the start of a tag.
         self._carry = text[pos:][-(_LONGEST_THINKING_TAG - 1) :]
         return thinking
+
+    @property
+    def partial_tag(self) -> bool:
+        """True if the stream, outside a thinking block, ends with the start
+        of an opening tag (e.g. `<th`), so its last tokens can't be classified
+        yet."""
+        if self._closing_tag is not None:
+            return False
+        return any(
+            self._carry.endswith(tag[:n])
+            for tag in _THINKING_TAGS
+            for n in range(1, len(tag))
+        )
 
 
 def _maybe_build_optiq_prompt_cache(model, model_id: str):
