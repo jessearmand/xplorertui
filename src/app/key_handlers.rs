@@ -355,6 +355,12 @@ impl App {
             KeyCode::Char('m') => {
                 self.show_status_detail();
             }
+            KeyCode::Char(']') if matches!(self.current_view(), Some(ViewKind::Thread(_))) => {
+                self.cycle_photo(1);
+            }
+            KeyCode::Char('[') if matches!(self.current_view(), Some(ViewKind::Thread(_))) => {
+                self.cycle_photo(-1);
+            }
             KeyCode::Char('f') => {
                 if is_model_view {
                     self.model_search.clear();

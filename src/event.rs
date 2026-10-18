@@ -153,6 +153,24 @@ pub enum AppEvent {
     /// (e.g. "MLX + Jev"). A run can move on to another one.
     ClusterTopicsLabeller(u64, String),
     ClusterTopicsGenerated(u64, ApiResult<TopicLabels>),
+
+    // -- Photos --
+    /// A photo for the thread view, encoded for the terminal.
+    PhotoReady {
+        url: String,
+        result: ApiResult<PhotoProtocol>,
+    },
+}
+
+/// A photo encoded for the terminal's graphics protocol, ready to draw.
+#[derive(Clone)]
+pub struct PhotoProtocol(pub Arc<ratatui_image::protocol::Protocol>);
+
+impl std::fmt::Debug for PhotoProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let size = self.0.size();
+        write!(f, "PhotoProtocol({}x{} cells)", size.width, size.height)
+    }
 }
 
 /// Cluster labels from `:topics`, with the backend that produced them.

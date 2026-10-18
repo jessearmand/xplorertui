@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use super::{App, ClusterSource};
-use crate::api::types::{Includes, Tweet, User};
+use crate::api::types::{Includes, Media, Tweet, User};
 use crate::event::{ApiResult, AppEvent, Event, TopicLabels, ViewKind};
 use crate::mlx::client::{EmbedTask, MlxClient};
 use crate::openrouter;
@@ -593,14 +593,23 @@ impl App {
         }
     }
 
-    pub(super) fn cache_users_from_includes(&mut self, includes: &Option<Includes>) {
-        if let Some(inc) = includes
-            && let Some(users) = &inc.users
-        {
-            for user in users {
-                self.users_cache.insert(user.id.clone(), user.clone());
-            }
+    /// Cache the users and media of a response for author and photo lookup.
+    pub(super) fn cache_includes(&mut self, includes: &Option<Includes>) {
+        let Some(inc) = includes else {
+            return;
+        };
+        for user in inc.users.iter().flatten() {
+            self.users_cache.insert(user.id.clone(), user.clone());
         }
+        for media in inc.media.iter().flatten() {
+            self.media_cache
+                .insert(media.media_key.clone(), media.clone());
+        }
+    }
+
+    /// Look up a photo or video by its media key from the includes cache.
+    pub fn lookup_media(&self, media_key: &str) -> Option<&Media> {
+        self.media_cache.get(media_key)
     }
 
     /// Look up a user by their ID from the includes cache.

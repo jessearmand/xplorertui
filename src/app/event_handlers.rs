@@ -77,7 +77,7 @@ impl App {
                 self.home_timeline.loading = false;
                 match result {
                     Ok(resp) => {
-                        self.cache_users_from_includes(&resp.includes);
+                        self.cache_includes(&resp.includes);
                         self.home_timeline.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.home_timeline.includes = resp.includes;
@@ -99,7 +99,7 @@ impl App {
                 self.viewed_user_timeline.loading = false;
                 match result {
                     Ok(resp) => {
-                        self.cache_users_from_includes(&resp.includes);
+                        self.cache_includes(&resp.includes);
                         self.viewed_user_timeline.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.viewed_user_timeline.includes = resp.includes;
@@ -116,7 +116,7 @@ impl App {
                 self.loading = false;
                 match *result {
                     Ok(resp) => {
-                        self.cache_users_from_includes(&resp.includes);
+                        self.cache_includes(&resp.includes);
                         if let Some(tweet) = resp.data {
                             let conv_id = tweet
                                 .conversation_id
@@ -144,7 +144,7 @@ impl App {
                 self.loading = false;
                 match result {
                     Ok(resp) => {
-                        self.cache_users_from_includes(&resp.includes);
+                        self.cache_includes(&resp.includes);
                         self.thread_tweets = resp.data.unwrap_or_default();
                         // Push the thread view if not already on it.
                         if self.current_view() != Some(&ViewKind::Thread(conversation_id.clone())) {
@@ -179,7 +179,7 @@ impl App {
                 self.search_results.loading = false;
                 match result {
                     Ok(resp) => {
-                        self.cache_users_from_includes(&resp.includes);
+                        self.cache_includes(&resp.includes);
                         self.search_results.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.search_results.includes = resp.includes;
@@ -206,7 +206,7 @@ impl App {
                 self.mentions.loading = false;
                 match result {
                     Ok(resp) => {
-                        self.cache_users_from_includes(&resp.includes);
+                        self.cache_includes(&resp.includes);
                         self.mentions.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.mentions.includes = resp.includes;
@@ -227,7 +227,7 @@ impl App {
                 self.bookmarks.loading = false;
                 match result {
                     Ok(resp) => {
-                        self.cache_users_from_includes(&resp.includes);
+                        self.cache_includes(&resp.includes);
                         self.bookmarks.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
                         self.bookmarks.includes = resp.includes;
@@ -382,6 +382,9 @@ impl App {
                         self.set_error(format!("Clustering error: {e}"));
                     }
                 }
+            }
+            AppEvent::PhotoReady { url, result } => {
+                self.on_photo_ready(url, result);
             }
             AppEvent::EmbeddingProviderMissing(source) => {
                 self.cluster_loading = false;

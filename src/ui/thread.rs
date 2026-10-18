@@ -5,6 +5,7 @@ use ratatui::widgets::{Block, Borders, Widget};
 
 use crate::api::types::Tweet;
 use crate::app::App;
+use crate::ui::photo::PhotoPanel;
 use crate::ui::tweet::{TweetCard, tweet_card_height};
 
 /// Thread/conversation view: root tweet at top, replies below.
@@ -59,13 +60,30 @@ impl Widget for ThreadView<'_> {
                 TweetCard::new(root, author).render(root_area, buf);
                 y += render_h;
             }
+        }
 
-            // Separator
-            if y < inner.y + inner.height {
-                let sep = "\u{2550}".repeat(content_width as usize);
-                buf.set_string(inner.x + 1, y, &sep, Style::default().fg(Color::Cyan));
-                y += 1;
+        // The focused post's photo, above the replies.
+        let mut photo_shown = false;
+        if let Some(focused) = self.app.focused_photo() {
+            let panel = PhotoPanel::new(
+                self.app.photo_views.get(&focused.url),
+                &focused,
+                self.app.picker.protocol_type(),
+            );
+            let remaining = (inner.y + inner.height).saturating_sub(y);
+            let panel_h = panel.height().min(remaining);
+            if panel_h > 0 {
+                panel.render(Rect::new(inner.x + 1, y, content_width, panel_h), buf);
+                y += panel_h;
+                photo_shown = true;
             }
+        }
+
+        // Separator
+        if (self.root.is_some() || photo_shown) && y < inner.y + inner.height {
+            let sep = "\u{2550}".repeat(content_width as usize);
+            buf.set_string(inner.x + 1, y, &sep, Style::default().fg(Color::Cyan));
+            y += 1;
         }
 
         if self.replies.is_empty() {

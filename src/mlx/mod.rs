@@ -1,5 +1,4 @@
 pub mod client;
-pub mod media;
 
 use thiserror::Error;
 
