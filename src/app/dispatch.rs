@@ -242,6 +242,9 @@ impl App {
                     .collect()
             })
             .collect();
+        let photo_urls =
+            super::clustering::topic_photo_urls(result, decisions::MAX_POSTS_PER_CLUSTER);
+        let photo_cache = Arc::clone(&self.photo_cache);
         let chat = self
             .resolve_chat_provider()
             .filter(|_| jev.propose_labels)
@@ -263,6 +266,12 @@ impl App {
                 |c: usize| -> Vec<&str> { cluster_posts[c].iter().map(String::as_str).collect() };
 
             if let Some((provider, model, body)) = chat {
+                // Photos only go to the pick round. Download them while
+                // the tech check and the label proposal run.
+                let photos = tokio::spawn(super::clustering::fetch_topic_photos(
+                    photo_cache,
+                    photo_urls,
+                ));
                 let tech_requests = (0..num_clusters)
                     .map(|c| decisions::tech_request(&jev.model, &posts(c)))
                     .collect();
@@ -273,8 +282,16 @@ impl App {
                 if tech_share.is_some_and(|s| s >= decisions::MIN_TECH_SHARE) {
                     let labeller = format!("{} + Jev", provider.name());
                     started(&labeller);
-                    match propose_then_pick(&client, &jev, &provider, &model, body, &cluster_posts)
-                        .await
+                    match propose_then_pick(
+                        &client,
+                        &jev,
+                        &provider,
+                        &model,
+                        body,
+                        &cluster_posts,
+                        photos,
+                    )
+                    .await
                     {
                         Ok(Some(labels)) => {
                             return send(labels.map(|labels| TopicLabels { labels, labeller }));
@@ -287,6 +304,7 @@ impl App {
                         }
                     }
                 } else {
+                    photos.abort();
                     // Non-tech timeline (or Jev couldn't tell): the chat
                     // model's own labels beat Jev's picks there.
                     // Partial labels would leave placeholders; the taxonomy
@@ -932,8 +950,9 @@ async fn propose_then_pick(
     model: &str,
     body: String,
     cluster_posts: &[Vec<String>],
+    photos: tokio::task::JoinHandle<Vec<Vec<Option<Arc<str>>>>>,
 ) -> Result<Option<ApiResult<Vec<String>>>, Arc<String>> {
-    use crate::openrouter::decisions;
+    use crate::openrouter::{decision_photos, decisions};
 
     let num_clusters = cluster_posts.len();
     let content = provider
@@ -943,15 +962,29 @@ async fn propose_then_pick(
             body,
             decisions::propose_max_tokens(num_clusters),
         )
-        .await?;
+        .await
+        .inspect_err(|_| photos.abort())?;
     let Some(candidates) = decisions::parse_label_candidates(&content, num_clusters) else {
+        photos.abort();
         return Ok(None);
     };
+    let photos = photos.await.unwrap_or_else(|e| {
+        tracing::warn!("photo downloads failed ({e}); labelling from text only");
+        Vec::new()
+    });
+    let sent = photos.iter().flatten().filter(|p| p.is_some()).count();
+    tracing::info!("{sent} photos go with the Jev pick round");
     let requests = cluster_posts
         .iter()
-        .map(|posts| {
+        .enumerate()
+        .map(|(c, posts)| {
             let posts: Vec<&str> = posts.iter().map(String::as_str).collect();
-            decisions::pick_label_request(&jev.model, &posts, &candidates)
+            let mut req = decisions::pick_label_request(&jev.model, &posts, &candidates);
+            if let Some(cluster_photos) = photos.get(c) {
+                let refs: Vec<Option<&str>> = cluster_photos.iter().map(Option::as_deref).collect();
+                decision_photos::attach_photos(&mut req, &refs);
+            }
+            req
         })
         .collect();
     let responses = client.decide_all(requests, jev.concurrency).await;

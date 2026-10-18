@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod client;
+pub mod decision_photos;
 pub mod decisions;
 pub mod types;
 

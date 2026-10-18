@@ -263,6 +263,61 @@ fn skipped(result: ClusterResult, reason: String) -> ClusterResult {
     }
 }
 
+/// Photo URLs to send with each cluster's pick request, in the order of
+/// the cluster's representative posts. Only posts with thin text send
+/// their photo, within the per-cluster and per-run budgets.
+pub(super) fn topic_photo_urls(
+    result: &ClusterResult,
+    posts_per_cluster: usize,
+) -> Vec<Vec<Option<String>>> {
+    use crate::openrouter::decision_photos::{
+        MAX_PHOTOS_PER_CLUSTER, MAX_PHOTOS_PER_RUN, select_photos,
+    };
+
+    let representatives: Vec<Vec<usize>> = (0..result.num_clusters())
+        .map(|c| result.representative_indices(c, posts_per_cluster))
+        .collect();
+    let wants: Vec<Vec<bool>> = representatives
+        .iter()
+        .map(|idx| idx.iter().map(|&i| result.wants_photo(i)).collect())
+        .collect();
+    let chosen = select_photos(&wants, MAX_PHOTOS_PER_CLUSTER, MAX_PHOTOS_PER_RUN);
+    representatives
+        .iter()
+        .zip(chosen)
+        .map(|(idx, chosen)| {
+            idx.iter()
+                .zip(chosen)
+                .map(|(&i, yes)| yes.then(|| result.photo_urls[i].clone()).flatten())
+                .collect()
+        })
+        .collect()
+}
+
+/// Download the photos of `topic_photo_urls` and return their `data:` URLs
+/// in the same shape. A photo that fails or times out is `None`.
+pub(super) async fn fetch_topic_photos(
+    cache: Arc<PhotoCache>,
+    urls: Vec<Vec<Option<String>>>,
+) -> Vec<Vec<Option<Arc<str>>>> {
+    let flat: Vec<String> = urls.iter().flatten().flatten().cloned().collect();
+    let mut fetched = cache
+        .get_many(flat, BATCH_TIMEOUT, BATCH_CONCURRENCY)
+        .await
+        .into_iter();
+    urls.iter()
+        .map(|cluster| {
+            cluster
+                .iter()
+                .map(|url| {
+                    url.as_ref()?;
+                    fetched.next().flatten().map(|p| Arc::clone(&p.data_url))
+                })
+                .collect()
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342,5 +397,30 @@ mod tests {
         ))));
         assert!(!app.cluster_fill_in_flight);
         assert!(!app.refresh_then_cluster);
+    }
+
+    #[test]
+    fn topic_photos_follow_the_representative_order_and_budget() {
+        let result = ClusterResult {
+            labels: vec![0, 0, 0, 1],
+            tweet_texts: vec![
+                "ramen".into(),
+                "a long post that needs no photo at all, because its words carry the whole point"
+                    .into(),
+                "lunch".into(),
+                "cat".into(),
+            ],
+            photo_urls: vec![
+                Some("p0".into()),
+                Some("p1".into()),
+                Some("p2".into()),
+                Some("p3".into()),
+            ],
+            representatives: vec![vec![2, 1, 0], vec![3]],
+            ..Default::default()
+        };
+        let urls = topic_photo_urls(&result, 8);
+        assert_eq!(urls[0], vec![Some("p2".into()), None, Some("p0".into())]);
+        assert_eq!(urls[1], vec![Some("p3".into())]);
     }
 }
