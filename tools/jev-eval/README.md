@@ -1,7 +1,8 @@
 # Jev cluster-label evaluation
 
 Scripts behind §9 of `docs/jev-design.md`: why Jev's taxonomy labels collide on
-real timelines, and how propose-then-pick compares.
+real timelines, and how propose-then-pick compares. `exp_images.py` is behind
+§10: Jev 1.13 against 1.14 on posts in six languages, and what photos cost.
 
 Data (post text, embeddings, API cache) is written to `scratchpad/jev-eval/`
 (override with `JEV_EVAL_DATA`) and is not committed. `corpus_ids.json` lists
@@ -27,5 +28,21 @@ scratchpad/.venv/bin/python tools/jev-eval/exp_posts.py      # results_posts.jso
   distinguishability.
 - `exp_posts.py`: per-post topic accuracy of Jev vs Luna against Claude
   Sonnet 5.5 reference labels.
+- `exp_images.py`: per-post topics on multilingual posts (Jev 1.13 and 1.14
+  against Claude Sonnet 5.5 reference labels), photo posts with text only,
+  text and photo, and photo only, photo tokens by resolution, and photos in
+  one cluster request. It reads `xplorertui search` output and calls
+  OpenRouter with `OPENROUTER_API_KEY` or the key `xplorertui
+  openrouter-auth` stored. Its data goes to `scratchpad/jev-eval/images/`.
+
+  ```bash
+  mkdir -p scratchpad/jev-eval/images/posts
+  fnox exec -- xplorertui search "(AI OR GPU OR football) has:images -is:retweet lang:en" \
+    > scratchpad/jev-eval/images/posts/en_img.jsonl   # one file per query
+  uv run --with pillow --with requests python tools/jev-eval/exp_images.py ref     # reference labels
+  uv run --with pillow --with requests python tools/jev-eval/exp_images.py text    # text only
+  uv run --with pillow --with requests python tools/jev-eval/exp_images.py images  # photo runs
+  uv run --with pillow --with requests python tools/jev-eval/exp_images.py summary # results_images.json
+  ```
 - `results_*.json`: the run reported in the design doc (labels and scores,
   no post text).

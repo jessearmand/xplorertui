@@ -2,15 +2,19 @@
 
 Status: A-i (`:topics` via Jev) and B (`xplorertui rank`) implemented, plus a
 per-tweet `xplorertui classify`, in `src/openrouter/decisions.rs`. See §8 for
-live measurements, which changed parts of this design. Sources checked 2026-09-27:
-OpenRouter Jev hub, Jev tutorial, Decisions API reference, the
-"Classify and Tag Text at Scale" cookbook, and the TypeSafe `Choice` and
-`State` docs.
+live measurements, which changed parts of this design. §10 adds photos (in
+the thread view, in Jev cluster requests and in embeddings), larger clusters,
+and the move to Jev 1.14. Sources checked 2026-09-27: OpenRouter Jev hub, Jev
+tutorial, Decisions API reference, the "Classify and Tag Text at Scale"
+cookbook, and the TypeSafe `Choice` and `State` docs; for §10, 2026-10-18:
+TypeSafe's Images page, OpenRouter's Multimodal Decisions guide and
+Embeddings reference, and the `ratatui-image` README.
 
 ## 1. What Jev is (and isn't)
 
-`typesafe/jev-1.13` is a *decision* model, not a generator. You send a `state`
-(string, JSON object or array; 32k-token context) and a map of typed
+`typesafe/jev-1.14` (the default since §10; 1.13 before) is a *decision*
+model, not a generator. You send a `state` (string, JSON object or array; 262k
+tokens on OpenRouter, 32k when this was written) and a map of typed
 `questions`, and you get back probabilities:
 
 | Primitive | Answers | Returns |
@@ -28,14 +32,18 @@ OpenRouter Jev hub, Jev tutorial, Decisions API reference, the
   adding questions barely changes latency.
 - **It cannot write a label.** It only picks among options you supply.
 - **It's English-first.** The docs say other languages, CJK especially, are less
-  accurate.
+  accurate. On 134 real posts in six languages (§10), 1.14 was as accurate as
+  1.13 and better calibrated, but Korean and Chinese still trail German and
+  Spanish.
+- **It reads images** (both 1.13 and 1.14): PNG or JPEG parts in the `state`.
+  See §10 for the limits.
 
 ## 2. What xplorertui does today
 
 ```
 :cluster
   tweets ──embed (MLX Qwen3-Embedding / OpenRouter)──► vectors
-         ──k-means (k = 5, fixed)──► labels
+         ──k-means (k = 5, fixed; §10: √(n/2) in 4..10)──► labels
          ──PCA 2D──► scatter plot (ui/cluster.rs)
          ──closest-to-centroid tweet──► placeholder topic
   :topics (optional)
@@ -167,7 +175,7 @@ This also opens up search features that embeddings can't do:
 | 2D map / scatter plot | ✅ | ~ | needs a vector space (see idea below) |
 | Retrieval over large or cached corpora | ✅ | ❌ | a query is O(1) against cached vectors; Jev is O(N) per query and judgments are query-specific |
 | Near-duplicate / "more like this" | ✅ | ❌ | pairwise; Jev would be O(N²) |
-| Non-English / CJK tweets | ✅ (Qwen3 multilingual) | ⚠️ | Jev is English-first; route on the `lang` field we already fetch |
+| Non-English / CJK tweets | ✅ (Qwen3 multilingual) | ⚠️ | Jev is English-first; 1.14 narrows the gap (§10); route on the `lang` field we already fetch |
 | Offline / local / private | ✅ (MLX) | ❌ | Jev is cloud-only (though cheap) |
 | Labelling clusters | ⚠️ (centroid tweet) | ✅ | typed, no parsing, ~one round |
 | Precise relevance of top-K | ⚠️ (bi-encoder) | ✅ | cross-attention judgment + calibrated probs |
@@ -430,3 +438,126 @@ posts), returned as 502 "refused to answer"; those are no longer retried.
   A3 sidesteps this; a display-name field would fix it for taxonomies.
 - Representative posts are still the first 8 in timeline order, not the
   ones closest to the centroid.
+
+## 10. Photos, larger clusters, and Jev 1.14 (2026-10-18)
+
+Scripts and results: `tools/jev-eval/exp_images.py` and
+`results_images.json`. The posts came from `xplorertui search` with keyword
+queries per language, so their topics are easier than a real timeline's.
+Treat small differences as noise.
+
+### What the APIs accept
+
+- **Jev reads images through OpenRouter without a header.** TypeSafe's own
+  API needs `TypeSafe-Danger-Zone-Images: true`; OpenRouter answered the
+  same with and without it, for 1.13 and 1.14.
+- **Image part:** `{"type": "image_url", "image_url": {"url":
+  "data:image/jpeg;base64,…"}}`. Remote URLs are not fetched. Jev reads
+  image parts at any depth of the `state`, so a post can be
+  `{"text": …, "image": <part>}` inside the existing `posts` array.
+- **Limits:** PNG or JPEG only (no WebP, no GIF, no animated PNG);
+  280–1568 px a side (OpenRouter says 256; TypeSafe says 280, so we use 280);
+  78,400–2,458,624 px in total; 16 MiB a file. Images outside the limits are
+  rejected, never resized. EXIF orientation is not applied.
+- **X photo sizes:** `?format=jpg&name=small` gives 680 px on the long side,
+  inside the range for every photo we saw. `name=thumb` (150 px) is under
+  the minimum. The app always asks for `small` and pads a short side under
+  280 px with black instead of upscaling.
+
+### Cost and time
+
+| Photo size sent | Input tokens (photo only) | Jev latency |
+|---|---|---|
+| `small`, 680 px | 1,383–1,692 | 0.44–0.56 s |
+| `medium`, 1200 px | 2,844–3,788 | 0.47–0.80 s |
+| 1568 px | 4,274–4,835 | 0.48–0.83 s |
+
+A request without a photo used about 600 tokens, so a `small` photo adds
+about 800, at the normal input price. One cluster request with 8 posts took
+0.48 s with no photos, 0.60 s with 2, 0.81 s with 4 and 1.06 s with 8 (1,357
+→ 7,727 input tokens). Downloads were the slow part: 45 of 53 X photos
+arrived in under 0.1 s, but 8 took 10–12 s.
+
+### Accuracy
+
+Per-post topic over the 20-topic taxonomy plus `adult`, against Claude
+Sonnet 5.5 reference labels (the reference saw the photo too):
+
+| | Jev 1.13 | Jev 1.14 |
+|---|---|---|
+| All 134 posts | 0.87 | 0.87 |
+| At confidence ≥ 0.8 | 0.92 (105 posts) | 0.96 (102 posts) |
+| German / Spanish / Japanese | 0.95 / 0.95 / 0.94 | 0.95 / 0.95 / 0.94 |
+| Korean / Chinese | 0.75 / 0.75 | 0.80 / 0.75 |
+| Korean / Chinese at confidence ≥ 0.8 | 0.81 / 0.87 | 1.00 / 0.92 |
+| p50 / p90 latency | 0.43 / 0.93 s | 0.42 / 0.48 s |
+
+On the 53 posts with a photo:
+
+| | Jev 1.13 | Jev 1.14 |
+|---|---|---|
+| Text only | 0.89 | 0.87 |
+| Text and photo | 0.89 (0.95 at ≥ 0.8) | 0.85 (1.00 at ≥ 0.8) |
+| Photo only | 0.72 | 0.72 |
+
+The photo did not make the topic more accurate, even on the 15 posts with
+under 60 characters of text: the text alone got 14 of them right. It did
+make high-confidence answers more reliable. A photo alone is a weak but
+usable signal (0.72), which matters for posts with almost no text.
+
+### What the app does with this
+
+- **Default model:** `typesafe/jev-1.14`, pinned. Same accuracy, better
+  calibration, shorter tail latency. `[jev] model` in `config.toml`
+  overrides it.
+- **Posts:** `:cluster` loads more pages until it has `cluster_posts` (100)
+  posts; one X API read returns 100 at most. A search is asked again for
+  100 results. Each page's includes are merged, not replaced, and media go
+  into an app-wide cache keyed by media key.
+- **Clusters:** k = √(n/2), from 4 to 10 (20 posts → 4, 100 → 7, 200 → 10),
+  or `cluster_k`. Ten is the number of cluster colours. The 8 posts a
+  cluster request carries are now the 8 nearest the centroid, not the first
+  8 in timeline order.
+- **Photos to Jev:** only in the pick round of propose-then-pick, and only
+  for posts with under 60 characters of text once links, mentions and
+  hashtags are removed. At most 2 a cluster and 24 a run; clusters take
+  turns. Downloads start with the tech check, 8 at a time, and a photo that
+  takes over 3 s is skipped. At k = 10 that is 20 photos, about 16k extra
+  input tokens (under $0.001) and about 0.1 s more per request.
+- **Photo embeddings:** a cluster where more than 80% of the posts are
+  photos with thin text grouped because the posts have no text, not
+  because they show the same thing. Those posts get one vector of text and
+  photo, and k-means runs again on all posts with the same k. Text and
+  photo vectors must come from the same model to be comparable, so the
+  photo vector comes from the model that embedded the text:
+  `embeddinggemma-2` on the MLX server, `google/gemini-embedding-2` on
+  OpenRouter. A text-only model (Qwen3-Embedding, or an OpenRouter model
+  whose `input_modalities` lack `image`) skips the step, and the status
+  line says why.
+  - The MLX server's `/v1/embeddings/multimodal` returns the text and the
+    image as separate vectors, so a new `/v1/embeddings/documents` puts the
+    image tokens inside the text sequence and returns one vector per post.
+    Checked on `mlx-community/embeddinggemma-2-mxfp8`: a text-only document
+    gives the same vector as `/v1/embeddings` (cosine 1.0); a post with its
+    photo stays near its own text (0.90) and away from an unrelated post
+    (0.71). It loads a second copy of the model with its vision tower on
+    first use; about 1 s for 3 documents on an M-series Mac.
+  - OpenRouter: one input item `{"content": [text part, image part]}` gives
+    one 3,072-dimension vector; a 680 px photo was 258 image tokens
+    ($0.00012). Cosine to its own text 0.72, to an unrelated post 0.31.
+- **Thread view:** the focused post's photo (the selected reply's if it has
+  one, else the root's) in a 48 × 14-cell box, `[` / `]` to page through
+  photos. `ratatui-image` 11.1 draws it with the terminal's protocol: Kitty
+  (Kitty, Ghostty), iTerm2 (iTerm2, WezTerm, Rio) or Sixel (Xterm with
+  `-ti 340`, Foot, mlterm). Terminal.app, Alacritty, Konsole and Warp get
+  half-block characters. The protocol query runs before `App::new`, whose
+  event handler would otherwise read the terminal's reply. Decoding and
+  encoding run on a blocking task; the UI draws the cached result.
+
+### Not done
+
+- Box questions (bounding boxes, 1.14 only).
+- Photos in the tech check, in chat-written labels, or in `classify` /
+  `rank`.
+- Video and GIF frames.
+
