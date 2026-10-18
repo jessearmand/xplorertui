@@ -17,7 +17,7 @@ use super::client::OpenRouterClient;
 pub const DECISIONS_URL: &str = "https://openrouter.ai/api/alpha/decisions";
 
 /// Pinned default. Thresholds are version-specific, so don't track `-latest`.
-pub const DEFAULT_JEV_MODEL: &str = "typesafe/jev-1.13";
+pub const DEFAULT_JEV_MODEL: &str = "typesafe/jev-1.14";
 
 /// Default number of in-flight Decisions requests.
 pub const DEFAULT_CONCURRENCY: usize = 8;

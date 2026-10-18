@@ -49,7 +49,7 @@ cluster_posts = 100      # :cluster loads more pages until it has this many post
 # Optional: label :cluster topics with Jev (TypeSafe) instead of a chat LLM,
 # and set the model for `classify` / `rank`. Needs OpenRouter auth.
 [jev]
-model = "typesafe/jev-1.13" # pin a version; thresholds shift between releases
+model = "typesafe/jev-1.14" # pin a version; thresholds shift between releases
 concurrency = 8
 # topics = { rust = "Rust language and ecosystem", ai_ml = "AI, ML, LLMs" }  # default: built-in taxonomy; `other` is always added
 propose_labels = true # with a chat model available, use it for :topics labels (Jev routes; see below)
