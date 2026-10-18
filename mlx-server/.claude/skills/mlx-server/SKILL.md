@@ -59,13 +59,29 @@ curl -X POST http://localhost:8678/v1/chat/completions \
 ```
 
 ### POST /v1/embeddings/multimodal
-Text + image embeddings.
+Text + image embeddings (separate text and image vectors).
+
+### POST /v1/embeddings/documents
+One vector per `{text, image}` document, with the image tokens inside the text
+sequence, in the same space as `/v1/embeddings` vectors of the same model and
+task. Needs a model with a vision tower (EmbeddingGemma 2); others get a 400
+after only their `config.json` is read. At most 8 images per request.
+
+```bash
+curl -X POST http://localhost:8678/v1/embeddings/documents \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"mlx-community/embeddinggemma-2-mxfp8","task":"clustering","input":[{"text":"lunch","image":"data:image/jpeg;base64,..."}]}'
+```
+
+The first request loads a second copy of the model with its vision tower.
+Model loads and downloads run on the single MLX thread, so a chat model that
+is still downloading blocks every other request until it finishes.
 
 ### GET /v1/models
 List loaded and available models.
 
 ### GET /health
-Health check with capabilities: `{"status": "ok", "capabilities": ["embeddings", "chat"]}`
+Health check with capabilities: `{"status": "ok", "capabilities": ["embeddings", "document_embeddings", "chat"]}`
 
 ## xplorertui Integration
 

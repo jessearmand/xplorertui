@@ -41,6 +41,7 @@ from schemas import (
     ChatCompletionResponse,
     ChatUsage,
     CompletionTokensDetails,
+    DocumentEmbeddingRequest,
     EmbeddingData,
     EmbeddingRequest,
     EmbeddingResponse,
@@ -225,6 +226,60 @@ async def create_multimodal_embeddings(request: MultimodalEmbeddingRequest):
     )
 
 
+@app.post("/v1/embeddings/documents", response_model=EmbeddingResponse)
+async def create_document_embeddings(request: DocumentEmbeddingRequest):
+    """One embedding per document (text plus an optional image).
+
+    The image goes inside the text sequence, so each document gets a single
+    vector in the same space as ``/v1/embeddings`` text vectors.
+    """
+    model_id = request.model or registry.default_model
+    if not model_id:
+        raise HTTPException(status_code=400, detail="No model specified")
+
+    image_values = [doc.image for doc in request.input if doc.image is not None]
+    try:
+        decoded = iter(await decode_images(image_values))
+    except UnsafeImage as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    images = [next(decoded) if doc.image is not None else None for doc in request.input]
+
+    try:
+        model, processor, prompts = await run_mlx(registry.get_document_model, model_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400, detail=f"{model_id} cannot embed images: {e}"
+        ) from e
+    except Exception as e:
+        logger.error("Failed to load document model %s: %s", model_id, e)
+        raise HTTPException(status_code=500, detail=f"Failed to load model: {e}")
+
+    texts = apply_task_prompt(prompts, request.task, [d.text for d in request.input])
+    try:
+        t0 = time.perf_counter()
+        embeddings, tokens = await run_mlx(
+            _embed_documents, model, processor, texts, images
+        )
+        logger.info(
+            "Document embedding complete: %d documents, %d images, %.2fs, model=%s",
+            len(texts),
+            len(image_values),
+            time.perf_counter() - t0,
+            model_id,
+        )
+    except Exception as e:
+        logger.error("Document embedding failed for model %s: %s", model_id, e)
+        raise HTTPException(status_code=500, detail=f"Document embedding failed: {e}")
+
+    return EmbeddingResponse(
+        data=[
+            EmbeddingData(embedding=emb, index=i) for i, emb in enumerate(embeddings)
+        ],
+        model=model_id,
+        usage=EmbeddingUsage(prompt_tokens=tokens, total_tokens=tokens),
+    )
+
+
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def chat_completions(request: ChatCompletionRequest):
     """Generate a chat completion (OpenAI-compatible).
@@ -380,6 +435,32 @@ def _embed_multimodal(model, processor, texts: list[str], images) -> list[list[f
     if output.image_embeds is not None:
         all_embeddings.extend(mx_to_list(output.image_embeds))
     return all_embeddings
+
+
+def _embed_documents(
+    model, processor, texts: list[str], images: list[Any]
+) -> tuple[list[list[float]], int]:
+    """One vector per document, the image after its text. Runs on the MLX thread.
+
+    The processor expands ``image_token`` into the model's soft image tokens,
+    and the model mean-pools text and image tokens together. Documents go
+    one at a time: each image adds a few hundred tokens.
+    """
+    embeddings: list[list[float]] = []
+    tokens = 0
+    for text, image in zip(texts, images, strict=True):
+        if image is None:
+            inputs = processor(text=[text], return_tensors="mlx")
+        else:
+            inputs = processor(
+                text=[f"{text}\n{processor.image_token}"],
+                images=[image],
+                return_tensors="mlx",
+            )
+        output = model(**inputs)
+        embeddings.extend(mx_to_list(output.text_embeds))
+        tokens += int(inputs["attention_mask"].sum().item())
+    return embeddings, tokens
 
 
 # Extra tokens a chat reply may spend on thinking, on top of `max_tokens`.
@@ -739,7 +820,7 @@ async def health():
     return {
         "status": "ok",
         "timestamp": time.time(),
-        "capabilities": ["embeddings", "chat"],
+        "capabilities": ["embeddings", "document_embeddings", "chat"],
     }
 
 
