@@ -1,5 +1,5 @@
 use super::{App, ClusterSource, TimelineState};
-use crate::api::types::Tweet;
+use crate::api::types::{Includes, Tweet};
 use crate::event::{AppEvent, TopicLabels, ViewKind};
 
 impl App {
@@ -53,7 +53,8 @@ impl App {
             | AppEvent::FetchMentions { .. }
             | AppEvent::FetchBookmarks { .. }
             | AppEvent::FetchFollowers { .. }
-            | AppEvent::FetchFollowing { .. }) => {
+            | AppEvent::FetchFollowing { .. }
+            | AppEvent::FetchForCluster { .. }) => {
                 self.loading = true;
                 self.mark_loading_started();
                 // Set per-timeline loading flags so UI widgets know to show
@@ -66,6 +67,12 @@ impl App {
                     AppEvent::FetchUserTimeline { .. } => {
                         self.viewed_user_timeline.loading = true;
                     }
+                    AppEvent::FetchForCluster { source, .. } => match source {
+                        ClusterSource::Home => self.home_timeline.loading = true,
+                        ClusterSource::Mentions => self.mentions.loading = true,
+                        ClusterSource::Bookmarks => self.bookmarks.loading = true,
+                        ClusterSource::Search => self.search_results.loading = true,
+                    },
                     _ => {}
                 }
                 self.dispatch_api_request(evt.clone());
@@ -80,7 +87,7 @@ impl App {
                         self.cache_includes(&resp.includes);
                         self.home_timeline.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
-                        self.home_timeline.includes = resp.includes;
+                        Includes::merge_page(&mut self.home_timeline.includes, resp.includes);
                         self.home_timeline
                             .tweets
                             .extend(resp.data.unwrap_or_default());
@@ -102,7 +109,10 @@ impl App {
                         self.cache_includes(&resp.includes);
                         self.viewed_user_timeline.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
-                        self.viewed_user_timeline.includes = resp.includes;
+                        Includes::merge_page(
+                            &mut self.viewed_user_timeline.includes,
+                            resp.includes,
+                        );
                         self.viewed_user_timeline
                             .tweets
                             .extend(resp.data.unwrap_or_default());
@@ -209,7 +219,7 @@ impl App {
                         self.cache_includes(&resp.includes);
                         self.mentions.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
-                        self.mentions.includes = resp.includes;
+                        Includes::merge_page(&mut self.mentions.includes, resp.includes);
                         self.mentions.tweets.extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
@@ -230,7 +240,7 @@ impl App {
                         self.cache_includes(&resp.includes);
                         self.bookmarks.next_token =
                             resp.meta.as_ref().and_then(|m| m.next_token.clone());
-                        self.bookmarks.includes = resp.includes;
+                        Includes::merge_page(&mut self.bookmarks.includes, resp.includes);
                         self.bookmarks.tweets.extend(resp.data.unwrap_or_default());
                     }
                     Err(e) => {
@@ -364,6 +374,8 @@ impl App {
                     );
                     return;
                 };
+                // A fresh `:cluster` may load more posts again.
+                self.cluster_fill_in_flight = false;
                 self.start_cluster(source);
             }
             AppEvent::ClusteringComplete(result) => {
@@ -371,8 +383,8 @@ impl App {
                 match result {
                     Ok(cluster_result) => {
                         self.cluster_generation += 1;
+                        self.status_message = Some(clustering_status(&cluster_result));
                         self.cluster_result = Some(cluster_result);
-                        self.status_message = Some("Clustering complete!".into());
                         // Auto-trigger topic labelling if Jev or a chat provider is available.
                         if self.has_topic_labeller() {
                             self.start_cluster_topics();
@@ -536,7 +548,26 @@ impl App {
             ClusterSource::Bookmarks => self.bookmarks.tweets.is_empty(),
         };
         if tweets_empty {
+            self.cluster_fill_in_flight = false;
             self.status_message = Some(format!("No tweets to cluster in {source}. Load it first."));
+            return;
+        }
+        // Load more posts first, once: the gate in the source's `*Loaded`
+        // handler calls back here when they arrive.
+        let fill = if self.cluster_fill_in_flight {
+            None
+        } else {
+            self.cluster_fill_request(source)
+        };
+        self.cluster_fill_in_flight = fill.is_some();
+        if let Some(fetch) = fill {
+            self.cluster_source = Some(source);
+            self.refresh_then_cluster = true;
+            self.status_message = Some(format!(
+                "Loading up to {} {source} posts to cluster…",
+                self.config.cluster_posts
+            ));
+            self.events.send(fetch);
             return;
         }
         self.cluster_source = Some(source);
@@ -547,6 +578,23 @@ impl App {
             self.push_view(ViewKind::Cluster);
         }
         self.dispatch_cluster_timeline();
+    }
+}
+
+/// Status line after a clustering run: post and cluster counts, and what
+/// the photo-embedding step did.
+fn clustering_status(result: &crate::embeddings::cluster::ClusterResult) -> String {
+    use crate::embeddings::cluster::PhotoEmbedding;
+
+    let base = format!(
+        "Clustered {} posts into {} clusters",
+        result.tweet_texts.len(),
+        result.num_clusters()
+    );
+    match &result.photo_embedding {
+        PhotoEmbedding::NotNeeded => base,
+        PhotoEmbedding::Applied(n) => format!("{base} ({n} posts embedded with their photo)"),
+        PhotoEmbedding::Skipped(reason) => format!("{base} (photo embeddings skipped: {reason})"),
     }
 }
 

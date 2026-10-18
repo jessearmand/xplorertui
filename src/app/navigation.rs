@@ -476,6 +476,7 @@ impl App {
         let tl = timeline_fn(self);
         tl.tweets.clear();
         tl.next_token = None;
+        tl.includes = None;
         tl.selected_index = 0;
         tl.scroll_offset = 0;
         if let Some(vs) = self.view_stack.last_mut() {

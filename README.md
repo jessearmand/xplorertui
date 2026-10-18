@@ -43,6 +43,8 @@ tick_rate_fps = 30       # UI refresh rate
 default_max_results = 20 # Tweets per API request (10–100)
 default_view = "home"    # One of: home, mentions, bookmarks, search
 openrouter_callback_port = 3000 # OpenRouter OAuth localhost callback port
+cluster_posts = 100      # :cluster loads more pages until it has this many posts
+# cluster_k = 8          # number of clusters; default √(posts / 2), from 4 to 10
 
 # Optional: label :cluster topics with Jev (TypeSafe) instead of a chat LLM,
 # and set the model for `classify` / `rank`. Needs OpenRouter auth.

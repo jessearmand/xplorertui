@@ -8,7 +8,7 @@ use crate::openrouter;
 use crate::openrouter::client::OpenRouterClient;
 use crate::openrouter::types::{EmbeddingResponse, Model};
 
-const DEFAULT_MLX_EMBEDDING_MODEL: &str = "mlx-community/Qwen3-Embedding-0.6B-mxfp8";
+pub(super) const DEFAULT_MLX_EMBEDDING_MODEL: &str = "mlx-community/Qwen3-Embedding-0.6B-mxfp8";
 const DEFAULT_MLX_CHAT_MODEL: &str = "mlx-community/Qwen3.5-0.8B-OptiQ-4bit";
 
 /// Identifies which chat provider the user prefers.
@@ -76,107 +76,6 @@ impl App {
                 model_id: model,
                 result,
             })));
-        });
-    }
-
-    pub(super) fn dispatch_cluster_timeline(&self) {
-        // Try to resolve an embed provider now; if none is available but
-        // an MLX client exists, pass it along so the async task can
-        // re-probe the server (it may have started after the TUI).
-        let embed_provider = self.resolve_embed_provider();
-        let mlx_fallback = if embed_provider.is_none() {
-            self.mlx_client.as_ref().map(|mlx| {
-                let model = self
-                    .config
-                    .mlx_embedding_model
-                    .clone()
-                    .unwrap_or_else(|| DEFAULT_MLX_EMBEDDING_MODEL.to_string());
-                (Arc::clone(mlx), model)
-            })
-        } else {
-            None
-        };
-        let openrouter_fallback = if embed_provider.is_none() {
-            self.resolve_openrouter_embed()
-        } else {
-            None
-        };
-
-        let sender = self.events.sender();
-        let Some(source) = self.cluster_source else {
-            self.events.send(AppEvent::ClusteringComplete(Err(Arc::new(
-                "Internal error: cluster_source not set before dispatch.".into(),
-            ))));
-            return;
-        };
-
-        if embed_provider.is_none() && mlx_fallback.is_none() && openrouter_fallback.is_none() {
-            self.events.send(AppEvent::EmbeddingProviderMissing(source));
-            return;
-        }
-        let tweets = match source {
-            ClusterSource::Home => self.home_timeline.tweets.clone(),
-            ClusterSource::Mentions => self.mentions.tweets.clone(),
-            ClusterSource::Search => self.search_results.tweets.clone(),
-            ClusterSource::Bookmarks => self.bookmarks.tweets.clone(),
-        };
-
-        tokio::spawn(async move {
-            // If we had a resolved provider, use it. Otherwise try MLX
-            // with a live probe, falling back to OpenRouter.
-            let (provider, model) = if let Some((p, m)) = embed_provider {
-                (p, m)
-            } else if let Some((mlx_client, mlx_model)) = mlx_fallback {
-                // Re-probe: check if server is now reachable.
-                let caps = mlx_client.capabilities().await;
-                if caps.iter().any(|c| c == "embeddings") {
-                    // Update flags via event so future calls don't need to re-probe.
-                    let chat = caps.iter().any(|c| c == "chat");
-                    let _ = sender.send(Event::App(Box::new(AppEvent::MLXCapabilitiesProbed {
-                        embed: true,
-                        chat,
-                    })));
-                    (EmbedProvider::Mlx(mlx_client), mlx_model)
-                } else if let Some((p, m)) = openrouter_fallback {
-                    (p, m)
-                } else {
-                    let _ = sender.send(Event::App(Box::new(AppEvent::EmbeddingProviderMissing(
-                        source,
-                    ))));
-                    return;
-                }
-            } else if let Some((p, m)) = openrouter_fallback {
-                (p, m)
-            } else {
-                unreachable!("checked above");
-            };
-            let result = async {
-                let texts: Vec<String> = tweets.iter().map(|t| t.text.clone()).collect();
-                let ids: Vec<String> = tweets.iter().map(|t| t.id.clone()).collect();
-                let conv_ids: Vec<Option<String>> =
-                    tweets.iter().map(|t| t.conversation_id.clone()).collect();
-                let author_ids: Vec<Option<String>> =
-                    tweets.iter().map(|t| t.author_id.clone()).collect();
-
-                let embeddings = provider
-                    .embed(&model, &texts, EmbedTask::Clustering)
-                    .await?;
-
-                let k = 5.min(tweets.len());
-                let cluster_result = crate::embeddings::cluster::build_cluster_result(
-                    &embeddings,
-                    texts,
-                    ids,
-                    conv_ids,
-                    author_ids,
-                    k,
-                );
-
-                Ok(cluster_result)
-            }
-            .await;
-
-            let _ = sender.send(Event::App(Box::new(AppEvent::ClusteringComplete(result))));
         });
     }
 
@@ -337,10 +236,9 @@ impl App {
         let cluster_posts: Vec<Vec<String>> = (0..num_clusters)
             .map(|c| {
                 result
-                    .texts_for_cluster(c)
+                    .representative_texts(c, decisions::MAX_POSTS_PER_CLUSTER)
                     .into_iter()
-                    .take(decisions::MAX_POSTS_PER_CLUSTER)
-                    .map(|(_, t)| t.to_string())
+                    .map(str::to_string)
                     .collect()
             })
             .collect();
@@ -452,6 +350,7 @@ impl App {
         let client = Arc::clone(client);
         let sender = self.events.sender();
         let max_results = self.config.default_max_results;
+        let search_query = self.search_query.clone();
 
         tokio::spawn(async move {
             /// Map an API result to an `AppEvent` and send it through the channel.
@@ -564,6 +463,38 @@ impl App {
                         user_id,
                         result: r,
                     });
+                }
+                AppEvent::FetchForCluster {
+                    source,
+                    page_size,
+                    pagination_token,
+                } => {
+                    let token = pagination_token.as_deref();
+                    match source {
+                        ClusterSource::Home => {
+                            let mut api = client.lock().await;
+                            let result = api.get_home_timeline(page_size, token).await;
+                            send_result(&sender, result, AppEvent::HomeTimelineLoaded);
+                        }
+                        ClusterSource::Mentions => {
+                            let mut api = client.lock().await;
+                            let result = api.get_mentions(page_size, token).await;
+                            send_result(&sender, result, AppEvent::MentionsLoaded);
+                        }
+                        ClusterSource::Bookmarks => {
+                            let mut api = client.lock().await;
+                            let result = api.get_bookmarks(page_size, token).await;
+                            send_result(&sender, result, AppEvent::BookmarksLoaded);
+                        }
+                        ClusterSource::Search => {
+                            let api = client.lock().await;
+                            let result = api.search_tweets(&search_query, page_size, token).await;
+                            send_result(&sender, result, |r| AppEvent::SearchLoaded {
+                                query: search_query,
+                                result: r,
+                            });
+                        }
+                    }
                 }
                 _ => unreachable!("dispatch_api_request called with non-Fetch variant"),
             }
@@ -697,7 +628,7 @@ impl App {
         self.resolve_chat_provider().map(|(_, model)| model)
     }
 
-    fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {
+    pub(super) fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {
         let mlx = self.resolve_mlx_embed();
         let openrouter = self.resolve_openrouter_embed();
         mlx.or(openrouter)
@@ -716,7 +647,7 @@ impl App {
         Some((EmbedProvider::Mlx(Arc::clone(mlx)), model))
     }
 
-    fn resolve_openrouter_embed(&self) -> Option<(EmbedProvider, String)> {
+    pub(super) fn resolve_openrouter_embed(&self) -> Option<(EmbedProvider, String)> {
         let or_client = self.openrouter_client.as_ref()?;
         let model_id = self.selected_embedding_model.as_ref()?;
         Some((
@@ -741,7 +672,7 @@ fn cluster_topic_max_tokens(num_clusters: usize) -> u32 {
 /// server.  Both return `EmbeddingResponse` in the same OpenAI-compatible
 /// format.
 #[derive(Clone)]
-enum EmbedProvider {
+pub(super) enum EmbedProvider {
     OpenRouter(Arc<OpenRouterClient>),
     Mlx(Arc<MlxClient>),
 }
@@ -750,7 +681,7 @@ impl EmbedProvider {
     /// Embed `texts` for `task`, returning one vector per text in input order.
     ///
     /// Only the MLX server takes a task; OpenRouter embeds the text as given.
-    async fn embed(
+    pub(super) async fn embed(
         &self,
         model: &str,
         texts: &[String],
@@ -767,6 +698,27 @@ impl EmbedProvider {
                 .map_err(|e| Arc::new(e.to_string())),
         }?;
         ordered_embeddings(resp, texts.len())
+    }
+
+    /// Embed `(text, photo data URL)` documents, one vector each, in the
+    /// space of `embed` vectors from the same model and task.
+    pub(super) async fn embed_documents(
+        &self,
+        model: &str,
+        documents: &[(String, Arc<str>)],
+        task: EmbedTask,
+    ) -> Result<Vec<Vec<f64>>, Arc<String>> {
+        let resp = match self {
+            Self::OpenRouter(client) => client
+                .embed_documents(model, documents)
+                .await
+                .map_err(|e| Arc::new(e.to_string())),
+            Self::Mlx(client) => client
+                .embed_documents(model, documents, task)
+                .await
+                .map_err(|e| Arc::new(e.to_string())),
+        }?;
+        ordered_embeddings(resp, documents.len())
     }
 
     /// Embed a search query and the documents to score against it.
@@ -1054,11 +1006,7 @@ fn cluster_prompt_body(result: &crate::embeddings::cluster::ClusterResult) -> St
     let mut body = String::new();
     for c in 0..result.num_clusters() {
         body.push_str(&format!("## Cluster {c}\n"));
-        for (_, text) in result
-            .texts_for_cluster(c)
-            .iter()
-            .take(openrouter::decisions::MAX_POSTS_PER_CLUSTER)
-        {
+        for text in result.representative_texts(c, openrouter::decisions::MAX_POSTS_PER_CLUSTER) {
             let truncated: String = text.chars().take(280).collect();
             body.push_str(&format!("- {}\n", truncated.replace('\n', " ")));
         }
@@ -1296,6 +1244,7 @@ mod tests {
             conversation_ids: vec![None],
             author_ids: vec![None],
             cluster_topics: vec![String::new()],
+            ..Default::default()
         });
 
         app.start_cluster_topics();
@@ -1368,6 +1317,7 @@ mod tests {
             conversation_ids: vec![None; n],
             author_ids: vec![None; n],
             cluster_topics: vec![String::new(); 3],
+            ..Default::default()
         };
 
         // Qwen3.5-9B used to spend the whole budget on hidden reasoning.

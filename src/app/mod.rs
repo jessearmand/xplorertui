@@ -1,4 +1,5 @@
 mod auth;
+mod clustering;
 mod commands;
 mod dispatch;
 mod event_handlers;
@@ -220,6 +221,9 @@ pub struct App {
     /// When true, a cluster operation will be triggered after the source
     /// timeline (determined by `cluster_source`) finishes refreshing.
     pub refresh_then_cluster: bool,
+    /// A fetch for more posts to cluster is in flight. The next clustering
+    /// run uses what is loaded and does not fetch again.
+    pub cluster_fill_in_flight: bool,
 
     // Status
     pub status_message: Option<String>,
@@ -327,6 +331,7 @@ impl App {
             selected_cluster: None,
             cluster_source: None,
             refresh_then_cluster: false,
+            cluster_fill_in_flight: false,
             status_message: None,
             popup: None,
             popup_scroll: 0,

@@ -96,6 +96,28 @@ impl OpenRouterClient {
         self.post("/embeddings", &request).await
     }
 
+    /// One embedding per `(text, image)` document. The text and the image
+    /// go into one input item, so a multimodal model such as
+    /// `google/gemini-embedding-2` returns one vector for both, in the same
+    /// space as its text-only vectors. `image` is a `data:` URL.
+    pub async fn embed_documents(
+        &self,
+        model: &str,
+        documents: &[(String, std::sync::Arc<str>)],
+    ) -> Result<super::types::EmbeddingResponse, OpenRouterError> {
+        let input: Vec<serde_json::Value> = documents
+            .iter()
+            .map(|(text, image)| {
+                serde_json::json!({ "content": [
+                    { "type": "text", "text": text },
+                    { "type": "image_url", "image_url": { "url": &**image } },
+                ]})
+            })
+            .collect();
+        let request = serde_json::json!({ "model": model, "input": input });
+        self.post("/embeddings", &request).await
+    }
+
     /// Check status and deserialize the response body.
     async fn handle_response<T: DeserializeOwned>(
         &self,

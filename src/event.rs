@@ -73,6 +73,13 @@ pub enum AppEvent {
         user_id: String,
         pagination_token: Option<String>,
     },
+    /// Load more posts of a cluster source before clustering. The response
+    /// arrives as that source's usual `*Loaded` event.
+    FetchForCluster {
+        source: ClusterSource,
+        page_size: u32,
+        pagination_token: Option<String>,
+    },
 
     // -- API response events (sent from async tasks back to the event loop) --
     HomeTimelineLoaded(ApiResult<ListResponse<Tweet>>),
@@ -214,6 +221,15 @@ impl AppEvent {
             AppEvent::FetchFollowers { user_id, .. } => AppEvent::FollowersLoaded {
                 user_id,
                 result: Err(err),
+            },
+            AppEvent::FetchForCluster { source, .. } => match source {
+                ClusterSource::Home => AppEvent::HomeTimelineLoaded(Err(err)),
+                ClusterSource::Mentions => AppEvent::MentionsLoaded(Err(err)),
+                ClusterSource::Bookmarks => AppEvent::BookmarksLoaded(Err(err)),
+                ClusterSource::Search => AppEvent::SearchLoaded {
+                    query: String::new(),
+                    result: Err(err),
+                },
             },
             AppEvent::FetchFollowing { user_id, .. } => AppEvent::FollowingLoaded {
                 user_id,

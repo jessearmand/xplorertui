@@ -227,6 +227,28 @@ pub struct Includes {
     pub media: Option<Vec<Media>>,
 }
 
+impl Includes {
+    /// Add the includes of one more page to `slot`, so the users, tweets
+    /// and media of earlier pages stay available.
+    pub fn merge_page(slot: &mut Option<Includes>, page: Option<Includes>) {
+        let Some(page) = page else {
+            return;
+        };
+        let Some(current) = slot else {
+            *slot = Some(page);
+            return;
+        };
+        fn extend<T>(into: &mut Option<Vec<T>>, more: Option<Vec<T>>) {
+            if let Some(more) = more {
+                into.get_or_insert_with(Vec::new).extend(more);
+            }
+        }
+        extend(&mut current.users, page.users);
+        extend(&mut current.tweets, page.tweets);
+        extend(&mut current.media, page.media);
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Meta {
     #[serde(default)]
@@ -251,4 +273,34 @@ pub struct ApiError {
     pub type_: Option<String>,
     #[serde(default)]
     pub status: Option<u16>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn media(key: &str) -> Media {
+        serde_json::from_value(serde_json::json!({"media_key": key, "type": "photo"})).unwrap()
+    }
+
+    #[test]
+    fn merging_a_page_keeps_earlier_media() {
+        let mut slot = None;
+        let page = |key: &str| Includes {
+            users: None,
+            tweets: None,
+            media: Some(vec![media(key)]),
+        };
+        Includes::merge_page(&mut slot, Some(page("a")));
+        Includes::merge_page(&mut slot, Some(page("b")));
+        Includes::merge_page(&mut slot, None);
+        let keys: Vec<_> = slot
+            .unwrap()
+            .media
+            .unwrap()
+            .into_iter()
+            .map(|m| m.media_key)
+            .collect();
+        assert_eq!(keys, vec!["a", "b"]);
+    }
 }
