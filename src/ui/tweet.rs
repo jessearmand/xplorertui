@@ -9,9 +9,12 @@ use crate::api::types::{Tweet, User};
 /// Renders a single tweet as a compact card (2-4 lines).
 ///
 /// Layout:
-///   @username · 2h ago                   [RT] [Reply]
-///   Tweet text (may wrap) ...
-///   ♥ 12  🔁 3  💬 5  🔖 1
+///
+/// ```text
+/// @username · 2h ago                   [RT] [Reply]
+/// Tweet text (may wrap) ...
+/// ♥ 12  🔁 3  💬 5  🔖 1
+/// ```
 pub struct TweetCard<'a> {
     pub tweet: &'a Tweet,
     pub author: Option<&'a User>,
