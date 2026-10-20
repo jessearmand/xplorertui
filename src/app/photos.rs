@@ -48,24 +48,16 @@ impl App {
     }
 
     /// The post whose photos the thread view shows: the selected reply when
-    /// it has photos, otherwise the root post. A thread opened from a
-    /// timeline has no root, so the post that started the conversation
-    /// stands in for it.
+    /// it has photos, otherwise the root post (the post the thread was
+    /// opened from).
     fn photo_post(&self) -> Option<&Tweet> {
-        let Some(ViewKind::Thread(conversation_id)) = self.current_view() else {
+        if !matches!(self.current_view(), Some(ViewKind::Thread(_))) {
             return None;
-        };
-        let has_photo = |t: &&Tweet| !self.photo_urls(t).is_empty();
+        }
         self.thread_tweets
             .get(self.selected_index())
-            .filter(has_photo)
+            .filter(|reply| !self.photo_urls(reply).is_empty())
             .or(self.thread_root.as_ref())
-            .or_else(|| {
-                self.thread_tweets
-                    .iter()
-                    .find(|t| &t.id == conversation_id)
-                    .filter(has_photo)
-            })
     }
 
     /// The photo the thread view shows, if the focused post has any.
@@ -212,15 +204,6 @@ mod tests {
         app.cycle_photo(1);
         assert!(app.focused_photo().unwrap().url.ends_with("/a.jpg"));
         app.cycle_photo(-1);
-        assert!(app.focused_photo().unwrap().url.ends_with("/b.jpg"));
-    }
-
-    #[tokio::test]
-    async fn without_a_root_the_conversation_starter_takes_the_focus() {
-        let mut app = thread_app();
-        app.thread_root = None;
-        app.thread_tweets.push(tweet("root", &["b"]));
-        // Selected reply r1 has no photo; the starter "root" is a reply here.
         assert!(app.focused_photo().unwrap().url.ends_with("/b.jpg"));
     }
 

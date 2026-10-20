@@ -132,11 +132,7 @@ impl App {
                                 .conversation_id
                                 .clone()
                                 .unwrap_or_else(|| tweet.id.clone());
-                            self.thread_root = Some(tweet);
-                            self.events.send(AppEvent::FetchThread {
-                                conversation_id: conv_id.clone(),
-                                pagination_token: None,
-                            });
+                            self.open_thread(tweet);
                             self.push_view(ViewKind::Thread(conv_id));
                         } else {
                             self.status_message = Some("Tweet not found".to_string());
@@ -155,7 +151,14 @@ impl App {
                 match result {
                     Ok(resp) => {
                         self.cache_includes(&resp.includes);
-                        self.thread_tweets = resp.data.unwrap_or_default();
+                        let root_id = self.thread_root.as_ref().map(|t| t.id.clone());
+                        // The root is drawn above the replies; do not list it twice.
+                        self.thread_tweets = resp
+                            .data
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|t| Some(&t.id) != root_id.as_ref())
+                            .collect();
                         // Push the thread view if not already on it.
                         if self.current_view() != Some(&ViewKind::Thread(conversation_id.clone())) {
                             self.push_view(ViewKind::Thread(conversation_id));
