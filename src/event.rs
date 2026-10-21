@@ -165,6 +165,8 @@ pub enum AppEvent {
     /// A photo for the thread view, encoded for the terminal.
     PhotoReady {
         url: String,
+        /// Rows of the photo box it was encoded for.
+        rows: u16,
         result: ApiResult<PhotoProtocol>,
     },
 }

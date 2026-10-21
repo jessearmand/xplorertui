@@ -156,6 +156,11 @@ pub struct App {
     pub photo_cache: Arc<PhotoCache>,
     /// Encoded photos for the thread view, by photo URL.
     pub photo_views: HashMap<String, PhotoView>,
+    /// Box height each photo was last asked to be encoded for, by photo URL.
+    pub photo_requested_rows: HashMap<String, u16>,
+    /// Rows the thread view can give the photo, from its last layout. The
+    /// view sets it while drawing; the next tick encodes for it.
+    pub photo_box_rows: std::cell::Cell<u16>,
     /// Which photo of the focused post the thread view shows.
     pub photo_index: usize,
 
@@ -298,6 +303,8 @@ impl App {
             picker: ratatui_image::picker::Picker::halfblocks(),
             photo_cache: Arc::new(PhotoCache::new()),
             photo_views: HashMap::new(),
+            photo_requested_rows: HashMap::new(),
+            photo_box_rows: std::cell::Cell::new(photos::PHOTO_ROWS),
             photo_index: 0,
             mlx_client,
             mlx_embed_supported: false,

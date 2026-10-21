@@ -12,10 +12,14 @@ use crate::api::types::Tweet;
 use crate::event::{AppEvent, Event, PhotoProtocol, ViewKind};
 use crate::media::prepare::photos;
 
-/// Size of the thread view's photo box, in terminal cells. The photo keeps
-/// its aspect ratio inside it.
+/// Largest photo box in the thread view, in terminal cells. The photo keeps
+/// its aspect ratio inside it. On a short terminal the box gets fewer rows,
+/// so that replies stay visible (see `ui::thread`).
 pub const PHOTO_COLS: u16 = 48;
 pub const PHOTO_ROWS: u16 = 14;
+/// Below this many rows a photo is not worth drawing; the view shows a
+/// one-line note instead.
+pub const MIN_PHOTO_ROWS: u16 = 3;
 
 /// A photo waits this long for its download in the thread view.
 const VIEW_TIMEOUT: Duration = Duration::from_secs(15);
@@ -83,18 +87,25 @@ impl App {
 
     /// Start encoding the focused photo if nothing has started it yet.
     /// Called on every tick, so it follows selection changes.
+    /// Encodes again when the thread view's photo box changes height, for
+    /// example after a terminal resize; the old encoding stays on screen
+    /// until the new one is ready.
     pub(super) fn ensure_focused_photo(&mut self) {
         let Some(focused) = self.focused_photo() else {
             return;
         };
-        if self.photo_views.contains_key(&focused.url) {
+        let rows = self.photo_box_rows.get().min(PHOTO_ROWS);
+        if rows < MIN_PHOTO_ROWS || self.photo_requested_rows.get(&focused.url) == Some(&rows) {
             return;
         }
         if self.photo_views.len() >= MAX_PHOTO_VIEWS {
             self.photo_views.clear();
+            self.photo_requested_rows.clear();
         }
+        self.photo_requested_rows.insert(focused.url.clone(), rows);
         self.photo_views
-            .insert(focused.url.clone(), PhotoView::Loading);
+            .entry(focused.url.clone())
+            .or_insert(PhotoView::Loading);
 
         let url = focused.url;
         let cache = Arc::clone(&self.photo_cache);
@@ -110,7 +121,7 @@ impl App {
                     picker
                         .new_protocol(
                             (*photo.image).clone(),
-                            Size::new(PHOTO_COLS, PHOTO_ROWS),
+                            Size::new(PHOTO_COLS, rows),
                             Resize::Fit(None),
                         )
                         .map(|p| PhotoProtocol(Arc::new(p)))
@@ -121,15 +132,25 @@ impl App {
             }
             .await
             .map_err(Arc::new);
-            let _ = sender.send(Event::App(Box::new(AppEvent::PhotoReady { url, result })));
+            let _ = sender.send(Event::App(Box::new(AppEvent::PhotoReady {
+                url,
+                rows,
+                result,
+            })));
         });
     }
 
+    /// Keep an encoding only if it is for the latest requested box height;
+    /// an older one finishing late must not replace a newer one.
     pub(super) fn on_photo_ready(
         &mut self,
         url: String,
+        rows: u16,
         result: crate::event::ApiResult<PhotoProtocol>,
     ) {
+        if self.photo_requested_rows.get(&url) != Some(&rows) {
+            return;
+        }
         let view = match result {
             Ok(protocol) => PhotoView::Ready(protocol),
             Err(e) => {
@@ -205,6 +226,42 @@ mod tests {
         assert!(app.focused_photo().unwrap().url.ends_with("/a.jpg"));
         app.cycle_photo(-1);
         assert!(app.focused_photo().unwrap().url.ends_with("/b.jpg"));
+    }
+
+    fn protocol(rows: u16) -> PhotoProtocol {
+        let p = ratatui_image::picker::Picker::halfblocks()
+            .new_protocol(
+                image::DynamicImage::new_rgb8(400, 600),
+                Size::new(PHOTO_COLS, rows),
+                Resize::Fit(None),
+            )
+            .unwrap();
+        PhotoProtocol(Arc::new(p))
+    }
+
+    #[tokio::test]
+    async fn a_smaller_box_asks_for_a_new_encoding() {
+        let mut app = thread_app();
+        app.ensure_focused_photo();
+        let url = app.focused_photo().unwrap().url;
+        assert_eq!(app.photo_requested_rows.get(&url), Some(&PHOTO_ROWS));
+        app.photo_box_rows.set(8);
+        app.ensure_focused_photo();
+        assert_eq!(app.photo_requested_rows.get(&url), Some(&8));
+    }
+
+    #[tokio::test]
+    async fn a_late_encoding_for_an_old_box_is_dropped() {
+        let mut app = thread_app();
+        let url = app.focused_photo().unwrap().url;
+        app.photo_requested_rows.insert(url.clone(), 8);
+        app.on_photo_ready(url.clone(), PHOTO_ROWS, Ok(protocol(PHOTO_ROWS)));
+        assert!(!app.photo_views.contains_key(&url));
+        app.on_photo_ready(url.clone(), 8, Ok(protocol(8)));
+        assert!(matches!(
+            app.photo_views.get(&url),
+            Some(PhotoView::Ready(_))
+        ));
     }
 
     #[tokio::test]

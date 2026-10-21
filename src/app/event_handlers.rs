@@ -398,8 +398,8 @@ impl App {
                     }
                 }
             }
-            AppEvent::PhotoReady { url, result } => {
-                self.on_photo_ready(url, result);
+            AppEvent::PhotoReady { url, rows, result } => {
+                self.on_photo_ready(url, rows, result);
             }
             AppEvent::EmbeddingProviderMissing(source) => {
                 self.cluster_loading = false;
