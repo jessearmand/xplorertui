@@ -5,6 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
 
 use crate::api::types::{Tweet, User};
+use crate::ui::text::wrap_to_width;
 
 /// Renders a single tweet as a compact card (2-4 lines).
 ///
@@ -174,36 +175,29 @@ pub fn tweet_card_height(tweet: &Tweet, width: u16) -> u16 {
     1 + text_lines + 1
 }
 
+/// Wrap tweet text to `width` terminal columns. Line breaks in the text are
+/// kept, and a blank line stays blank. Widths are display columns, so
+/// styled Unicode letters (1 column, 4 bytes) and CJK (2 columns) wrap at
+/// the edge, and a run without spaces breaks inside the card.
 fn wrap_text(text: &str, width: usize) -> Vec<String> {
     if width == 0 {
         return vec![];
     }
-    let mut lines = Vec::new();
-    for paragraph in text.lines() {
-        if paragraph.is_empty() {
-            lines.push(String::new());
-            continue;
-        }
-        let mut current = String::new();
-        for word in paragraph.split_whitespace() {
-            if current.is_empty() {
-                current = word.to_string();
-            } else if current.len() + 1 + word.len() <= width {
-                current.push(' ');
-                current.push_str(word);
+    let lines: Vec<String> = text
+        .lines()
+        .flat_map(|line| {
+            if line.trim().is_empty() {
+                vec![String::new()]
             } else {
-                lines.push(current);
-                current = word.to_string();
+                wrap_to_width(line, width)
             }
-        }
-        if !current.is_empty() {
-            lines.push(current);
-        }
-    }
+        })
+        .collect();
     if lines.is_empty() {
-        lines.push(String::new());
+        vec![String::new()]
+    } else {
+        lines
     }
-    lines
 }
 
 fn format_time_ago(dt: chrono::DateTime<chrono::Utc>) -> String {
@@ -230,5 +224,61 @@ fn format_count(n: u64) -> String {
         format!("{:.1}K", n as f64 / 1_000.0)
     } else {
         n.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use unicode_width::UnicodeWidthStr;
+
+    use super::*;
+
+    fn fits(lines: &[String], width: usize) -> bool {
+        lines.iter().all(|l| l.width() <= width)
+    }
+
+    #[test]
+    fn styled_bold_letters_wrap_by_columns_not_bytes() {
+        // Each bold letter is 4 bytes but 1 column.
+        let text = "📄 New Paper: 𝗔𝗹𝗶𝗴𝗻𝗶𝗻𝗴 𝗟𝗮𝗻𝗴𝘂𝗮𝗴𝗲 𝗠𝗼𝗱𝗲𝗹𝘀 𝘁𝗼𝘄𝗮𝗿𝗱𝘀 𝗖𝗼𝘂𝗻𝘁𝗲𝗿𝗳𝗮𝗰𝘁𝘂𝗮𝗹 𝗜𝗻𝘃𝗮𝗿𝗶𝗮𝗻𝗰𝗲";
+        let lines = wrap_text(text, 78);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        let lines = wrap_text(text, 30);
+        assert!(fits(&lines, 30), "{lines:?}");
+        assert_eq!(lines.len(), 3, "{lines:?}");
+    }
+
+    #[test]
+    fn cjk_without_spaces_breaks_inside_the_card() {
+        let text = "推しが目の前にいる体験をポータルライブとポータルミートで実際に体験できます";
+        let lines = wrap_text(text, 20);
+        assert!(fits(&lines, 20), "{lines:?}");
+        assert_eq!(lines.concat(), text, "no character is lost");
+    }
+
+    #[test]
+    fn ascii_wraps_as_before() {
+        let lines = wrap_text("the quick brown fox jumps over the lazy dog", 10);
+        assert_eq!(
+            lines,
+            vec!["the quick", "brown fox", "jumps over", "the lazy", "dog"]
+        );
+    }
+
+    #[test]
+    fn line_breaks_and_blank_lines_are_kept() {
+        let lines = wrap_text("first line\n\nsecond line", 40);
+        assert_eq!(lines, vec!["first line", "", "second line"]);
+    }
+
+    #[test]
+    fn card_height_follows_the_wrapped_text() {
+        let tweet: Tweet = serde_json::from_value(serde_json::json!({
+            "id": "1",
+            "text": "𝗖𝗼𝘂𝗻𝘁𝗲𝗿𝗳𝗮𝗰𝘁𝘂𝗮𝗹 ".repeat(10),
+        }))
+        .unwrap();
+        // 10 words of 14 columns at 78 columns: 5 per line, so 2 lines.
+        assert_eq!(tweet_card_height(&tweet, 78), 1 + 2 + 1);
     }
 }
