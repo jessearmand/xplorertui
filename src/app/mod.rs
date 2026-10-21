@@ -8,6 +8,7 @@ mod navigation;
 pub mod photos;
 mod popup;
 
+pub use clustering::ClusterFill;
 pub use photos::PhotoView;
 pub use popup::{Popup, PopupTone, PromptAction};
 
@@ -221,9 +222,10 @@ pub struct App {
     /// When true, a cluster operation will be triggered after the source
     /// timeline (determined by `cluster_source`) finishes refreshing.
     pub refresh_then_cluster: bool,
-    /// A fetch for more posts to cluster is in flight. The next clustering
-    /// run uses what is loaded and does not fetch again.
-    pub cluster_fill_in_flight: bool,
+    /// Set while `:cluster` loads more posts: the post count before the
+    /// page in flight. A page that adds posts leads to the next one; a
+    /// failed or empty page ends the loading.
+    pub cluster_fill: Option<ClusterFill>,
 
     // Status
     pub status_message: Option<String>,
@@ -331,7 +333,7 @@ impl App {
             selected_cluster: None,
             cluster_source: None,
             refresh_then_cluster: false,
-            cluster_fill_in_flight: false,
+            cluster_fill: None,
             status_message: None,
             popup: None,
             popup_scroll: 0,

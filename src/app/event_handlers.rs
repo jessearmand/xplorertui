@@ -1,4 +1,4 @@
-use super::{App, ClusterSource, TimelineState};
+use super::{App, ClusterFill, ClusterSource, TimelineState};
 use crate::api::types::{Includes, Tweet};
 use crate::event::{AppEvent, TopicLabels, ViewKind};
 
@@ -377,8 +377,8 @@ impl App {
                     );
                     return;
                 };
-                // A fresh `:cluster` may load more posts again.
-                self.cluster_fill_in_flight = false;
+                // A fresh `:cluster` starts loading posts again.
+                self.cluster_fill = None;
                 self.start_cluster(source);
             }
             AppEvent::ClusteringComplete(result) => {
@@ -544,30 +544,30 @@ impl App {
     /// refresh-gate callers — they already clear the flag before calling.
     fn start_cluster(&mut self, source: ClusterSource) {
         self.refresh_then_cluster = false;
-        let tweets_empty = match source {
-            ClusterSource::Home => self.home_timeline.tweets.is_empty(),
-            ClusterSource::Mentions => self.mentions.tweets.is_empty(),
-            ClusterSource::Search => self.search_results.tweets.is_empty(),
-            ClusterSource::Bookmarks => self.bookmarks.tweets.is_empty(),
-        };
-        if tweets_empty {
-            self.cluster_fill_in_flight = false;
+        let loaded = self.loaded_posts(source);
+        if loaded == 0 {
+            self.cluster_fill = None;
             self.status_message = Some(format!("No tweets to cluster in {source}. Load it first."));
             return;
         }
-        // Load more posts first, once: the gate in the source's `*Loaded`
-        // handler calls back here when they arrive.
-        let fill = if self.cluster_fill_in_flight {
-            None
-        } else {
-            self.cluster_fill_request(source)
+        // Load more posts first. The gate in the source's `*Loaded` handler
+        // calls back here when a page arrives; a page that added posts leads
+        // to the next one, and a failed or empty page ends the loading.
+        let fill = match self.cluster_fill.take() {
+            Some(previous) if loaded > previous.loaded_before => {
+                self.cluster_fill_request(source, false)
+            }
+            Some(_) => None,
+            None => self.cluster_fill_request(source, true),
         };
-        self.cluster_fill_in_flight = fill.is_some();
         if let Some(fetch) = fill {
+            self.cluster_fill = Some(ClusterFill {
+                loaded_before: loaded,
+            });
             self.cluster_source = Some(source);
             self.refresh_then_cluster = true;
             self.status_message = Some(format!(
-                "Loading up to {} {source} posts to cluster…",
+                "Loading {source} posts to cluster: {loaded} of {}…",
                 self.config.cluster_posts
             ));
             self.events.send(fetch);

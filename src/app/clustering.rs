@@ -20,27 +20,47 @@ const MAX_PAGE_SIZE: usize = 100;
 /// Fewest posts the X API accepts as `max_results` on search.
 const MIN_PAGE_SIZE: usize = 10;
 
+/// `:cluster` is loading more posts: the post count before the page in
+/// flight, to tell whether that page added any.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClusterFill {
+    pub loaded_before: usize,
+}
+
 impl App {
-    /// The fetch that brings `source` up to `config.cluster_posts` posts, or
-    /// `None` when enough are loaded or there is nothing more to load.
-    pub(super) fn cluster_fill_request(&self, source: ClusterSource) -> Option<AppEvent> {
+    /// Posts of `source` loaded now.
+    pub(super) fn loaded_posts(&self, source: ClusterSource) -> usize {
+        match source {
+            ClusterSource::Home => self.home_timeline.tweets.len(),
+            ClusterSource::Mentions => self.mentions.tweets.len(),
+            ClusterSource::Bookmarks => self.bookmarks.tweets.len(),
+            ClusterSource::Search => self.search_results.tweets.len(),
+        }
+    }
+
+    /// The next fetch toward `config.cluster_posts` posts, or `None` when
+    /// enough are loaded or there is nothing more to load. `first` is true
+    /// for the first fetch of a `:cluster` run.
+    pub(super) fn cluster_fill_request(
+        &self,
+        source: ClusterSource,
+        first: bool,
+    ) -> Option<AppEvent> {
         let target = self.config.cluster_posts;
-        let (loaded, next_token) = match source {
-            ClusterSource::Home => (
-                self.home_timeline.tweets.len(),
-                &self.home_timeline.next_token,
-            ),
-            ClusterSource::Mentions => (self.mentions.tweets.len(), &self.mentions.next_token),
-            ClusterSource::Bookmarks => (self.bookmarks.tweets.len(), &self.bookmarks.next_token),
-            ClusterSource::Search => (self.search_results.tweets.len(), &None),
-        };
+        let loaded = self.loaded_posts(source);
         if loaded >= target {
             return None;
         }
+        let next_token = match source {
+            ClusterSource::Home => &self.home_timeline.next_token,
+            ClusterSource::Mentions => &self.mentions.next_token,
+            ClusterSource::Bookmarks => &self.bookmarks.next_token,
+            ClusterSource::Search => &None,
+        };
         let (page_size, pagination_token) = match source {
-            // A search page replaces the results, so ask again from the
-            // start for the whole target.
-            ClusterSource::Search if !self.search_query.is_empty() => (target, None),
+            // A search page replaces the results, so ask once, from the
+            // start, for the whole target (one read returns 100 at most).
+            ClusterSource::Search if first && !self.search_query.is_empty() => (target, None),
             ClusterSource::Search => return None,
             // The other sources append the next page.
             _ => (target - loaded, Some(next_token.clone()?)),
@@ -338,7 +358,7 @@ mod tests {
         let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
         app.home_timeline.tweets = tweets(20);
         app.home_timeline.next_token = Some("next".into());
-        match app.cluster_fill_request(ClusterSource::Home) {
+        match app.cluster_fill_request(ClusterSource::Home, true) {
             Some(AppEvent::FetchForCluster {
                 page_size,
                 pagination_token,
@@ -356,9 +376,15 @@ mod tests {
         let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
         app.home_timeline.tweets = tweets(100);
         app.home_timeline.next_token = Some("next".into());
-        assert!(app.cluster_fill_request(ClusterSource::Home).is_none());
+        assert!(
+            app.cluster_fill_request(ClusterSource::Home, true)
+                .is_none()
+        );
         app.mentions.tweets = tweets(20);
-        assert!(app.cluster_fill_request(ClusterSource::Mentions).is_none());
+        assert!(
+            app.cluster_fill_request(ClusterSource::Mentions, true)
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -366,11 +392,12 @@ mod tests {
         let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
         app.search_results.tweets = tweets(20);
         assert!(
-            app.cluster_fill_request(ClusterSource::Search).is_none(),
+            app.cluster_fill_request(ClusterSource::Search, true)
+                .is_none(),
             "no query"
         );
         app.search_query = "rust".into();
-        match app.cluster_fill_request(ClusterSource::Search) {
+        match app.cluster_fill_request(ClusterSource::Search, true) {
             Some(AppEvent::FetchForCluster {
                 page_size,
                 pagination_token,
@@ -382,20 +409,74 @@ mod tests {
         }
     }
 
+    fn page(first_id: usize, n: usize, next: Option<&str>) -> AppEvent {
+        let data: Vec<Tweet> = (first_id..first_id + n)
+            .map(|i| {
+                serde_json::from_value(serde_json::json!({"id": i.to_string(), "text": "t"}))
+                    .unwrap()
+            })
+            .collect();
+        let resp = serde_json::from_value(serde_json::json!({
+            "data": data, "meta": { "next_token": next },
+        }))
+        .unwrap();
+        AppEvent::HomeTimelineLoaded(Ok(resp))
+    }
+
+    fn fill_page_size(app: &App) -> Option<u32> {
+        match app.cluster_fill_request(ClusterSource::Home, false)? {
+            AppEvent::FetchForCluster { page_size, .. } => Some(page_size),
+            _ => None,
+        }
+    }
+
     #[tokio::test]
-    async fn start_cluster_fills_once_then_clusters() {
+    async fn loading_continues_while_pages_add_posts() {
+        let config = AppConfig {
+            cluster_posts: 200,
+            ..Default::default()
+        };
+        let mut app = App::new(config, None, CredentialSet::default());
+        app.home_timeline.tweets = tweets(20);
+        app.home_timeline.next_token = Some("p1".into());
+        app.handle_app_event(AppEvent::ClusterTimeline);
+        assert_eq!(app.cluster_fill, Some(ClusterFill { loaded_before: 20 }));
+
+        // One read returns 100 at most, so 120 of 200 asks for one more page.
+        app.handle_app_event(page(20, 100, Some("p2")));
+        assert_eq!(app.cluster_fill, Some(ClusterFill { loaded_before: 120 }));
+        assert!(app.refresh_then_cluster && !app.cluster_loading);
+        assert_eq!(fill_page_size(&app), Some(80));
+
+        // A short page still counts; it reaches the target, so clustering starts.
+        app.handle_app_event(page(120, 80, Some("p3")));
+        assert_eq!(app.cluster_fill, None);
+        assert!(!app.refresh_then_cluster);
+        assert_eq!(app.home_timeline.tweets.len(), 200);
+    }
+
+    #[tokio::test]
+    async fn a_failed_page_ends_the_loading() {
         let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
         app.home_timeline.tweets = tweets(20);
         app.home_timeline.next_token = Some("next".into());
         app.handle_app_event(AppEvent::ClusterTimeline);
-        assert!(app.cluster_fill_in_flight && app.refresh_then_cluster);
-        assert!(!app.cluster_loading);
-        // The page arrives (no client: as an error); clustering starts with
-        // the posts it has and does not fetch again.
+        assert!(app.cluster_fill.is_some() && app.refresh_then_cluster);
         app.handle_app_event(AppEvent::HomeTimelineLoaded(Err(Arc::new(
             "offline".into(),
         ))));
-        assert!(!app.cluster_fill_in_flight);
+        assert_eq!(app.cluster_fill, None);
+        assert!(!app.refresh_then_cluster);
+    }
+
+    #[tokio::test]
+    async fn an_empty_page_ends_the_loading() {
+        let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
+        app.home_timeline.tweets = tweets(20);
+        app.home_timeline.next_token = Some("next".into());
+        app.handle_app_event(AppEvent::ClusterTimeline);
+        app.handle_app_event(page(20, 0, Some("again")));
+        assert_eq!(app.cluster_fill, None);
         assert!(!app.refresh_then_cluster);
     }
 
