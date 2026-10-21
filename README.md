@@ -316,6 +316,6 @@ Type `:` to enter command mode, then:
 
 Copyright (c) Jesse Armand <jesse@jessearmand.com>
 
-This project is licensed under the MIT license ([LICENSE] or <http://opensource.org/licenses/MIT>)
+This project is licensed under the Mozilla Public License, version 2.0 ([LICENSE] or <https://www.mozilla.org/MPL/2.0/>)
 
 [LICENSE]: ./LICENSE

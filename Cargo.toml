@@ -3,7 +3,7 @@ name = "xplorertui"
 version = "0.1.0"
 description = "event-driven async tui for X"
 authors = ["Jesse Armand <jesse@jessearmand.com>"]
-license = "MIT"
+license = "MPL-2.0"
 edition = "2024"
 
 [dependencies]
