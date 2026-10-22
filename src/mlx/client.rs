@@ -37,13 +37,23 @@ struct TextEmbeddingRequest<'a> {
     task: EmbedTask,
 }
 
-/// Request body for the multimodal embedding endpoint.
+/// One document for the document embedding endpoint: a text and its photo.
 #[derive(Debug, Serialize)]
-pub struct MultimodalEmbeddingRequest {
-    pub model: String,
-    pub texts: Vec<String>,
-    pub images: Vec<String>,
+struct DocumentInput<'a> {
+    text: &'a str,
+    image: &'a str,
 }
+
+/// Request body for the document embedding endpoint.
+#[derive(Debug, Serialize)]
+struct DocumentEmbeddingRequest<'a> {
+    model: &'a str,
+    input: Vec<DocumentInput<'a>>,
+    task: EmbedTask,
+}
+
+/// The server decodes at most this many images per request.
+const MAX_IMAGES_PER_REQUEST: usize = 8;
 
 impl MlxClient {
     pub fn new(base_url: String) -> Self {
@@ -119,21 +129,39 @@ impl MlxClient {
         self.handle_response(resp).await
     }
 
-    /// Generate multimodal (text + image) embeddings via the local MLX server.
-    pub async fn embed_multimodal(
+    /// One embedding per `(text, image)` document, in the same space as
+    /// `embed` vectors of the same model and task. `image` is a `data:` URL.
+    /// Fails with a 400 when the model cannot read images.
+    pub async fn embed_documents(
         &self,
         model: &str,
-        texts: &[String],
-        image_urls: &[String],
+        documents: &[(String, std::sync::Arc<str>)],
+        task: EmbedTask,
     ) -> Result<EmbeddingResponse, MlxError> {
-        let url = format!("{}/v1/embeddings/multimodal", self.base_url);
-        let request = MultimodalEmbeddingRequest {
+        let url = format!("{}/v1/embeddings/documents", self.base_url);
+        let mut all = EmbeddingResponse {
+            data: Vec::with_capacity(documents.len()),
             model: model.to_string(),
-            texts: texts.to_vec(),
-            images: image_urls.to_vec(),
+            usage: None,
         };
-        let resp = self.http.post(&url).json(&request).send().await?;
-        self.handle_response(resp).await
+        for (batch_no, batch) in documents.chunks(MAX_IMAGES_PER_REQUEST).enumerate() {
+            let request = DocumentEmbeddingRequest {
+                model,
+                input: batch
+                    .iter()
+                    .map(|(text, image)| DocumentInput { text, image })
+                    .collect(),
+                task,
+            };
+            let resp = self.http.post(&url).json(&request).send().await?;
+            let part: EmbeddingResponse = self.handle_response(resp).await?;
+            let offset = batch_no * MAX_IMAGES_PER_REQUEST;
+            all.data.extend(part.data.into_iter().map(|mut d| {
+                d.index += offset;
+                d
+            }));
+        }
+        Ok(all)
     }
 
     async fn handle_response<T: serde::de::DeserializeOwned>(

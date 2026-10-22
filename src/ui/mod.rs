@@ -5,6 +5,7 @@ pub mod help;
 pub mod hf_models;
 pub mod input;
 pub mod models;
+pub mod photo;
 pub mod popup;
 pub mod search;
 pub mod skeleton;

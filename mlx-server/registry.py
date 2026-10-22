@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import enum
+import json
 import os
 from dataclasses import dataclass, field
 from typing import Any
@@ -79,11 +80,48 @@ def _load_text_embedder_mlx_vlm(model_id: str) -> tuple[Any, Any]:
     return model, tokenizer
 
 
+def _model_config(model_id: str) -> dict[str, Any]:
+    """``config.json`` of a local model directory or a Hugging Face repo."""
+    from pathlib import Path
+
+    local = Path(model_id) / "config.json"
+    if local.is_file():
+        return json.loads(local.read_text())
+    from huggingface_hub import hf_hub_download
+
+    return json.loads(Path(hf_hub_download(model_id, "config.json")).read_text())
+
+
+def _load_document_embedder_mlx_vlm(model_id: str) -> tuple[Any, Any]:
+    """Load an mlx-vlm embedding model with its vision tower, and its processor.
+
+    Raises ``ValueError`` if the model cannot embed images.
+    """
+    from mlx_vlm.embedding_loader import load_embedding_model
+    from mlx_vlm.utils import get_model_path, load_processor
+
+    # Read only the config first, so a text-only model is not downloaded
+    # just to be refused.
+    if _model_config(model_id).get("vision_config") is None:
+        raise ValueError(f"{model_id} has no vision tower")
+    path = get_model_path(model_id)
+    model = load_embedding_model(path)
+    processor = load_processor(path, add_detokenizer=False)
+    if getattr(processor, "image_processor", None) is None or not getattr(
+        processor, "image_token", None
+    ):
+        raise ValueError(f"{model_id} has no image processor")
+    return model, processor
+
+
 class ModelRegistry:
     """Manages loaded MLX models with lazy initialization."""
 
     def __init__(self, default_model: str | None = None) -> None:
         self._text_models: dict[str, TextEmbedder] = {}
+        # Embedders that read images inside the text sequence. A separate
+        # copy from `_text_models`, which drops the media towers.
+        self._document_models: dict[str, tuple[Any, Any, dict[str, str]]] = {}
         self._vl_models: dict[str, tuple[Any, Any]] = {}
         self._chat_models: dict[str, tuple[ChatBackend, Any, Any]] = {}
         self.default_model = default_model
@@ -146,6 +184,21 @@ class ModelRegistry:
                 logger.info("Loaded %s via mlx_vlm", model_id)
         return self._chat_models[model_id]
 
+    def get_document_model(self, model_id: str) -> tuple[Any, Any, dict[str, str]]:
+        """Return (model, processor, task prompts) for image + text documents.
+
+        Raises ``ValueError`` if the model cannot embed images.
+        """
+        if model_id not in self._document_models:
+            model, processor = _load_document_embedder_mlx_vlm(model_id)
+            self._document_models[model_id] = (
+                model,
+                processor,
+                load_prompt_catalog(model_id),
+            )
+            logger.info("Loaded %s with its vision tower", model_id)
+        return self._document_models[model_id]
+
     def get_vl_model(self, model_id: str) -> tuple[Any, Any]:
         """Return (model, processor) for a vision-language model."""
         if model_id not in self._vl_models:
@@ -163,14 +216,16 @@ class ModelRegistry:
         exits.
         """
         self._text_models.clear()
+        self._document_models.clear()
         self._vl_models.clear()
         self._chat_models.clear()
 
     def loaded_model_ids(self) -> list[str]:
         text_ids = list(self._text_models.keys())
+        document_ids = [m for m in self._document_models if m not in self._text_models]
         vl_ids = list(self._vl_models.keys())
         chat_ids = list(self._chat_models.keys())
-        return text_ids + vl_ids + chat_ids
+        return text_ids + document_ids + vl_ids + chat_ids
 
 
 # ---------------------------------------------------------------------------

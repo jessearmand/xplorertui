@@ -32,6 +32,13 @@ pub struct AppConfig {
     /// `:topics` labels clusters with Jev instead of a chat LLM.
     #[serde(default)]
     pub jev: Option<JevConfig>,
+    /// Posts `:cluster` collects before it clusters. It loads more pages
+    /// when fewer are loaded. One X API read returns 100 at most.
+    #[serde(default = "default_cluster_posts")]
+    pub cluster_posts: usize,
+    /// Number of clusters. Unset: √(posts / 2), from 4 to 10.
+    #[serde(default)]
+    pub cluster_k: Option<usize>,
 }
 
 /// `[jev]` section of config.toml.
@@ -99,6 +106,10 @@ pub enum DefaultView {
     Search,
 }
 
+fn default_cluster_posts() -> usize {
+    100
+}
+
 fn default_tick_rate() -> f64 {
     30.0
 }
@@ -127,6 +138,8 @@ impl Default for AppConfig {
             mlx_embedding_model: None,
             mlx_chat_model: None,
             jev: None,
+            cluster_posts: default_cluster_posts(),
+            cluster_k: None,
         }
     }
 }
@@ -150,6 +163,15 @@ pub fn load_config() -> AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cluster_settings_default_to_100_posts_and_the_k_rule() {
+        let config: AppConfig = toml::from_str("").unwrap();
+        assert_eq!(config.cluster_posts, 100);
+        assert_eq!(config.cluster_k, None);
+        let config: AppConfig = toml::from_str("cluster_posts = 50\ncluster_k = 6\n").unwrap();
+        assert_eq!((config.cluster_posts, config.cluster_k), (50, Some(6)));
+    }
 
     #[test]
     fn jev_proposes_labels_by_default() {

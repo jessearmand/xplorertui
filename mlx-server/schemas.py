@@ -123,6 +123,25 @@ class MultimodalEmbeddingRequest(BaseModel):
     )
 
 
+class DocumentInput(BaseModel):
+    """One document: its text and, optionally, one image."""
+
+    text: str = ""
+    image: ImageInput | None = None
+
+
+class DocumentEmbeddingRequest(BaseModel):
+    """One embedding per document, with the image inside the text sequence.
+
+    The vectors share the space of ``/v1/embeddings`` vectors from the same
+    model and task, so the two can be mixed in one clustering run.
+    """
+
+    model: str
+    input: list[DocumentInput] = Field(min_length=1, max_length=32)
+    task: EmbeddingTask | None = None
+
+
 # ---------------------------------------------------------------------------
 # Model info schemas
 # ---------------------------------------------------------------------------

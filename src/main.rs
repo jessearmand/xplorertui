@@ -8,6 +8,7 @@ pub mod config;
 pub mod embeddings;
 pub mod event;
 pub mod huggingface;
+pub mod media;
 pub mod mlx;
 pub mod openrouter;
 pub mod ui;
@@ -60,7 +61,17 @@ async fn run_tui() -> color_eyre::Result<()> {
     };
 
     let terminal = ratatui::init();
-    let result = App::new(config, api_client, creds).run(terminal).await;
+    // Ask the terminal for its graphics protocol and font size now: the
+    // event handler that `App::new` starts reads stdin and would take the
+    // reply. Terminals that do not answer get half-block characters.
+    let picker = ratatui_image::picker::Picker::from_query_stdio().unwrap_or_else(|e| {
+        tracing::info!("no terminal graphics protocol ({e}); photos use half blocks");
+        ratatui_image::picker::Picker::halfblocks()
+    });
+    let result = App::new(config, api_client, creds)
+        .with_picker(picker)
+        .run(terminal)
+        .await;
     ratatui::restore();
     result
 }

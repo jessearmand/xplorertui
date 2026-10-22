@@ -52,6 +52,9 @@ pub struct ModelPricing {
 pub struct ModelArchitecture {
     #[serde(default)]
     pub modality: Option<String>,
+    /// For example `["text", "image"]`.
+    #[serde(default)]
+    pub input_modalities: Option<Vec<String>>,
     #[serde(default)]
     pub tokenizer: Option<String>,
 }

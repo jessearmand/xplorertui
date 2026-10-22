@@ -23,6 +23,7 @@ The server pre-loads the default embedding model at startup. Chat and additional
 |--------|------|-------------|
 | POST | `/v1/embeddings` | Text embeddings (OpenAI-compatible) |
 | POST | `/v1/embeddings/multimodal` | Text + image embeddings |
+| POST | `/v1/embeddings/documents` | One vector per text + image document, in the text-embedding space (EmbeddingGemma 2) |
 | POST | `/v1/chat/completions` | Chat completions (OpenAI-compatible) |
 | GET | `/v1/models` | List loaded/available models |
 | GET | `/health` | Health check |

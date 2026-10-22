@@ -1,11 +1,15 @@
 mod auth;
+mod clustering;
 mod commands;
 mod dispatch;
 mod event_handlers;
 mod key_handlers;
 mod navigation;
+pub mod photos;
 mod popup;
 
+pub use clustering::ClusterFill;
+pub use photos::PhotoView;
 pub use popup::{Popup, PopupTone, PromptAction};
 
 use std::collections::HashMap;
@@ -16,11 +20,12 @@ use tokio::sync::Mutex;
 use ratatui::DefaultTerminal;
 
 use crate::api::XApiClient;
-use crate::api::types::{Includes, Tweet, User};
+use crate::api::types::{Includes, Media, Tweet, User};
 use crate::auth::credentials::CredentialSet;
 use crate::config::AppConfig;
 use crate::embeddings::cluster::ClusterResult;
 use crate::event::{AppEvent, Event, EventHandler, ViewKind};
+use crate::media::PhotoCache;
 use crate::mlx::client::MlxClient;
 use crate::openrouter::client::OpenRouterClient;
 use crate::openrouter::types::Model;
@@ -141,6 +146,23 @@ pub struct App {
 
     // Includes cache (users from API responses for author lookup)
     pub users_cache: HashMap<String, User>,
+    /// Photos and videos from API responses, by media key.
+    pub media_cache: HashMap<String, Media>,
+
+    // Photos
+    /// Terminal graphics protocol and font size, found once at start.
+    pub picker: ratatui_image::picker::Picker,
+    /// Downloaded and prepared photos, shared with background tasks.
+    pub photo_cache: Arc<PhotoCache>,
+    /// Encoded photos for the thread view, by photo URL.
+    pub photo_views: HashMap<String, PhotoView>,
+    /// Box height each photo was last asked to be encoded for, by photo URL.
+    pub photo_requested_rows: HashMap<String, u16>,
+    /// Rows the thread view can give the photo, from its last layout. The
+    /// view sets it while drawing; the next tick encodes for it.
+    pub photo_box_rows: std::cell::Cell<u16>,
+    /// Which photo of the focused post the thread view shows.
+    pub photo_index: usize,
 
     // OpenRouter client
     pub openrouter_client: Option<Arc<OpenRouterClient>>,
@@ -205,6 +227,10 @@ pub struct App {
     /// When true, a cluster operation will be triggered after the source
     /// timeline (determined by `cluster_source`) finishes refreshing.
     pub refresh_then_cluster: bool,
+    /// Set while `:cluster` loads more posts: the post count before the
+    /// page in flight. A page that adds posts leads to the next one; a
+    /// failed or empty page ends the loading.
+    pub cluster_fill: Option<ClusterFill>,
 
     // Status
     pub status_message: Option<String>,
@@ -273,6 +299,13 @@ impl App {
             credentials,
             api_client: api_client.map(|c| Arc::new(Mutex::new(c))),
             users_cache: HashMap::new(),
+            media_cache: HashMap::new(),
+            picker: ratatui_image::picker::Picker::halfblocks(),
+            photo_cache: Arc::new(PhotoCache::new()),
+            photo_views: HashMap::new(),
+            photo_requested_rows: HashMap::new(),
+            photo_box_rows: std::cell::Cell::new(photos::PHOTO_ROWS),
+            photo_index: 0,
             mlx_client,
             mlx_embed_supported: false,
             mlx_chat_supported: false,
@@ -307,6 +340,7 @@ impl App {
             selected_cluster: None,
             cluster_source: None,
             refresh_then_cluster: false,
+            cluster_fill: None,
             status_message: None,
             popup: None,
             popup_scroll: 0,
@@ -315,6 +349,13 @@ impl App {
             epoch: Instant::now(),
             loading_started_at: None,
         }
+    }
+
+    /// Use the terminal's graphics protocol for photos. `new()` starts with
+    /// half-block characters, which work in every terminal.
+    pub fn with_picker(mut self, picker: ratatui_image::picker::Picker) -> Self {
+        self.picker = picker;
+        self
     }
 
     /// Returns `Some(elapsed_ms)` for skeleton animation if any loading has been
@@ -428,7 +469,9 @@ impl App {
         ui::draw(frame, self);
     }
 
-    fn tick(&self) {}
+    fn tick(&mut self) {
+        self.ensure_focused_photo();
+    }
 
     // -- View stack ---------------------------------------------------------
 
