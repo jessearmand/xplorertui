@@ -453,6 +453,15 @@ impl App {
                 }
             }
 
+            // llama.cpp server probe
+            AppEvent::ProbeLlamaCpp => {
+                self.dispatch_probe_llama_cpp();
+            }
+            AppEvent::LlamaCppProbed(found) => {
+                self.llama_cpp.apply(found);
+                self.status_message = Some(self.llama_cpp.status());
+            }
+
             // HuggingFace Hub models
             AppEvent::FetchHuggingFaceModels => {
                 self.hf_models_loading = true;
@@ -486,7 +495,8 @@ impl App {
                 if !self.has_topic_labeller() {
                     self.status_message = Some(
                         "No topic labeller configured. Add a [jev] section to config, \
-                         set mlx_server_url, or use :openrouter-auth + :openrouter-models."
+                         set mlx_server_url or [llama_cpp] chat_url, or use \
+                         :openrouter-auth + :openrouter-models."
                             .into(),
                     );
                     return;

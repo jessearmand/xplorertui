@@ -28,6 +28,10 @@ pub struct AppConfig {
     /// Falls back to `DEFAULT_MLX_CHAT_MODEL` when not set.
     #[serde(default)]
     pub mlx_chat_model: Option<String>,
+    /// `[llama_cpp]` section: `llama-server` processes for chat and
+    /// embeddings, used alongside (or instead of) the MLX server.
+    #[serde(default)]
+    pub llama_cpp: Option<LlamaCppConfig>,
     /// Jev (TypeSafe) decision model settings. When `[jev]` is present,
     /// `:topics` labels clusters with Jev instead of a chat LLM.
     #[serde(default)]
@@ -39,6 +43,73 @@ pub struct AppConfig {
     /// Number of clusters. Unset: √(posts / 2), from 4 to 10.
     #[serde(default)]
     pub cluster_k: Option<usize>,
+}
+
+/// `[llama_cpp]` section of config.toml.
+///
+/// A `llama-server` started with `--embeddings` answers only embedding
+/// requests, so chat and embeddings usually run as two servers. Set both
+/// URLs to the same server when it runs in router mode.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LlamaCppConfig {
+    /// Base URL of the chat server (e.g. "http://localhost:8092").
+    #[serde(default)]
+    pub chat_url: Option<String>,
+    /// Base URL of the embedding server, started with `--embeddings`.
+    #[serde(default)]
+    pub embedding_url: Option<String>,
+    /// Model name sent to the chat server. Unset: the first model the
+    /// server lists (its `--alias`, or the file name).
+    #[serde(default)]
+    pub chat_model: Option<String>,
+    /// Model name sent to the embedding server. Unset: as for `chat_model`.
+    #[serde(default)]
+    pub embedding_model: Option<String>,
+    /// Text put in front of each input, per embedding task. `llama-server`
+    /// does not read a model's prompt catalog, so the prompts the model was
+    /// trained with go here (e.g. EmbeddingGemma's `task: clustering |
+    /// query: `). A task without a prompt embeds the text as given.
+    #[serde(default)]
+    pub task_prompts: TaskPrompts,
+}
+
+/// `[llama_cpp.task_prompts]`: one optional prefix per embedding task.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TaskPrompts {
+    #[serde(default)]
+    pub clustering: Option<String>,
+    #[serde(default)]
+    pub search_query: Option<String>,
+    #[serde(default)]
+    pub document: Option<String>,
+}
+
+impl TaskPrompts {
+    /// The prefix for `task`, if one is set and not empty.
+    pub fn for_task(&self, task: crate::mlx::client::EmbedTask) -> Option<&str> {
+        use crate::mlx::client::EmbedTask;
+        let prompt = match task {
+            EmbedTask::Clustering => &self.clustering,
+            EmbedTask::SearchQuery => &self.search_query,
+            EmbedTask::Document => &self.document,
+        };
+        prompt.as_deref().filter(|p| !p.is_empty())
+    }
+
+    /// `texts` with the prompt for `task` in front of each one.
+    pub fn apply(&self, task: crate::mlx::client::EmbedTask, texts: &[String]) -> Vec<String> {
+        match self.for_task(task) {
+            Some(prefix) => texts.iter().map(|t| format!("{prefix}{t}")).collect(),
+            None => texts.to_vec(),
+        }
+    }
+
+    /// Whether queries and documents get different prompts, so a search
+    /// must embed them in separate requests.
+    pub fn splits_search(&self) -> bool {
+        use crate::mlx::client::EmbedTask;
+        self.for_task(EmbedTask::SearchQuery) != self.for_task(EmbedTask::Document)
+    }
 }
 
 /// `[jev]` section of config.toml.
@@ -137,6 +208,7 @@ impl Default for AppConfig {
             mlx_server_url: None,
             mlx_embedding_model: None,
             mlx_chat_model: None,
+            llama_cpp: None,
             jev: None,
             cluster_posts: default_cluster_posts(),
             cluster_k: None,
@@ -179,5 +251,37 @@ mod tests {
         assert!(config.jev.unwrap().propose_labels);
         let config: AppConfig = toml::from_str("[jev]\npropose_labels = false\n").unwrap();
         assert!(!config.jev.unwrap().propose_labels);
+    }
+
+    #[test]
+    fn llama_cpp_section_reads_urls_models_and_task_prompts() {
+        use crate::mlx::client::EmbedTask;
+        let config: AppConfig = toml::from_str(
+            "[llama_cpp]\n\
+             chat_url = \"http://localhost:8092\"\n\
+             chat_model = \"gemma-4-12b\"\n\
+             [llama_cpp.task_prompts]\n\
+             clustering = \"task: clustering | query: \"\n\
+             document = \"\"\n",
+        )
+        .unwrap();
+        let llama = config.llama_cpp.unwrap();
+        assert_eq!(llama.chat_url.as_deref(), Some("http://localhost:8092"));
+        assert_eq!(llama.embedding_url, None);
+        assert_eq!(llama.chat_model.as_deref(), Some("gemma-4-12b"));
+        let prompts = &llama.task_prompts;
+        assert_eq!(
+            prompts.apply(EmbedTask::Clustering, &["Rust".into()]),
+            vec!["task: clustering | query: Rust".to_string()]
+        );
+        // An empty prompt counts as none.
+        assert_eq!(prompts.for_task(EmbedTask::Document), None);
+        assert!(!prompts.splits_search());
+    }
+
+    #[test]
+    fn llama_cpp_is_off_without_its_section() {
+        let config: AppConfig = toml::from_str("").unwrap();
+        assert!(config.llama_cpp.is_none());
     }
 }

@@ -8,6 +8,7 @@ pub mod config;
 pub mod embeddings;
 pub mod event;
 pub mod huggingface;
+pub mod llamacpp;
 pub mod media;
 pub mod mlx;
 pub mod openrouter;

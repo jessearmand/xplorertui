@@ -184,6 +184,14 @@ impl App {
             }
             None => "No MLX server is configured (mlx_server_url).".to_string(),
         };
+        let llama_line = match &self.llama_cpp.embed {
+            Some(client) => format!(
+                "The llama.cpp server at {} is not reachable or was not started with --embeddings.",
+                client.base_url()
+            ),
+            None => "No llama.cpp embedding server is configured ([llama_cpp] embedding_url)."
+                .to_string(),
+        };
         let (or_line, question, accept_label, action) = if self.openrouter_client.is_some() {
             (
                 "No OpenRouter embedding model is selected.",
@@ -207,7 +215,7 @@ impl App {
             title: "Embedding Model Needed",
             text: format!(
                 "Clustering needs an embedding model, and none is available.\n\n\
-                 {mlx_line}\n{or_line}\n\n{question}"
+                 {mlx_line}\n{llama_line}\n{or_line}\n\n{question}"
             ),
             accept_label,
             action,

@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use super::{App, ClusterSource};
 use crate::api::types::{Includes, Media, Tweet, User};
+use crate::config::TaskPrompts;
 use crate::event::{ApiResult, AppEvent, Event, TopicLabels, ViewKind};
+use crate::llamacpp::client::LlamaCppClient;
 use crate::mlx::client::{EmbedTask, MlxClient};
 use crate::openrouter;
 use crate::openrouter::client::OpenRouterClient;
@@ -15,6 +17,7 @@ const DEFAULT_MLX_CHAT_MODEL: &str = "mlx-community/Qwen3.5-0.8B-OptiQ-4bit";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChatProviderKind {
     Mlx,
+    LlamaCpp,
     OpenRouter,
 }
 
@@ -168,8 +171,9 @@ impl App {
             self.events.send(AppEvent::ClusterTopicsGenerated(
                 generation,
                 Err(Arc::new(
-                    "No chat provider configured. Set mlx_server_url in config \
-                     or use :openrouter-auth + :openrouter-models."
+                    "No chat provider configured. Set mlx_server_url or \
+                     [llama_cpp] chat_url in config, or use :openrouter-auth + \
+                     :openrouter-models."
                         .into(),
                 )),
             ));
@@ -566,7 +570,8 @@ impl App {
         self.users_cache.get(user_id)
     }
 
-    /// Returns `true` if any embedding provider (MLX or OpenRouter) is available.
+    /// Returns `true` if any embedding provider (MLX, llama.cpp or
+    /// OpenRouter) is available.
     pub(super) fn has_embed_provider(&self) -> bool {
         self.resolve_embed_provider().is_some()
     }
@@ -576,7 +581,6 @@ impl App {
         self.resolve_embed_provider().map(|(_, model)| model)
     }
 
-    /// Returns `true` if any chat provider (MLX or OpenRouter) is available.
     /// Jev labels cluster topics when `[jev]` is configured and OpenRouter
     /// is authenticated; it takes precedence over the chat LLM.
     fn resolve_jev(&self) -> Option<(Arc<OpenRouterClient>, crate::config::JevConfig)> {
@@ -590,6 +594,8 @@ impl App {
         self.resolve_jev().is_some() || self.has_chat_provider()
     }
 
+    /// Returns `true` if any chat provider (MLX, llama.cpp or OpenRouter)
+    /// is available.
     pub(super) fn has_chat_provider(&self) -> bool {
         self.resolve_chat_provider().is_some()
     }
@@ -597,21 +603,29 @@ impl App {
     /// Resolve which chat provider to use.
     ///
     /// Respects `preferred_chat_provider` when set.  Default priority:
-    /// MLX server (if configured and chat-capable) > OpenRouter (if
-    /// authenticated and a model is selected).
+    /// MLX server (if configured and chat-capable) > llama.cpp server (if
+    /// configured and reachable) > OpenRouter (if authenticated and a model
+    /// is selected). The local servers come first: they are free and keep
+    /// posts on this machine.
     fn resolve_chat_provider(&self) -> Option<(ChatProvider, String)> {
-        let mlx = self.resolve_mlx_chat();
-        let openrouter = self.resolve_openrouter_chat();
-
         match self.preferred_chat_provider {
             // Explicit preference: no fallback — return None so the user
             // gets a clear error instead of silent rerouting to a
             // potentially paid/remote provider.
-            Some(ChatProviderKind::Mlx) => mlx,
-            Some(ChatProviderKind::OpenRouter) => openrouter,
-            // Auto: MLX preferred, OpenRouter fallback.
-            None => mlx.or(openrouter),
+            Some(ChatProviderKind::Mlx) => self.resolve_mlx_chat(),
+            Some(ChatProviderKind::LlamaCpp) => self.resolve_llama_cpp_chat(),
+            Some(ChatProviderKind::OpenRouter) => self.resolve_openrouter_chat(),
+            None => self
+                .resolve_mlx_chat()
+                .or_else(|| self.resolve_llama_cpp_chat())
+                .or_else(|| self.resolve_openrouter_chat()),
         }
+    }
+
+    fn resolve_llama_cpp_chat(&self) -> Option<(ChatProvider, String)> {
+        let client = self.llama_cpp.chat.as_ref()?;
+        let model = self.llama_cpp.chat_model.clone()?;
+        Some((ChatProvider::LlamaCpp(Arc::clone(client)), model))
     }
 
     fn resolve_mlx_chat(&self) -> Option<(ChatProvider, String)> {
@@ -646,10 +660,20 @@ impl App {
         self.resolve_chat_provider().map(|(_, model)| model)
     }
 
+    /// Same priority as chat: MLX > llama.cpp > OpenRouter.
     pub(super) fn resolve_embed_provider(&self) -> Option<(EmbedProvider, String)> {
-        let mlx = self.resolve_mlx_embed();
-        let openrouter = self.resolve_openrouter_embed();
-        mlx.or(openrouter)
+        self.resolve_mlx_embed()
+            .or_else(|| self.resolve_llama_cpp_embed())
+            .or_else(|| self.resolve_openrouter_embed())
+    }
+
+    pub(super) fn resolve_llama_cpp_embed(&self) -> Option<(EmbedProvider, String)> {
+        let client = self.llama_cpp.embed.as_ref()?;
+        let model = self.llama_cpp.embed_model.clone()?;
+        Some((
+            EmbedProvider::LlamaCpp(Arc::clone(client), Arc::clone(&self.llama_cpp.task_prompts)),
+            model,
+        ))
     }
 
     fn resolve_mlx_embed(&self) -> Option<(EmbedProvider, String)> {
@@ -686,19 +710,23 @@ fn cluster_topic_max_tokens(num_clusters: usize) -> u32 {
 // Embedding provider abstraction
 // ---------------------------------------------------------------------------
 
-/// A unified embedding provider that wraps either OpenRouter or a local MLX
-/// server.  Both return `EmbeddingResponse` in the same OpenAI-compatible
-/// format.
+/// A unified embedding provider that wraps OpenRouter, a local MLX server
+/// or a llama.cpp server.  All return `EmbeddingResponse` in the same
+/// OpenAI-compatible format.
 #[derive(Clone)]
 pub(super) enum EmbedProvider {
     OpenRouter(Arc<OpenRouterClient>),
     Mlx(Arc<MlxClient>),
+    /// The client and the task prompts from `[llama_cpp.task_prompts]`.
+    LlamaCpp(Arc<LlamaCppClient>, Arc<TaskPrompts>),
 }
 
 impl EmbedProvider {
     /// Embed `texts` for `task`, returning one vector per text in input order.
     ///
-    /// Only the MLX server takes a task; OpenRouter embeds the text as given.
+    /// The MLX server takes the task and picks the prompt itself; for
+    /// llama.cpp the configured prompt is put in front of each text here.
+    /// OpenRouter embeds the text as given.
     pub(super) async fn embed(
         &self,
         model: &str,
@@ -712,6 +740,10 @@ impl EmbedProvider {
                 .map_err(|e| Arc::new(e.to_string())),
             Self::Mlx(client) => client
                 .embed(model, texts, task)
+                .await
+                .map_err(|e| Arc::new(e.to_string())),
+            Self::LlamaCpp(client, prompts) => client
+                .embed(model, &prompts.apply(task, texts))
                 .await
                 .map_err(|e| Arc::new(e.to_string())),
         }?;
@@ -735,6 +767,10 @@ impl EmbedProvider {
                 .embed_documents(model, documents, task)
                 .await
                 .map_err(|e| Arc::new(e.to_string())),
+            // `/v1/embeddings` on llama-server takes text only.
+            Self::LlamaCpp(..) => Err(Arc::new(
+                "llama.cpp embeddings take text only, not photos".to_string(),
+            )),
         }?;
         ordered_embeddings(resp, documents.len())
     }
@@ -742,8 +778,8 @@ impl EmbedProvider {
     /// Embed a search query and the documents to score against it.
     ///
     /// Queries and documents take different task prompts, so the MLX server
-    /// gets one request for each. OpenRouter has no task prompts and takes
-    /// both in a single batch.
+    /// gets one request for each, and so does llama.cpp when its configured
+    /// prompts differ. Otherwise both go in a single batch.
     async fn embed_query_and_documents(
         &self,
         model: &str,
@@ -751,12 +787,17 @@ impl EmbedProvider {
         documents: &[String],
     ) -> Result<(Vec<f64>, Vec<Vec<f64>>), Arc<String>> {
         let query = [query.to_string()];
-        let (mut query_embs, doc_embs) = match self {
-            Self::Mlx(_) => tokio::try_join!(
+        let separate = match self {
+            Self::Mlx(_) => true,
+            Self::LlamaCpp(_, prompts) => prompts.splits_search(),
+            Self::OpenRouter(_) => false,
+        };
+        let (mut query_embs, doc_embs) = match separate {
+            true => tokio::try_join!(
                 self.embed(model, &query, EmbedTask::SearchQuery),
                 self.embed(model, documents, EmbedTask::Document),
             )?,
-            Self::OpenRouter(_) => {
+            false => {
                 let texts: Vec<String> = query.iter().chain(documents).cloned().collect();
                 let mut embs = self.embed(model, &texts, EmbedTask::Document).await?;
                 let doc_embs = embs.split_off(1);
@@ -791,19 +832,21 @@ fn ordered_embeddings(
 // Chat provider abstraction
 // ---------------------------------------------------------------------------
 
-/// A unified chat provider that wraps either OpenRouter or a local MLX
-/// server.  Both return `ChatCompletionResponse` in the same OpenAI-compatible
-/// format.
+/// A unified chat provider that wraps OpenRouter, a local MLX server or a
+/// llama.cpp server.  All return `ChatCompletionResponse` in the same
+/// OpenAI-compatible format.
 #[derive(Clone)]
 enum ChatProvider {
     OpenRouter(Arc<OpenRouterClient>),
     Mlx(Arc<MlxClient>),
+    LlamaCpp(Arc<LlamaCppClient>),
 }
 
 impl ChatProvider {
     fn name(&self) -> &'static str {
         match self {
             Self::Mlx(_) => "MLX",
+            Self::LlamaCpp(_) => "llama.cpp",
             Self::OpenRouter(_) => "OpenRouter",
         }
     }
@@ -864,6 +907,13 @@ impl ChatProvider {
             // off itself, and gives a model that thinks anyway extra room
             // on top of `max_tokens`.
             Self::Mlx(client) => client
+                .chat_completion(model, messages, Some(max_tokens), Some(0.3))
+                .await
+                .map_err(|e| Arc::new(e.to_string()))?,
+            // Thinking is turned off in the chat template. llama-server
+            // puts the thinking of a model that thinks anyway in
+            // `reasoning_content`, so `content` holds only the answer.
+            Self::LlamaCpp(client) => client
                 .chat_completion(model, messages, Some(max_tokens), Some(0.3))
                 .await
                 .map_err(|e| Arc::new(e.to_string()))?,
@@ -1259,6 +1309,123 @@ mod tests {
         assert_eq!(requests.len(), 1);
     }
 
+    fn llama_embedder(url: String, prompts: TaskPrompts) -> EmbedProvider {
+        EmbedProvider::LlamaCpp(Arc::new(LlamaCppClient::new(url)), Arc::new(prompts))
+    }
+
+    /// Inputs of each `/v1/embeddings` request the fake server saw.
+    fn embedding_inputs(seen: &crate::llamacpp::client::tests::Seen) -> Vec<serde_json::Value> {
+        seen.lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, path, _)| path == "/v1/embeddings")
+            .map(|(_, _, body)| body["input"].clone())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_embeddings_carry_the_configured_task_prompt() {
+        use crate::llamacpp::client::tests::{embedding_server, fake_llama_server};
+        let (url, seen) = fake_llama_server(embedding_server).await;
+        let prompts = TaskPrompts {
+            clustering: Some("task: clustering | query: ".into()),
+            ..Default::default()
+        };
+        let provider = llama_embedder(url, prompts);
+        let texts = vec!["Rust".to_string(), "Go".to_string()];
+        let embs = provider
+            .embed("bge-small", &texts, EmbedTask::Clustering)
+            .await
+            .unwrap();
+        assert_eq!(embs.len(), 2);
+        assert_eq!(
+            embedding_inputs(&seen),
+            vec![serde_json::json!([
+                "task: clustering | query: Rust",
+                "task: clustering | query: Go"
+            ])]
+        );
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_search_splits_only_when_query_and_document_prompts_differ() {
+        use crate::llamacpp::client::tests::{embedding_server, fake_llama_server};
+        let docs = vec!["doc a".to_string(), "doc b".to_string()];
+
+        let (url, seen) = fake_llama_server(embedding_server).await;
+        let provider = llama_embedder(url, TaskPrompts::default());
+        let (_, doc_embs) = provider
+            .embed_query_and_documents("m", "query", &docs)
+            .await
+            .unwrap();
+        assert_eq!(doc_embs.len(), 2);
+        assert_eq!(
+            embedding_inputs(&seen),
+            vec![serde_json::json!(["query", "doc a", "doc b"])]
+        );
+
+        let (url, seen) = fake_llama_server(embedding_server).await;
+        let prompts = TaskPrompts {
+            search_query: Some("q: ".into()),
+            document: Some("d: ".into()),
+            ..Default::default()
+        };
+        let provider = llama_embedder(url, prompts);
+        provider
+            .embed_query_and_documents("m", "query", &docs)
+            .await
+            .unwrap();
+        let mut inputs = embedding_inputs(&seen);
+        inputs.sort_by_key(|v| v.to_string());
+        assert_eq!(
+            inputs,
+            vec![
+                serde_json::json!(["d: doc a", "d: doc b"]),
+                serde_json::json!(["q: query"]),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn llama_cpp_does_not_take_photos() {
+        let provider = llama_embedder("http://127.0.0.1:9".into(), TaskPrompts::default());
+        let docs = vec![(
+            "text".to_string(),
+            Arc::<str>::from("data:image/jpeg;base64,"),
+        )];
+        let error = provider
+            .embed_documents("m", &docs, EmbedTask::Clustering)
+            .await
+            .unwrap_err();
+        assert!(error.contains("text only"), "{error}");
+    }
+
+    #[tokio::test]
+    async fn local_servers_come_before_openrouter_and_mlx_before_llama_cpp() {
+        use crate::auth::credentials::CredentialSet;
+        use crate::config::AppConfig;
+
+        let mut app = App::new(AppConfig::default(), None, CredentialSet::default());
+        app.openrouter_client = Some(Arc::new(OpenRouterClient::new("key".into())));
+        app.selected_chat_model = Some("remote/model".into());
+        assert_eq!(app.resolved_chat_provider_name(), Some("OpenRouter"));
+
+        app.llama_cpp.chat = Some(Arc::new(LlamaCppClient::new("http://127.0.0.1:9".into())));
+        // Configured but not probed yet: not used.
+        assert_eq!(app.resolved_chat_provider_name(), Some("OpenRouter"));
+        app.llama_cpp.chat_model = Some("gemma-4-12b".into());
+        assert_eq!(app.resolved_chat_provider_name(), Some("llama.cpp"));
+        assert_eq!(app.resolved_chat_model().as_deref(), Some("gemma-4-12b"));
+
+        app.mlx_client = Some(Arc::new(MlxClient::new("http://127.0.0.1:9".into())));
+        app.mlx_chat_supported = true;
+        assert_eq!(app.resolved_chat_provider_name(), Some("MLX"));
+
+        // An explicit preference wins over the order.
+        app.preferred_chat_provider = Some(ChatProviderKind::LlamaCpp);
+        assert_eq!(app.resolved_chat_provider_name(), Some("llama.cpp"));
+    }
+
     #[tokio::test]
     async fn chat_only_topics_report_their_labeller_before_the_labels() {
         use crate::auth::credentials::CredentialSet;
@@ -1301,6 +1468,58 @@ mod tests {
             app.status_message.as_deref(),
             Some("MLX generated 1/1 topic labels")
         );
+    }
+
+    /// Live check against two `llama-server` processes: probe both, embed
+    /// and rank a search, and label a cluster. Run with:
+    /// `LLAMA_EMBED_URL=http://localhost:8091 LLAMA_CHAT_URL=http://localhost:8092 \
+    ///  cargo test llama_cpp_live -- --ignored --nocapture`
+    #[tokio::test]
+    #[ignore]
+    async fn llama_cpp_live() {
+        use crate::app::llama_cpp::LlamaCppState;
+        use crate::config::LlamaCppConfig;
+        use crate::embeddings::similarity::cosine_similarity;
+
+        let config = LlamaCppConfig {
+            embedding_url: std::env::var("LLAMA_EMBED_URL").ok(),
+            chat_url: std::env::var("LLAMA_CHAT_URL").ok(),
+            ..Default::default()
+        };
+        let mut state = LlamaCppState::from_config(Some(&config));
+        let found = state.probe().await;
+        println!("probe: {found:?}");
+        state.apply(found);
+
+        if let (Some(client), Some(model)) = (&state.embed, &state.embed_model) {
+            let provider =
+                EmbedProvider::LlamaCpp(Arc::clone(client), Arc::clone(&state.task_prompts));
+            let docs = vec![
+                "Tokio makes async Rust networking fast".to_string(),
+                "My cat sleeps in the sun all afternoon".to_string(),
+            ];
+            let (query, doc_embs) = provider
+                .embed_query_and_documents(model, "async runtimes in Rust", &docs)
+                .await
+                .unwrap();
+            let scores: Vec<f64> = doc_embs
+                .iter()
+                .map(|d| cosine_similarity(&query, d))
+                .collect();
+            println!("embed: {} dims, scores {scores:?}", query.len());
+            assert!(
+                scores[0] > scores[1],
+                "the Rust post ranks first: {scores:?}"
+            );
+        }
+
+        if let (Some(client), Some(model)) = (&state.chat, &state.chat_model) {
+            let provider = ChatProvider::LlamaCpp(Arc::clone(client));
+            let body = "Cluster 0:\n- Tokio 2.0 is out\n- Async Rust finally clicked\n".to_string();
+            let labels = chat_labels(&provider, model, body, 1).await.unwrap();
+            println!("labels: {labels:?}");
+            assert!(!labels[0].is_empty());
+        }
     }
 
     /// Live check of propose-then-pick against OpenRouter, using the same

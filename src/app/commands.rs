@@ -77,6 +77,21 @@ impl App {
                     self.events.send(AppEvent::ProbeMLXCapabilities);
                     self.status_message = Some("Preferred provider: MLX. Probing server...".into());
                 }
+                Some("llama" | "llamacpp" | "llama.cpp" | "llama-cpp") => {
+                    self.preferred_chat_provider = Some(ChatProviderKind::LlamaCpp);
+                    if self.llama_cpp.chat.is_some() {
+                        // The result arrives via LlamaCppProbed.
+                        self.events.send(AppEvent::ProbeLlamaCpp);
+                        self.status_message =
+                            Some("Preferred provider: llama.cpp. Probing server...".into());
+                    } else {
+                        self.status_message = Some(
+                            "No llama.cpp chat server configured. Set chat_url in the \
+                             [llama_cpp] section of config.toml."
+                                .into(),
+                        );
+                    }
+                }
                 Some("openrouter" | "or") => {
                     self.preferred_chat_provider = Some(ChatProviderKind::OpenRouter);
                     if self.has_chat_provider() {
@@ -95,15 +110,16 @@ impl App {
                 }
                 Some("auto") => {
                     self.preferred_chat_provider = None;
-                    // Re-probe in case MLX server started after the TUI.
+                    // Re-probe in case a local server started after the TUI.
                     self.events.send(AppEvent::ProbeMLXCapabilities);
+                    self.events.send(AppEvent::ProbeLlamaCpp);
                     self.status_message =
-                        Some("Preferred provider: auto. Probing MLX server...".into());
+                        Some("Preferred provider: auto. Probing local servers...".into());
                 }
                 _ => {
                     let current = self.resolved_chat_provider_name().unwrap_or("none");
                     self.status_message = Some(format!(
-                        "Active: {current}. Usage: :provider <mlx|openrouter|auto>"
+                        "Active: {current}. Usage: :provider <mlx|llama|openrouter|auto>"
                     ));
                 }
             },

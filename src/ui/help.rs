@@ -115,7 +115,7 @@ impl Widget for HelpView {
         push_binding(
             &mut bindings,
             ":provider",
-            "Set chat provider (mlx|openrouter|auto)",
+            "Set chat provider (mlx|llama|openrouter|auto)",
         );
         push_binding(
             &mut bindings,

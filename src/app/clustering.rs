@@ -1,19 +1,22 @@
 //! `:cluster`: collect posts, embed them, run k-means, and give photo-heavy
 //! clusters photo embeddings.
 
+use std::future::Future;
 use std::sync::Arc;
 
 use super::dispatch::{DEFAULT_MLX_EMBEDDING_MODEL, EmbedProvider};
-use super::{App, ClusterSource};
+use super::{App, ClusterSource, LlamaCppProbe};
 use crate::api::types::Tweet;
+use crate::config::TaskPrompts;
 use crate::embeddings::cluster::{
     ClusterPosts, ClusterResult, PHOTO_HEAVY_SHARE, PhotoEmbedding, build_cluster_result, cluster_k,
 };
 use crate::event::{AppEvent, Event};
+use crate::llamacpp::client::LlamaCppClient;
 use crate::media::PhotoCache;
 use crate::media::cache::{BATCH_CONCURRENCY, BATCH_TIMEOUT};
 use crate::media::prepare::first_photo;
-use crate::mlx::client::EmbedTask;
+use crate::mlx::client::{EmbedTask, MlxClient};
 
 /// Most posts one X API read returns.
 const MAX_PAGE_SIZE: usize = 100;
@@ -97,25 +100,12 @@ impl App {
 
     pub(super) fn dispatch_cluster_timeline(&self) {
         // Try to resolve an embed provider now; if none is available but
-        // an MLX client exists, pass it along so the async task can
-        // re-probe the server (it may have started after the TUI).
+        // a local server is configured, pass it along so the async task can
+        // re-probe it (it may have started after the TUI).
         let embed_provider = self.resolve_embed_provider();
-        let mlx_fallback = if embed_provider.is_none() {
-            self.mlx_client.as_ref().map(|mlx| {
-                let model = self
-                    .config
-                    .mlx_embedding_model
-                    .clone()
-                    .unwrap_or_else(|| DEFAULT_MLX_EMBEDDING_MODEL.to_string());
-                (Arc::clone(mlx), model)
-            })
-        } else {
-            None
-        };
-        let openrouter_fallback = if embed_provider.is_none() {
-            self.resolve_openrouter_embed()
-        } else {
-            None
+        let fallback = match embed_provider {
+            Some(_) => None,
+            None => Some(self.embed_fallback()),
         };
 
         let sender = self.events.sender();
@@ -126,7 +116,7 @@ impl App {
             return;
         };
 
-        if embed_provider.is_none() && mlx_fallback.is_none() && openrouter_fallback.is_none() {
+        if fallback.as_ref().is_some_and(EmbedFallback::is_empty) {
             self.events.send(AppEvent::EmbeddingProviderMissing(source));
             return;
         }
@@ -142,38 +132,23 @@ impl App {
         let photo_cache = Arc::clone(&self.photo_cache);
 
         tokio::spawn(async move {
-            // If we had a resolved provider, use it. Otherwise try MLX
-            // with a live probe, falling back to OpenRouter.
-            let (provider, model) = if let Some((p, m)) = embed_provider {
-                (p, m)
-            } else if let Some((mlx_client, mlx_model)) = mlx_fallback {
-                // Re-probe: check if server is now reachable.
-                let caps = mlx_client.capabilities().await;
-                if caps.iter().any(|c| c == "embeddings") {
-                    // Update flags via event so future calls don't need to re-probe.
-                    let chat = caps.iter().any(|c| c == "chat");
-                    let _ = sender.send(Event::App(Box::new(AppEvent::MLXCapabilitiesProbed {
-                        embed: true,
-                        chat,
-                    })));
-                    (EmbedProvider::Mlx(mlx_client), mlx_model)
-                } else if let Some((p, m)) = openrouter_fallback {
-                    (p, m)
-                } else {
-                    let _ = sender.send(Event::App(Box::new(AppEvent::EmbeddingProviderMissing(
-                        source,
-                    ))));
-                    return;
-                }
-            } else if let Some((p, m)) = openrouter_fallback {
-                (p, m)
-            } else {
-                unreachable!("checked above");
+            let resolved = match (embed_provider, fallback) {
+                (Some(resolved), _) => Some(resolved),
+                (None, Some(fallback)) => fallback.resolve(&sender).await,
+                (None, None) => None,
+            };
+            let Some((provider, model)) = resolved else {
+                let _ = sender.send(Event::App(Box::new(AppEvent::EmbeddingProviderMissing(
+                    source,
+                ))));
+                return;
             };
             let reads_images = match provider {
                 EmbedProvider::OpenRouter(_) => openrouter_reads_images,
                 // The MLX server answers 400 when the model has no vision tower.
                 EmbedProvider::Mlx(_) => None,
+                // llama-server embeds text only.
+                EmbedProvider::LlamaCpp(..) => Some(false),
             };
             let result = async {
                 let embeddings = provider
@@ -192,6 +167,76 @@ impl App {
 
             let _ = sender.send(Event::App(Box::new(AppEvent::ClusteringComplete(result))));
         });
+    }
+}
+
+/// Embedding providers to try, in order, when none was available at
+/// dispatch: the local servers get a live probe first.
+struct EmbedFallback {
+    mlx: Option<(Arc<MlxClient>, String)>,
+    llama_cpp: Option<(LlamaCppProbeTask, Arc<LlamaCppClient>, Arc<TaskPrompts>)>,
+    openrouter: Option<(EmbedProvider, String)>,
+}
+
+type LlamaCppProbeTask = std::pin::Pin<Box<dyn Future<Output = LlamaCppProbe> + Send>>;
+
+impl App {
+    fn embed_fallback(&self) -> EmbedFallback {
+        let mlx = self.mlx_client.as_ref().map(|mlx| {
+            let model = self
+                .config
+                .mlx_embedding_model
+                .clone()
+                .unwrap_or_else(|| DEFAULT_MLX_EMBEDDING_MODEL.to_string());
+            (Arc::clone(mlx), model)
+        });
+        let llama_cpp = self.llama_cpp.embed.as_ref().map(|client| {
+            let probe: LlamaCppProbeTask = Box::pin(self.llama_cpp.probe());
+            (
+                probe,
+                Arc::clone(client),
+                Arc::clone(&self.llama_cpp.task_prompts),
+            )
+        });
+        EmbedFallback {
+            mlx,
+            llama_cpp,
+            openrouter: self.resolve_openrouter_embed(),
+        }
+    }
+}
+
+impl EmbedFallback {
+    fn is_empty(&self) -> bool {
+        self.mlx.is_none() && self.llama_cpp.is_none() && self.openrouter.is_none()
+    }
+
+    /// The first provider that answers. A probe that finds a server sends
+    /// its result back, so later runs need no probe.
+    async fn resolve(
+        self,
+        sender: &tokio::sync::mpsc::UnboundedSender<Event>,
+    ) -> Option<(EmbedProvider, String)> {
+        if let Some((client, model)) = self.mlx {
+            let caps = client.capabilities().await;
+            if caps.iter().any(|c| c == "embeddings") {
+                let chat = caps.iter().any(|c| c == "chat");
+                let _ = sender.send(Event::App(Box::new(AppEvent::MLXCapabilitiesProbed {
+                    embed: true,
+                    chat,
+                })));
+                return Some((EmbedProvider::Mlx(client), model));
+            }
+        }
+        if let Some((probe, client, prompts)) = self.llama_cpp {
+            let found = probe.await;
+            let model = found.embed_model.clone();
+            let _ = sender.send(Event::App(Box::new(AppEvent::LlamaCppProbed(found))));
+            if let Some(model) = model {
+                return Some((EmbedProvider::LlamaCpp(client, prompts), model));
+            }
+        }
+        self.openrouter
     }
 }
 
