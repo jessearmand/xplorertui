@@ -427,10 +427,10 @@ impl App {
             self.mlx_embed_supported = caps.iter().any(|c| c == "embeddings");
             self.mlx_chat_supported = caps.iter().any(|c| c == "chat");
         }
-        if self.llama_cpp.is_configured() {
-            let found = self.llama_cpp.probe().await;
-            self.llama_cpp.apply(found);
-        }
+        // Probe llama.cpp servers in the background: the result arrives as
+        // LlamaCppProbed, so a slow or stalled server never holds up the
+        // first draw.
+        self.dispatch_probe_llama_cpp();
 
         // Trigger initial data fetch based on default view.
         match self.current_view() {

@@ -1,4 +1,6 @@
-use reqwest::Response;
+use std::time::Duration;
+
+use reqwest::{RequestBuilder, Response};
 use serde::{Deserialize, Serialize};
 
 use super::LlamaCppError;
@@ -14,6 +16,9 @@ use crate::openrouter::types::{ChatCompletionResponse, ChatMessage, EmbeddingRes
 pub struct LlamaCppClient {
     http: reqwest::Client,
     base_url: String,
+    /// Limit for each probe request, so a server that accepts the
+    /// connection but never answers counts as unavailable.
+    probe_timeout: Duration,
 }
 
 /// Request body for `/v1/embeddings`. `llama-server` has no task prompts;
@@ -61,6 +66,10 @@ struct ModelEntry {
 /// A single-model `llama-server` accepts any name.
 const FALLBACK_MODEL_NAME: &str = "default";
 
+/// Default limit for each probe request. A healthy local server answers
+/// `/health` in milliseconds; the one-text embedding probe is the slowest.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+
 impl LlamaCppClient {
     pub fn new(base_url: String) -> Self {
         let http = reqwest::Client::builder()
@@ -70,7 +79,17 @@ impl LlamaCppClient {
         // Strip trailing slash for consistent URL joining.
         let base_url = base_url.trim_end_matches('/').to_string();
 
-        Self { http, base_url }
+        Self {
+            http,
+            base_url,
+            probe_timeout: PROBE_TIMEOUT,
+        }
+    }
+
+    /// The same client with another per-request probe limit.
+    pub fn with_probe_timeout(mut self, timeout: Duration) -> Self {
+        self.probe_timeout = timeout;
+        self
     }
 
     pub fn base_url(&self) -> &str {
@@ -83,6 +102,7 @@ impl LlamaCppClient {
         let url = format!("{}/health", self.base_url);
         self.http
             .get(&url)
+            .timeout(self.probe_timeout)
             .send()
             .await
             .is_ok_and(|resp| resp.status().is_success())
@@ -91,7 +111,14 @@ impl LlamaCppClient {
     /// The id of the first model the server lists, if any.
     async fn first_model(&self) -> Option<String> {
         let url = format!("{}/v1/models", self.base_url);
-        let list: ModelList = self.http.get(&url).send().await.ok()?.json().await.ok()?;
+        let resp = self
+            .http
+            .get(&url)
+            .timeout(self.probe_timeout)
+            .send()
+            .await
+            .ok()?;
+        let list: ModelList = resp.json().await.ok()?;
         list.data.into_iter().next().map(|m| m.id)
     }
 
@@ -128,7 +155,14 @@ impl LlamaCppClient {
             return None;
         }
         let model = self.model_name(configured_model).await;
-        self.embed(&model, &["ping".to_string()]).await.ok()?;
+        let texts = ["ping".to_string()];
+        let request = self
+            .embedding_request(&model, &texts)
+            .timeout(self.probe_timeout);
+        let _: EmbeddingResponse = self
+            .handle_response(request.send().await.ok()?)
+            .await
+            .ok()?;
         Some(model)
     }
 
@@ -138,13 +172,17 @@ impl LlamaCppClient {
         model: &str,
         texts: &[String],
     ) -> Result<EmbeddingResponse, LlamaCppError> {
+        let resp = self.embedding_request(model, texts).send().await?;
+        self.handle_response(resp).await
+    }
+
+    fn embedding_request(&self, model: &str, texts: &[String]) -> RequestBuilder {
         let url = format!("{}/v1/embeddings", self.base_url);
         let request = EmbeddingRequest {
             model,
             input: texts,
         };
-        let resp = self.http.post(&url).json(&request).send().await?;
-        self.handle_response(resp).await
+        self.http.post(url).json(&request)
     }
 
     /// Generate a chat completion with thinking turned off in the chat
@@ -349,6 +387,25 @@ pub(crate) mod tests {
         let client = LlamaCppClient::new(url);
         assert_eq!(client.probe_chat(None).await, None);
         assert_eq!(client.probe_embeddings(None).await, None);
+    }
+
+    #[tokio::test]
+    async fn server_that_never_answers_fails_the_probes_in_time() {
+        // Accept connections and hold them open without replying.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                held.push(stream);
+            }
+        });
+        let client = LlamaCppClient::new(url).with_probe_timeout(Duration::from_millis(100));
+        let probes = async { tokio::join!(client.probe_chat(None), client.probe_embeddings(None)) };
+        let found = tokio::time::timeout(Duration::from_secs(5), probes)
+            .await
+            .expect("probes give up at their timeout");
+        assert_eq!(found, (None, None));
     }
 
     #[tokio::test]
