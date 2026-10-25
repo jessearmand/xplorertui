@@ -45,6 +45,7 @@ default_view = "home"    # One of: home, mentions, bookmarks, search
 openrouter_callback_port = 3000 # OpenRouter OAuth localhost callback port
 cluster_posts = 100      # :cluster loads more pages until it has this many posts
 # cluster_k = 8          # number of clusters; default √(posts / 2), from 4 to 10
+# chat_provider = "llama" # mlx, llama or openrouter; default: auto (MLX, then llama.cpp, then OpenRouter)
 
 # Optional: label :cluster topics with Jev (TypeSafe) instead of a chat LLM,
 # and set the model for `classify` / `rank`. Needs OpenRouter auth.
@@ -341,9 +342,15 @@ Type `:` to enter command mode, then:
 | `:embeddings` | Select an embedding model |
 | `:openrouter-models` / `:openrouter` | Select an OpenRouter chat model |
 | `:cluster` | Cluster home timeline by topic |
-| `:provider <mlx\|llama\|openrouter\|auto>` | Set the chat provider |
+| `:provider <mlx\|llama\|openrouter\|auto>` | Set the chat provider (see below) |
 | `:help` / `:h` | Show help |
 | `:quit` / `:q` | Quit |
+
+### Chat provider
+
+`:provider mlx`, `:provider llama` or `:provider openrouter` uses only that chat provider, with no fallback to another one. `:provider auto` tries MLX, then llama.cpp, then OpenRouter. Embeddings always use that order, whatever the chat provider is.
+
+When the chosen provider answers (the local server's probe finds chat, or an OpenRouter chat model is selected), a prompt offers to save it as `chat_provider` in `config.toml`, so the next session starts with it. The save changes only that key and keeps your comments and layout. `:provider auto` offers to remove a saved `chat_provider`. The OpenRouter chat model itself is not saved: select it with `:openrouter-models` in each session.
 
 ## License
 

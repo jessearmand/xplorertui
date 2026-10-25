@@ -1,5 +1,6 @@
 use super::{App, ClusterFill, ClusterSource, TimelineState};
 use crate::api::types::{Includes, Tweet};
+use crate::config::ChatProviderKind;
 use crate::event::{AppEvent, TopicLabels, ViewKind};
 
 impl App {
@@ -429,6 +430,8 @@ impl App {
                 self.selected_chat_model = Some(model_id.clone());
                 self.status_message = Some(format!("Selected chat model: {model_id}"));
                 self.pop_view();
+                let answers = self.has_chat_provider();
+                self.chat_provider_checked(ChatProviderKind::OpenRouter, answers);
             }
 
             // MLX capability probe
@@ -438,6 +441,7 @@ impl App {
             AppEvent::MLXCapabilitiesProbed { embed, chat } => {
                 self.mlx_embed_supported = embed;
                 self.mlx_chat_supported = chat;
+                self.chat_provider_checked(ChatProviderKind::Mlx, chat);
 
                 if embed || chat {
                     let mut caps = Vec::new();
@@ -460,6 +464,8 @@ impl App {
             AppEvent::LlamaCppProbed(found) => {
                 self.llama_cpp.apply(found);
                 self.status_message = Some(self.llama_cpp.status());
+                let answers = self.llama_cpp.chat_model.is_some();
+                self.chat_provider_checked(ChatProviderKind::LlamaCpp, answers);
             }
 
             // HuggingFace Hub models

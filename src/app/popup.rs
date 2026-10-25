@@ -6,6 +6,7 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
 use super::{App, ClusterSource};
+use crate::config::ChatProviderKind;
 use crate::event::{AppEvent, ViewKind};
 
 /// Visual tone of a popup (border and title color).
@@ -24,6 +25,8 @@ pub enum PromptAction {
     SelectEmbeddingModel { resume: ClusterSource },
     /// Run the OpenRouter auth flow, then continue as `SelectEmbeddingModel`.
     OpenRouterAuth { resume: ClusterSource },
+    /// Save `chat_provider` to config.toml, or remove it for `None`.
+    SaveChatProvider(Option<ChatProviderKind>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,7 +140,7 @@ impl App {
             }
             Popup::Confirm { action, .. } => match key.code {
                 KeyCode::Enter | KeyCode::Char('y' | 'Y') => self.accept_prompt(action),
-                KeyCode::Esc | KeyCode::Char('n' | 'N' | 'q') => self.cancel_prompt(),
+                KeyCode::Esc | KeyCode::Char('n' | 'N' | 'q') => self.cancel_prompt(action),
                 _ => self.popup = Some(popup),
             },
         }
@@ -160,12 +163,24 @@ impl App {
                 self.resume_cluster_after_model = Some(resume);
                 self.events.send(AppEvent::StartOpenRouterAuth);
             }
+            PromptAction::SaveChatProvider(provider) => self.save_chat_provider(provider),
         }
     }
 
-    /// Both prompt actions resume clustering, so cancelling either one
+    fn cancel_prompt(&mut self, action: PromptAction) {
+        match action {
+            PromptAction::SelectEmbeddingModel { .. } | PromptAction::OpenRouterAuth { .. } => {
+                self.cancel_cluster_prompt()
+            }
+            PromptAction::SaveChatProvider(_) => {
+                self.status_message = Some("chat_provider in config.toml not changed.".into());
+            }
+        }
+    }
+
+    /// Both embedding prompts resume clustering, so cancelling either one
     /// abandons the pending cluster run.
-    fn cancel_prompt(&mut self) {
+    fn cancel_cluster_prompt(&mut self) {
         self.resume_cluster_after_model = None;
         // An empty cluster view is a dead end; go back to the timeline.
         if self.current_view() == Some(&ViewKind::Cluster) && self.cluster_result.is_none() {

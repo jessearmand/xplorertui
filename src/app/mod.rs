@@ -1,4 +1,5 @@
 mod auth;
+mod chat_provider;
 mod clustering;
 mod commands;
 mod dispatch;
@@ -192,6 +193,11 @@ pub struct App {
     /// User-preferred chat provider. `None` = auto (MLX, then llama.cpp, then
     /// OpenRouter).
     pub preferred_chat_provider: Option<dispatch::ChatProviderKind>,
+    /// Provider that `:provider` asked for, to offer to save as
+    /// `chat_provider` once it answers.
+    pub provider_save_offer: Option<dispatch::ChatProviderKind>,
+    /// config.toml, where `chat_provider` is saved.
+    pub config_file: Option<std::path::PathBuf>,
 
     // Model filter state (shared by both model views)
     pub model_filter: Option<String>,
@@ -282,6 +288,7 @@ impl App {
             .as_ref()
             .map(|url| Arc::new(MlxClient::new(url.clone())));
         let llama_cpp = LlamaCppState::from_config(config.llama_cpp.as_ref());
+        let preferred_chat_provider = config.chat_provider;
 
         Self {
             running: true,
@@ -324,7 +331,9 @@ impl App {
             text_models: Vec::new(),
             selected_chat_model: None,
             text_models_loading: false,
-            preferred_chat_provider: None,
+            preferred_chat_provider,
+            provider_save_offer: None,
+            config_file: crate::config::config_path(),
             model_filter: None,
             model_filter_open: false,
             model_filter_index: 0,

@@ -13,13 +13,7 @@ use crate::openrouter::types::{EmbeddingResponse, Model};
 pub(super) const DEFAULT_MLX_EMBEDDING_MODEL: &str = "mlx-community/Qwen3-Embedding-0.6B-mxfp8";
 const DEFAULT_MLX_CHAT_MODEL: &str = "mlx-community/Qwen3.5-0.8B-OptiQ-4bit";
 
-/// Identifies which chat provider the user prefers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChatProviderKind {
-    Mlx,
-    LlamaCpp,
-    OpenRouter,
-}
+pub use crate::config::ChatProviderKind;
 
 impl App {
     // -- OpenRouter dispatch methods ------------------------------------------
