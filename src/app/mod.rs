@@ -421,15 +421,10 @@ impl App {
         // Try to initialize OpenRouter client from stored credentials.
         self.init_openrouter_client();
 
-        // Probe MLX server capabilities (non-blocking, fast health check).
-        if let Some(ref mlx) = self.mlx_client {
-            let caps = mlx.capabilities().await;
-            self.mlx_embed_supported = caps.iter().any(|c| c == "embeddings");
-            self.mlx_chat_supported = caps.iter().any(|c| c == "chat");
-        }
-        // Probe llama.cpp servers in the background: the result arrives as
-        // LlamaCppProbed, so a slow or stalled server never holds up the
-        // first draw.
+        // Probe the local servers in the background: the results arrive as
+        // MLXCapabilitiesProbed and LlamaCppProbed, so a slow or stalled
+        // server never holds up the first draw.
+        self.dispatch_probe_mlx();
         self.dispatch_probe_llama_cpp();
 
         // Trigger initial data fetch based on default view.
