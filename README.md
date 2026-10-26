@@ -354,8 +354,6 @@ When the chosen provider answers (the local server's probe finds chat, or an Ope
 
 ## License
 
-Copyright (c) Jesse Armand <jesse@jessearmand.com>
-
 This project is licensed under the Mozilla Public License, version 2.0 ([LICENSE] or <https://www.mozilla.org/MPL/2.0/>)
 
 [LICENSE]: ./LICENSE
