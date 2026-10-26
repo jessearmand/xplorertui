@@ -1,14 +1,17 @@
 mod auth;
+mod chat_provider;
 mod clustering;
 mod commands;
 mod dispatch;
 mod event_handlers;
 mod key_handlers;
+mod llama_cpp;
 mod navigation;
 pub mod photos;
 mod popup;
 
 pub use clustering::ClusterFill;
+pub use llama_cpp::{LlamaCppProbe, LlamaCppState};
 pub use photos::PhotoView;
 pub use popup::{Popup, PopupTone, PromptAction};
 
@@ -174,6 +177,9 @@ pub struct App {
     /// Whether the MLX server supports chat completions (probed at startup).
     pub mlx_chat_supported: bool,
 
+    /// llama.cpp servers from `[llama_cpp]` and what their probes found.
+    pub llama_cpp: LlamaCppState,
+
     // OpenRouter model selection
     pub openrouter_models: Vec<Model>,
     pub selected_embedding_model: Option<String>,
@@ -184,8 +190,14 @@ pub struct App {
     pub selected_chat_model: Option<String>,
     pub text_models_loading: bool,
 
-    /// User-preferred chat provider. `None` = auto (MLX if available, else OpenRouter).
+    /// User-preferred chat provider. `None` = auto (MLX, then llama.cpp, then
+    /// OpenRouter).
     pub preferred_chat_provider: Option<dispatch::ChatProviderKind>,
+    /// Provider that `:provider` asked for, to offer to save as
+    /// `chat_provider` once it answers.
+    pub provider_save_offer: Option<dispatch::ChatProviderKind>,
+    /// config.toml, where `chat_provider` is saved.
+    pub config_file: Option<std::path::PathBuf>,
 
     // Model filter state (shared by both model views)
     pub model_filter: Option<String>,
@@ -275,6 +287,8 @@ impl App {
             .mlx_server_url
             .as_ref()
             .map(|url| Arc::new(MlxClient::new(url.clone())));
+        let llama_cpp = LlamaCppState::from_config(config.llama_cpp.as_ref());
+        let preferred_chat_provider = config.chat_provider;
 
         Self {
             running: true,
@@ -309,6 +323,7 @@ impl App {
             mlx_client,
             mlx_embed_supported: false,
             mlx_chat_supported: false,
+            llama_cpp,
             openrouter_client: None,
             openrouter_models: Vec::new(),
             selected_embedding_model: None,
@@ -316,7 +331,9 @@ impl App {
             text_models: Vec::new(),
             selected_chat_model: None,
             text_models_loading: false,
-            preferred_chat_provider: None,
+            preferred_chat_provider,
+            provider_save_offer: None,
+            config_file: crate::config::config_path(),
             model_filter: None,
             model_filter_open: false,
             model_filter_index: 0,
@@ -413,12 +430,11 @@ impl App {
         // Try to initialize OpenRouter client from stored credentials.
         self.init_openrouter_client();
 
-        // Probe MLX server capabilities (non-blocking, fast health check).
-        if let Some(ref mlx) = self.mlx_client {
-            let caps = mlx.capabilities().await;
-            self.mlx_embed_supported = caps.iter().any(|c| c == "embeddings");
-            self.mlx_chat_supported = caps.iter().any(|c| c == "chat");
-        }
+        // Probe the local servers in the background: the results arrive as
+        // MLXCapabilitiesProbed and LlamaCppProbed, so a slow or stalled
+        // server never holds up the first draw.
+        self.dispatch_probe_mlx();
+        self.dispatch_probe_llama_cpp();
 
         // Trigger initial data fetch based on default view.
         match self.current_view() {

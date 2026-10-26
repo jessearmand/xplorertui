@@ -6,7 +6,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use crate::api::types::{ListResponse, SingleResponse, Tweet, User};
-use crate::app::ClusterSource;
+use crate::app::{ClusterSource, LlamaCppProbe};
 use crate::embeddings::cluster::ClusterResult;
 use crate::huggingface::types::HfModel;
 use crate::openrouter::types::Model;
@@ -132,6 +132,10 @@ pub enum AppEvent {
         chat: bool,
     },
 
+    // -- llama.cpp server probe --
+    ProbeLlamaCpp,
+    LlamaCppProbed(LlamaCppProbe),
+
     // -- HuggingFace Hub --
     FetchHuggingFaceModels,
     HuggingFaceModelsLoaded {
@@ -152,8 +156,8 @@ pub enum AppEvent {
     },
     ClusterTimeline,
     ClusteringComplete(ApiResult<ClusterResult>),
-    /// Clustering found no embedding provider (MLX unreachable and no
-    /// OpenRouter embedding model); prompts the user to select one.
+    /// Clustering found no embedding provider (MLX and llama.cpp unreachable
+    /// and no OpenRouter embedding model); prompts the user to select one.
     EmbeddingProviderMissing(ClusterSource),
     GenerateClusterTopics,
     /// The labeller the `:topics` run of this generation has started on

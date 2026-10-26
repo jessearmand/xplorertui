@@ -45,6 +45,7 @@ default_view = "home"    # One of: home, mentions, bookmarks, search
 openrouter_callback_port = 3000 # OpenRouter OAuth localhost callback port
 cluster_posts = 100      # :cluster loads more pages until it has this many posts
 # cluster_k = 8          # number of clusters; default √(posts / 2), from 4 to 10
+# chat_provider = "llama" # mlx, llama or openrouter; default: auto (MLX, then llama.cpp, then OpenRouter)
 
 # Optional: label :cluster topics with Jev (TypeSafe) instead of a chat LLM,
 # and set the model for `classify` / `rank`. Needs OpenRouter auth.
@@ -53,7 +54,37 @@ model = "typesafe/jev-1.14" # pin a version; thresholds shift between releases
 concurrency = 8
 # topics = { rust = "Rust language and ecosystem", ai_ml = "AI, ML, LLMs" }  # default: built-in taxonomy; `other` is always added
 propose_labels = true # with a chat model available, use it for :topics labels (Jev routes; see below)
+
+# Optional: llama.cpp servers for chat and embeddings (see "Local llama.cpp servers").
+[llama_cpp]
+chat_url = "http://localhost:8092"
+embedding_url = "http://localhost:8091"
+# chat_model = "gemma-4-12b"     # default: the model the server lists
+# embedding_model = "bge-small"  # default: the model the server lists
+
+# Text put in front of each input, per task. llama-server does not read a
+# model's prompt catalog; set the prompts your embedding model was trained with.
+# [llama_cpp.task_prompts]
+# clustering = "task: clustering | query: "
+# search_query = "task: search result | query: "
+# document = "title: none | text: "
 ```
+
+### Local llama.cpp servers
+
+xplorertui can use [llama.cpp](https://github.com/ggml-org/llama.cpp)'s `llama-server` for chat and embeddings, in addition to the MLX server (`mlx-server/`). A server started with `--embeddings` answers only embedding requests, so run one server for each:
+
+```bash
+llama-server -hf unsloth/gemma-4-12B-it-qat-GGUF --port 8092 -a gemma-4-12b -c 8192
+llama-server -hf unsloth/bge-small-en-v1.5-GGUF --embeddings --port 8091 -a bge-small
+```
+
+Then set `chat_url` and `embedding_url` in `[llama_cpp]`. When a single server runs in router mode (`--models-dir`), set both URLs to it and name the models with `chat_model` and `embedding_model`.
+
+- xplorertui probes the servers at startup, with `:provider auto`, and when `:cluster` finds no embedding provider. A server that is still loading its model answers 503 and is skipped until the next probe.
+- Local servers come first: MLX, then llama.cpp, then OpenRouter. `:provider llama` uses only the llama.cpp chat server.
+- Chat requests set `enable_thinking: false` in the chat template. `llama-server` returns the thinking of a model that thinks anyway in `reasoning_content`, which xplorertui ignores. `max_tokens` counts those thinking tokens.
+- Embeddings are text only: photo-heavy clusters keep their text vectors.
 
 ## Authentication
 
@@ -195,11 +226,11 @@ Type `:cluster` to cluster the tweets in the current view (following, mentions, 
 3. PCA projects embeddings to 2D coordinates
 4. A scatter plot is displayed using [kuva](https://github.com/psy-fer/kuva)'s terminal backend with Unicode braille characters
 
-If no embedding model is available (the MLX server is not reachable and no OpenRouter embedding model is selected), a prompt offers to open the embedding model picker, or to sign in to OpenRouter first. Clustering starts when you pick a model.
+If no embedding model is available (no MLX or llama.cpp server is reachable and no OpenRouter embedding model is selected), a prompt offers to open the embedding model picker, or to sign in to OpenRouter first. Clustering starts when you pick a model.
 
 Each cluster is labeled with the tweet closest to its centroid. `:topics` replaces those placeholders with short topic labels:
 
-- With a `[jev]` config section and a chat model (MLX or a selected OpenRouter model), Jev first checks whether each cluster is about technology.
+- With a `[jev]` config section and a chat model (MLX, llama.cpp or a selected OpenRouter model), Jev first checks whether each cluster is about technology.
   - If at least half the posts are in tech clusters, the chat model proposes three candidate labels per cluster and Jev picks the best one for each cluster. No two clusters get the same label, and a cluster that none of the candidates fit shows as "Mixed".
   - Otherwise the chat model writes the labels itself, which works better on non-tech timelines.
   - Set `propose_labels = false` to skip the chat model.
@@ -311,8 +342,15 @@ Type `:` to enter command mode, then:
 | `:embeddings` | Select an embedding model |
 | `:openrouter-models` / `:openrouter` | Select an OpenRouter chat model |
 | `:cluster` | Cluster home timeline by topic |
+| `:provider <mlx\|llama\|openrouter\|auto>` | Set the chat provider (see below) |
 | `:help` / `:h` | Show help |
 | `:quit` / `:q` | Quit |
+
+### Chat provider
+
+`:provider mlx`, `:provider llama` or `:provider openrouter` uses only that chat provider, with no fallback to another one. `:provider auto` tries MLX, then llama.cpp, then OpenRouter. Embeddings always use that order, whatever the chat provider is.
+
+When the chosen provider answers (the local server's probe finds chat, or an OpenRouter chat model is selected), a prompt offers to save it as `chat_provider` in `config.toml`, so the next session starts with it. The save changes only that key and keeps your comments and layout. `:provider auto` offers to remove a saved `chat_provider`. The OpenRouter chat model itself is not saved: select it with `:openrouter-models` in each session.
 
 ## License
 

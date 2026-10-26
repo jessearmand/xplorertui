@@ -72,19 +72,44 @@ impl App {
             Some(Command::Provider(arg)) => match arg.as_deref() {
                 Some("mlx") => {
                     self.preferred_chat_provider = Some(ChatProviderKind::Mlx);
+                    if self.mlx_client.is_some() {
+                        // Offer to save it once the probe finds chat.
+                        self.expect_chat_provider(ChatProviderKind::Mlx);
+                    }
                     // Always re-probe — the result arrives asynchronously via
                     // MLXCapabilitiesProbed, which updates flags and shows status.
                     self.events.send(AppEvent::ProbeMLXCapabilities);
                     self.status_message = Some("Preferred provider: MLX. Probing server...".into());
                 }
+                Some("llama" | "llamacpp" | "llama.cpp" | "llama-cpp") => {
+                    self.preferred_chat_provider = Some(ChatProviderKind::LlamaCpp);
+                    if self.llama_cpp.chat.is_some() {
+                        // The result arrives via LlamaCppProbed, which
+                        // offers to save it when the server answers.
+                        self.expect_chat_provider(ChatProviderKind::LlamaCpp);
+                        self.events.send(AppEvent::ProbeLlamaCpp);
+                        self.status_message =
+                            Some("Preferred provider: llama.cpp. Probing server...".into());
+                    } else {
+                        self.status_message = Some(
+                            "No llama.cpp chat server configured. Set chat_url in the \
+                             [llama_cpp] section of config.toml."
+                                .into(),
+                        );
+                    }
+                }
                 Some("openrouter" | "or") => {
                     self.preferred_chat_provider = Some(ChatProviderKind::OpenRouter);
+                    // Offered now if a chat model is selected, else once
+                    // one is.
+                    self.expect_chat_provider(ChatProviderKind::OpenRouter);
                     if self.has_chat_provider() {
                         let model = self
                             .resolved_chat_model()
                             .unwrap_or_else(|| "(none selected)".into());
                         self.status_message =
                             Some(format!("Chat provider set to OpenRouter: {model}"));
+                        self.chat_provider_checked(ChatProviderKind::OpenRouter, true);
                     } else {
                         self.status_message = Some(
                             "OpenRouter chat not available. Use :openrouter-auth \
@@ -95,15 +120,17 @@ impl App {
                 }
                 Some("auto") => {
                     self.preferred_chat_provider = None;
-                    // Re-probe in case MLX server started after the TUI.
+                    // Re-probe in case a local server started after the TUI.
                     self.events.send(AppEvent::ProbeMLXCapabilities);
+                    self.events.send(AppEvent::ProbeLlamaCpp);
                     self.status_message =
-                        Some("Preferred provider: auto. Probing MLX server...".into());
+                        Some("Preferred provider: auto. Probing local servers...".into());
+                    self.offer_to_clear_chat_provider();
                 }
                 _ => {
                     let current = self.resolved_chat_provider_name().unwrap_or("none");
                     self.status_message = Some(format!(
-                        "Active: {current}. Usage: :provider <mlx|openrouter|auto>"
+                        "Active: {current}. Usage: :provider <mlx|llama|openrouter|auto>"
                     ));
                 }
             },

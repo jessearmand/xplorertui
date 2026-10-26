@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use reqwest::Response;
 use serde::Serialize;
 
@@ -13,7 +15,14 @@ use crate::openrouter::types::{
 pub struct MlxClient {
     http: reqwest::Client,
     base_url: String,
+    /// Limit for the `/health` probe, so a server that accepts the
+    /// connection but never answers counts as unavailable.
+    probe_timeout: Duration,
 }
+
+/// Default limit for the `/health` probe. The server answers it without
+/// touching MLX, so a healthy one replies in milliseconds.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// What a batch of embeddings is for. The MLX server maps it to the task
 /// prompt the loaded model expects (e.g. EmbeddingGemma 2's
@@ -64,15 +73,27 @@ impl MlxClient {
         // Strip trailing slash for consistent URL joining.
         let base_url = base_url.trim_end_matches('/').to_string();
 
-        Self { http, base_url }
+        Self {
+            http,
+            base_url,
+            probe_timeout: PROBE_TIMEOUT,
+        }
+    }
+
+    /// The same client with another probe limit.
+    pub fn with_probe_timeout(mut self, timeout: Duration) -> Self {
+        self.probe_timeout = timeout;
+        self
     }
 
     /// Probe the `/health` endpoint and return the reported capabilities.
     ///
-    /// Returns an empty vec on any error (server down, old version, etc.).
+    /// Returns an empty vec on any error (server down, old version, no
+    /// answer within the probe timeout, etc.).
     pub async fn capabilities(&self) -> Vec<String> {
         let url = format!("{}/health", self.base_url);
-        let Ok(resp) = self.http.get(&url).send().await else {
+        let request = self.http.get(&url).timeout(self.probe_timeout);
+        let Ok(resp) = request.send().await else {
             return Vec::new();
         };
         let Ok(json) = resp.json::<serde_json::Value>().await else {
@@ -183,6 +204,24 @@ impl MlxClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn server_that_never_answers_has_no_capabilities() {
+        // Accept connections and hold them open without replying.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                held.push(stream);
+            }
+        });
+        let client = MlxClient::new(url).with_probe_timeout(Duration::from_millis(100));
+        let caps = tokio::time::timeout(Duration::from_secs(5), client.capabilities())
+            .await
+            .expect("the probe gives up at its timeout");
+        assert!(caps.is_empty());
+    }
 
     #[test]
     fn embedding_request_names_the_task_in_snake_case() {

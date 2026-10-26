@@ -33,6 +33,7 @@ rand = "0.10"
 dotenvy = "0.15"
 dirs = "6"
 toml = "1"
+toml_edit = "0.25"
 
 # CLI
 clap = { version = "4", features = ["derive"] }
