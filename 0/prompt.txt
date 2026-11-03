@@ -1,0 +1,844 @@
+Review this change for security vulnerabilities.
+
+Changed files (you may Read these and any other file in the repo):
+  - mlx-server/prompts.py
+  - mlx-server/pyproject.toml
+  - mlx-server/registry.py
+  - mlx-server/schemas.py
+  - mlx-server/server.py
+  - mlx-server/test_embedding_tasks.py
+  - src/app/dispatch.rs
+  - src/mlx/client.rs
+
+Unified diff (only + lines are new):
+
+=== DIFF: mlx-server/prompts.py ===
+@@ -0,0 +1,89 @@
++"""Task prompts for instruction-tuned embedding models.
++
++Checkpoints published for Sentence Transformers carry a prompt catalog in
++``config_sentence_transformers.json`` (prompt name -> text to prepend). Reading
++it from the checkpoint keeps the prompt wording with the model: EmbeddingGemma 2
++answers ``clustering`` with ``task: clustering | query: ``, Qwen3-Embedding
++answers ``search_query`` with its retrieval instruction, and a model with no
++catalog embeds the text unchanged.
++"""
++
++from __future__ import annotations
++
++import json
++import logging
++from pathlib import Path
++
++from schemas import EmbeddingTask
++
++logger = logging.getLogger("mlx-server")
++
++PROMPT_CATALOG_FILE = "config_sentence_transformers.json"
++
++# Catalog prompt names for each task, most specific first. Names follow the
++# Sentence Transformers conventions used by published checkpoints.
++TASK_PROMPT_NAMES: dict[EmbeddingTask, tuple[str, ...]] = {
++    EmbeddingTask.CLUSTERING: ("Clustering",),
++    EmbeddingTask.SEARCH_QUERY: ("SearchQuery", "Retrieval-query", "query"),
++    EmbeddingTask.DOCUMENT: ("Document", "Retrieval-document", "document"),
++    EmbeddingTask.CLASSIFICATION: ("Classification",),
++    EmbeddingTask.SIMILARITY: ("SentenceSimilarity", "STS"),
++}
++
++
++def find_prompt_catalog(model_id: str) -> Path | None:
++    """Locate the prompt catalog of an already-downloaded model.
++
++    ``model_id`` is a local directory or a Hugging Face repo id. Only the local
++    cache is consulted, so call this after the model has been loaded.
++    """
++    local = Path(model_id) / PROMPT_CATALOG_FILE
++    if local.is_file():
++        return local
++
++    from huggingface_hub import try_to_load_from_cache
++
++    try:
++        cached = try_to_load_from_cache(model_id, PROMPT_CATALOG_FILE)
++    except ValueError:  # not a valid repo id, e.g. a missing local path
++        return None
++    # A str is a cached file; anything else means absent or not cached.
++    return Path(cached) if isinstance(cached, str) else None
++
++
++def load_prompt_catalog(model_id: str) -> dict[str, str]:
++    """Return the model's prompt catalog, or an empty one if it has none."""
++    path = find_prompt_catalog(model_id)
++    if path is None:
++        return {}
++    try:
++        catalog = json.loads(path.read_text())
++    except (OSError, ValueError) as exc:
++        logger.warning("Ignoring unreadable prompt catalog %s: %s", path, exc)
++        return {}
++    prompts = catalog.get("prompts") if isinstance(catalog, dict) else None
++    if not isinstance(prompts, dict):
++        return {}
++    return {
++        name: text
++        for name, text in prompts.items()
++        if isinstance(name, str) and isinstance(text, str)
++    }
++
++
++def task_prompt(catalog: dict[str, str], task: EmbeddingTask | None) -> str:
++    """Return the text to prepend for ``task``; empty if the model has none."""
++    if task is None:
++        return ""
++    for name in TASK_PROMPT_NAMES[task]:
++        if name in catalog:
++            return catalog[name]
++    return ""
++
++
++def apply_task_prompt(
++    catalog: dict[str, str], task: EmbeddingTask | None, texts: list[str]
++) -> list[str]:
++    """Prepend the task prompt to each text, as Sentence Transformers does."""
++    prompt = task_prompt(catalog, task)
++    return [prompt + text for text in texts] if prompt else texts
+
+
+=== DIFF: mlx-server/pyproject.toml ===
+@@ -8,8 +8,11 @@ dependencies = [
+     "mlx-embeddings @ git+https://github.com/Blaizzy/mlx-embeddings.git@v0.1.0",
+     "mlx-lm==0.31.3",
+     "mlx-optiq==0.0.4",
+-    "mlx-vlm>=0.4.4",
+-    "mlx>=0.31.0",
++    # EmbeddingGemma 2 (`embedding_gemma2`) landed on main after 0.7.6 and is
++    # not in a PyPI release yet. Pin the merge commit; move back to a version
++    # range once a release includes it.
++    "mlx-vlm @ git+https://github.com/Blaizzy/mlx-vlm.git@fec3f50379bb2cb0760ef3c8a68ebce9585e4d97",
++    "mlx>=0.32.3",
+     "numpy>=1.26.0",
+     "httpcore>=1.0.9,<2",
+     "idna>=3.10",
+
+
+=== DIFF: mlx-server/registry.py ===
+@@ -4,6 +4,7 @@ from __future__ import annotations
+ 
+ import enum
+ import os
++from dataclasses import dataclass, field
+ from typing import Any
+ 
+ import logging
+@@ -11,6 +12,8 @@ import logging
+ import mlx.core as mx
+ import numpy as np
+ 
++from prompts import load_prompt_catalog
++
+ logger = logging.getLogger("mlx-server")
+ 
+ DEFAULT_MODEL = os.environ.get(
+@@ -34,22 +37,83 @@ class ChatBackend(enum.Enum):
+     MLX_VLM = "mlx_vlm"
+ 
+ 
++class EmbedBackend(enum.Enum):
++    """Which library loaded a text embedding model."""
++
++    MLX_EMBEDDINGS = "mlx_embeddings"
++    MLX_VLM = "mlx_vlm"
++
++
++@dataclass(frozen=True)
++class TextEmbedder:
++    """A loaded text embedding model and what is needed to call it."""
++
++    backend: EmbedBackend
++    model: Any
++    tokenizer: Any
++    # Prompt name -> text to prepend; see ``prompts.py``.
++    prompts: dict[str, str] = field(default_factory=dict)
++
++
++# Encoders that embed other modalities. A text embedder drops them at load.
++_NON_TEXT_TOWERS = ("vision_config", "audio_config")
++
++
++def _load_text_embedder_mlx_vlm(model_id: str) -> tuple[Any, Any]:
++    """Load a text embedding model through mlx-vlm, without its media towers.
++
++    Weights keep the dtype stored in the checkpoint. Do not cast them:
++    EmbeddingGemma 2 overflows float16 and returns NaN or degraded vectors.
++    """
++    from mlx_vlm.embedding_loader import load_embedding_model
++    from mlx_vlm.utils import get_model_path, load_config
++    from transformers import AutoTokenizer
++
++    path = get_model_path(model_id)
++    config = load_config(path)
++    for tower in _NON_TEXT_TOWERS:
++        if config.get(tower) is not None:
++            config[tower] = None
++    model = load_embedding_model(path, config=config)
++    tokenizer = AutoTokenizer.from_pretrained(path)
++    return model, tokenizer
++
++
+ class ModelRegistry:
+     """Manages loaded MLX models with lazy initialization."""
+ 
+     def __init__(self, default_model: str | None = None) -> None:
+-        self._text_models: dict[str, tuple[Any, Any]] = {}
++        self._text_models: dict[str, TextEmbedder] = {}
+         self._vl_models: dict[str, tuple[Any, Any]] = {}
+         self._chat_models: dict[str, tuple[ChatBackend, Any, Any]] = {}
+         self.default_model = default_model
+ 
+-    def get_text_model(self, model_id: str) -> tuple[Any, Any]:
+-        """Return (model, tokenizer) for a text embedding model."""
++    def get_text_model(self, model_id: str) -> TextEmbedder:
++        """Return the loaded text embedding model for ``model_id``.
++
++        Tries mlx_embeddings first. If the model architecture is unsupported,
++        falls back to mlx_vlm (e.g. EmbeddingGemma 2).
++        """
+         if model_id not in self._text_models:
+-            from mlx_embeddings import load
++            try:
++                from mlx_embeddings import load
+ 
+-            model, tokenizer = load(model_id)
+-            self._text_models[model_id] = (model, tokenizer)
++                logger.info("Trying mlx_embeddings for: %s", model_id)
++                model, tokenizer = load(model_id)
++                backend = EmbedBackend.MLX_EMBEDDINGS
++            except (ValueError, KeyError) as exc:
++                # Architecture not supported by mlx_embeddings — try mlx_vlm
++                logger.info(
++                    "mlx_embeddings unsupported for %s (%s), falling back to mlx_vlm",
++                    model_id,
++                    exc,
++                )
++                model, tokenizer = _load_text_embedder_mlx_vlm(model_id)
++                backend = EmbedBackend.MLX_VLM
++            logger.info("Loaded %s via %s", model_id, backend.value)
++            self._text_models[model_id] = TextEmbedder(
++                backend, model, tokenizer, load_prompt_catalog(model_id)
++            )
+         return self._text_models[model_id]
+ 
+     def get_chat_model(self, model_id: str) -> tuple[ChatBackend, Any, Any]:
+
+
+=== DIFF: mlx-server/schemas.py ===
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++import enum
+ from typing import Annotated
+ 
+ from pydantic import BaseModel, Field, StringConstraints
+@@ -12,9 +13,27 @@ from pydantic import BaseModel, Field, StringConstraints
+ # ---------------------------------------------------------------------------
+ 
+ 
++class EmbeddingTask(str, enum.Enum):
++    """What the embeddings are for.
++
++    Instruction-tuned embedding models (EmbeddingGemma 2, Qwen3-Embedding)
++    expect a task prompt in front of each text. The server looks the prompt up
++    in the model's own catalog, so clients name the task and stay
++    model-agnostic. See ``prompts.py``.
++    """
++
++    CLUSTERING = "clustering"
++    SEARCH_QUERY = "search_query"
++    DOCUMENT = "document"
++    CLASSIFICATION = "classification"
++    SIMILARITY = "similarity"
++
++
+ class EmbeddingRequest(BaseModel):
+     model: str
+     input: list[str]
++    # Extension to the OpenAI schema. Omit it to embed the text as given.
++    task: EmbeddingTask | None = None
+ 
+ 
+ class EmbeddingData(BaseModel):
+
+
+=== DIFF: mlx-server/server.py ===
+@@ -1,6 +1,6 @@
+ """MLX Server — OpenAI-compatible REST API for local embedding and chat inference.
+ 
+-Supports text embeddings via mlx-embeddings, multimodal (image+text)
++Supports text embeddings via mlx-embeddings (or mlx-vlm), multimodal (image+text)
+ embeddings via mlx-vlm, and chat completions via mlx-lm.
+ Designed to be called from the xplorertui Rust TUI.
+ 
+@@ -27,9 +27,12 @@ from registry import (
+     DEFAULT_CHAT_MODEL,
+     DEFAULT_MODEL,
+     ChatBackend,
++    EmbedBackend,
+     ModelRegistry,
++    TextEmbedder,
+     mx_to_list,
+ )
++from prompts import apply_task_prompt
+ from schemas import (
+     ChatChoice,
+     ChatChoiceMessage,
+@@ -146,14 +149,15 @@ async def create_embeddings(request: EmbeddingRequest):
+ 
+     try:
+         logger.info("Loading embedding model: %s", model_id)
+-        model, tokenizer = await run_mlx(registry.get_text_model, model_id)
++        embedder = await run_mlx(registry.get_text_model, model_id)
+     except Exception as e:
+         logger.error("Failed to load embedding model %s: %s", model_id, e)
+         raise HTTPException(status_code=500, detail=f"Failed to load model: {e}")
+ 
+     try:
+         t0 = time.perf_counter()
+-        embeddings = await run_mlx(_embed_texts, model, tokenizer, request.input)
++        texts = apply_task_prompt(embedder.prompts, request.task, request.input)
++        embeddings = await run_mlx(_embed_texts, embedder, texts)
+         elapsed = time.perf_counter() - t0
+         logger.info(
+             "Embedding complete: %d texts, %.2fs, model=%s",
+@@ -308,8 +312,48 @@ async def chat_completions(request: ChatCompletionRequest):
+     )
+ 
+ 
+-def _embed_texts(model, tokenizer, texts: list[str]) -> list[list[float]]:
+-    """Text embeddings via mlx-embeddings. Runs on the MLX thread."""
++# Texts per forward pass on the mlx-vlm path. A batch is padded to its longest
++# text, so this bounds memory when a request carries many or long texts.
++_EMBED_BATCH_SIZE = 32
++
++
++def _embed_texts(embedder: TextEmbedder, texts: list[str]) -> list[list[float]]:
++    """Text embeddings, one vector per text. Runs on the MLX thread."""
++    if not texts:
++        return []
++    if embedder.backend == EmbedBackend.MLX_VLM:
++        return _embed_texts_mlx_vlm(embedder.model, embedder.tokenizer, texts)
++    return _embed_texts_mlx_embeddings(embedder.model, embedder.tokenizer, texts)
++
++
++def _embed_texts_mlx_vlm(model, tokenizer, texts: list[str]) -> list[list[float]]:
++    """Text embeddings via an mlx-vlm embedding model (e.g. EmbeddingGemma 2).
++
++    The model mean-pools over the attention mask and L2-normalizes, so
++    ``text_embeds`` is ready for cosine similarity.
++    """
++    import mlx.core as mx
++
++    embeddings: list[list[float]] = []
++    for start in range(0, len(texts), _EMBED_BATCH_SIZE):
++        inputs = tokenizer(
++            texts[start : start + _EMBED_BATCH_SIZE],
++            padding=True,
++            truncation=True,
++            return_tensors="np",
++        )
++        output = model(
++            input_ids=mx.array(inputs["input_ids"]),
++            attention_mask=mx.array(inputs["attention_mask"]),
++        )
++        embeddings.extend(mx_to_list(output.text_embeds))
++    return embeddings
++
++
++def _embed_texts_mlx_embeddings(
++    model, tokenizer, texts: list[str]
++) -> list[list[float]]:
++    """Text embeddings via mlx-embeddings."""
+     from mlx_embeddings import generate
+     from mlx_embeddings.models.base import BaseModelOutput
+ 
+
+
+=== DIFF: mlx-server/test_embedding_tasks.py ===
+@@ -0,0 +1,210 @@
++"""Task prompts and the mlx-vlm fallback for text embeddings.
++
++The models are faked; real MLX arrays are used so results pass through the
++server's usual conversion.
++"""
++
++import json
++
++import pytest
++
++mx = pytest.importorskip("mlx.core")
++mlx_embeddings = pytest.importorskip("mlx_embeddings")
++
++import numpy as np  # noqa: E402
++from fastapi.testclient import TestClient  # noqa: E402
++
++import prompts  # noqa: E402
++import registry  # noqa: E402
++import server  # noqa: E402
++from registry import EmbedBackend  # noqa: E402
++from schemas import EmbeddingTask  # noqa: E402
++
++GEMMA_PROMPTS = {
++    "Clustering": "task: clustering | query: ",
++    "SearchQuery": "task: search result | query: ",
++    "Document": "title: none | text: ",
++    "query": "task: search result | query: ",
++    "document": "title: none | text: ",
++}
++QWEN_PROMPTS = {"query": "Instruct: retrieve passages\nQuery:", "document": ""}
++
++
++def write_catalog(directory, catalog):
++    path = directory / prompts.PROMPT_CATALOG_FILE
++    path.write_text(json.dumps({"prompts": catalog}))
++    return path
++
++
++# --- prompt catalog ---------------------------------------------------------
++
++
++def test_catalog_is_read_from_a_local_model_directory(tmp_path):
++    write_catalog(tmp_path, GEMMA_PROMPTS)
++    assert prompts.load_prompt_catalog(str(tmp_path)) == GEMMA_PROMPTS
++
++
++def test_model_without_a_catalog_has_no_prompts(tmp_path):
++    assert prompts.load_prompt_catalog(str(tmp_path)) == {}
++    assert prompts.load_prompt_catalog("not-cached/model") == {}
++
++
++@pytest.mark.parametrize("content", ["not json", "[]", '{"prompts": ["a"]}'])
++def test_malformed_catalog_is_ignored(tmp_path, content):
++    (tmp_path / prompts.PROMPT_CATALOG_FILE).write_text(content)
++    assert prompts.load_prompt_catalog(str(tmp_path)) == {}
++
++
++@pytest.mark.parametrize(
++    ("catalog", "task", "expected"),
++    [
++        (GEMMA_PROMPTS, EmbeddingTask.CLUSTERING, "task: clustering | query: "),
++        (GEMMA_PROMPTS, EmbeddingTask.SEARCH_QUERY, "task: search result | query: "),
++        (GEMMA_PROMPTS, EmbeddingTask.DOCUMENT, "title: none | text: "),
++        # Falls back to the generic name when the specific one is absent.
++        (
++            QWEN_PROMPTS,
++            EmbeddingTask.SEARCH_QUERY,
++            "Instruct: retrieve passages\nQuery:",
++        ),
++        (QWEN_PROMPTS, EmbeddingTask.DOCUMENT, ""),
++        # The model has no prompt for the task.
++        (QWEN_PROMPTS, EmbeddingTask.CLUSTERING, ""),
++        (GEMMA_PROMPTS, EmbeddingTask.CLASSIFICATION, ""),
++        ({}, EmbeddingTask.CLUSTERING, ""),
++        (GEMMA_PROMPTS, None, ""),
++    ],
++)
++def test_task_prompt(catalog, task, expected):
++    assert prompts.task_prompt(catalog, task) == expected
++
++
++def test_every_task_has_prompt_names():
++    assert set(prompts.TASK_PROMPT_NAMES) == set(EmbeddingTask)
++
++
++def test_apply_task_prompt_prepends_without_a_separator():
++    texts = ["rust 1.90 is out", "new M5 chips"]
++    assert prompts.apply_task_prompt(
++        GEMMA_PROMPTS, EmbeddingTask.CLUSTERING, texts
++    ) == [
++        "task: clustering | query: rust 1.90 is out",
++        "task: clustering | query: new M5 chips",
++    ]
++    assert prompts.apply_task_prompt({}, EmbeddingTask.CLUSTERING, texts) == texts
++    assert prompts.apply_task_prompt(GEMMA_PROMPTS, None, texts) == texts
++
++
++# --- registry fallback and the endpoint -------------------------------------
++
++
++class FakeTokenizer:
++    """Records what it was asked to tokenize; one token per character."""
++
++    def __init__(self):
++        self.batches: list[list[str]] = []
++
++    def __call__(self, texts, **kwargs):
++        self.batches.append(list(texts))
++        width = max(len(t) for t in texts)
++        mask = np.array([[1] * len(t) + [0] * (width - len(t)) for t in texts])
++        return {"input_ids": mask.copy(), "attention_mask": mask}
++
++    @property
++    def seen(self) -> list[str]:
++        return [text for batch in self.batches for text in batch]
++
++
++class FakeVlmModel:
++    """Embeds each text as [its length, 1], so order is checkable."""
++
++    def __call__(self, input_ids, attention_mask):
++        lengths = attention_mask.sum(axis=-1, keepdims=True).astype(mx.float32)
++        embeds = mx.concatenate([lengths, mx.ones_like(lengths)], axis=-1)
++        return type("Output", (), {"text_embeds": embeds})()
++
++
++@pytest.fixture
++def vlm_embedder(monkeypatch, tmp_path):
++    """A model mlx-embeddings rejects, served by a fake mlx-vlm loader."""
++    write_catalog(tmp_path, GEMMA_PROMPTS)
++    tokenizer = FakeTokenizer()
++    vlm_loads = []
++
++    def unsupported(model_id, **kwargs):
++        raise ValueError("Model type embedding_gemma2 not supported.")
++
++    def load_vlm(model_id):
++        vlm_loads.append(model_id)
++        return FakeVlmModel(), tokenizer
++
++    monkeypatch.setattr(server.registry, "default_model", None)
++    monkeypatch.setattr(mlx_embeddings, "load", unsupported)
++    monkeypatch.setattr(registry, "_load_text_embedder_mlx_vlm", load_vlm)
++    return {"model_id": str(tmp_path), "tokenizer": tokenizer, "loads": vlm_loads}
++
++
++def embed(client, model_id, texts, **extra):
++    return client.post(
++        "/v1/embeddings", json={"model": model_id, "input": texts, **extra}
++    )
++
++
++def test_unsupported_architecture_falls_back_to_mlx_vlm(vlm_embedder):
++    model_id = vlm_embedder["model_id"]
++    with TestClient(server.app) as client:
++        first = embed(client, model_id, ["ab", "abcd"])
++        second = embed(client, model_id, ["a"])
++        embedder = server.registry._text_models[model_id]
++        assert embedder.backend == EmbedBackend.MLX_VLM
++        assert embedder.prompts == GEMMA_PROMPTS
++    assert first.status_code == 200, first.json()
++    assert [d["embedding"] for d in first.json()["data"]] == [[2.0, 1.0], [4.0, 1.0]]
++    assert second.status_code == 200, second.json()
++    assert vlm_embedder["loads"] == [model_id]  # cached after the first request
++
++
++@pytest.mark.parametrize(
++    ("task", "prefix"),
++    [
++        ("clustering", "task: clustering | query: "),
++        ("search_query", "task: search result | query: "),
++        ("document", "title: none | text: "),
++        ("classification", ""),  # not in this model's catalog
++        (None, ""),
++    ],
++)
++def test_task_selects_the_prompt_from_the_model_catalog(vlm_embedder, task, prefix):
++    extra = {} if task is None else {"task": task}
++    with TestClient(server.app) as client:
++        response = embed(client, vlm_embedder["model_id"], ["hello"], **extra)
++    assert response.status_code == 200, response.json()
++    assert vlm_embedder["tokenizer"].seen == [prefix + "hello"]
++
++
++def test_unknown_task_is_rejected(vlm_embedder):
++    with TestClient(server.app) as client:
++        response = embed(client, vlm_embedder["model_id"], ["hello"], task="poetry")
++    assert response.status_code == 422
++
++
++def test_large_requests_are_batched_in_input_order(vlm_embedder):
++    texts = ["x" * (i + 1) for i in range(server._EMBED_BATCH_SIZE * 2 + 3)]
++    with TestClient(server.app) as client:
++        response = embed(client, vlm_embedder["model_id"], texts)
++    assert response.status_code == 200, response.json()
++    assert [d["embedding"][0] for d in response.json()["data"]] == [
++        float(len(t)) for t in texts
++    ]
++    assert [len(b) for b in vlm_embedder["tokenizer"].batches] == [
++        server._EMBED_BATCH_SIZE,
++        server._EMBED_BATCH_SIZE,
++        3,
++    ]
++
++
++def test_empty_input_returns_no_embeddings(vlm_embedder):
++    with TestClient(server.app) as client:
++        response = embed(client, vlm_embedder["model_id"], [])
++    assert response.status_code == 200, response.json()
++    assert response.json()["data"] == []
+
+
+=== DIFF: src/app/dispatch.rs ===
+@@ -3,7 +3,7 @@ use std::sync::Arc;
+ use super::{App, ClusterSource};
+ use crate::api::types::{Includes, Tweet, User};
+ use crate::event::{ApiResult, AppEvent, Event, ViewKind};
+-use crate::mlx::client::MlxClient;
++use crate::mlx::client::{EmbedTask, MlxClient};
+ use crate::openrouter;
+ use crate::openrouter::client::OpenRouterClient;
+ use crate::openrouter::types::{EmbeddingResponse, Model};
+@@ -53,32 +53,14 @@ impl App {
+ 
+         tokio::spawn(async move {
+             let result = async {
+-                // Build texts: query + all tweet texts
+-                let mut texts: Vec<String> = vec![query_clone.clone()];
+-                texts.extend(tweets.iter().map(|t| t.text.clone()));
+-
+-                let resp = provider.embed(&model, &texts).await?;
+-
+-                if resp.data.len() != texts.len() {
+-                    return Err(Arc::new(format!(
+-                        "Expected {} embeddings, got {}",
+-                        texts.len(),
+-                        resp.data.len()
+-                    )));
+-                }
+-
+-                // First embedding is the query, rest are tweets.
+-                let mut sorted_data: Vec<_> = resp.data;
+-                sorted_data.sort_by_key(|d| d.index);
+-                let query_emb = &sorted_data[0].embedding;
+-                let tweet_embs: Vec<(usize, Vec<f64>)> = sorted_data[1..]
+-                    .iter()
+-                    .enumerate()
+-                    .map(|(i, d)| (i, d.embedding.clone()))
+-                    .collect();
++                let texts: Vec<String> = tweets.iter().map(|t| t.text.clone()).collect();
++                let (query_emb, doc_embs) = provider
++                    .embed_query_and_documents(&model, &query_clone, &texts)
++                    .await?;
++                let tweet_embs: Vec<(usize, Vec<f64>)> = doc_embs.into_iter().enumerate().collect();
+ 
+                 let ranked =
+-                    crate::embeddings::similarity::rank_by_similarity(query_emb, &tweet_embs);
++                    crate::embeddings::similarity::rank_by_similarity(&query_emb, &tweet_embs);
+ 
+                 let result: Vec<(Tweet, f64)> = ranked
+                     .into_iter()
+@@ -176,12 +158,9 @@ impl App {
+                 let author_ids: Vec<Option<String>> =
+                     tweets.iter().map(|t| t.author_id.clone()).collect();
+ 
+-                let resp = provider.embed(&model, &texts).await?;
+-
+-                let mut sorted_data: Vec<_> = resp.data;
+-                sorted_data.sort_by_key(|d| d.index);
+-                let embeddings: Vec<Vec<f64>> =
+-                    sorted_data.into_iter().map(|d| d.embedding).collect();
++                let embeddings = provider
++                    .embed(&model, &texts, EmbedTask::Clustering)
++                    .await?;
+ 
+                 let k = 5.min(tweets.len());
+                 let cluster_result = crate::embeddings::cluster::build_cluster_result(
+@@ -749,18 +728,74 @@ enum EmbedProvider {
+ }
+ 
+ impl EmbedProvider {
+-    async fn embed(&self, model: &str, texts: &[String]) -> Result<EmbeddingResponse, Arc<String>> {
+-        match self {
++    /// Embed `texts` for `task`, returning one vector per text in input order.
++    ///
++    /// Only the MLX server takes a task; OpenRouter embeds the text as given.
++    async fn embed(
++        &self,
++        model: &str,
++        texts: &[String],
++        task: EmbedTask,
++    ) -> Result<Vec<Vec<f64>>, Arc<String>> {
++        let resp = match self {
+             Self::OpenRouter(client) => client
+                 .embed(model, texts)
+                 .await
+                 .map_err(|e| Arc::new(e.to_string())),
+             Self::Mlx(client) => client
+-                .embed(model, texts)
++                .embed(model, texts, task)
+                 .await
+                 .map_err(|e| Arc::new(e.to_string())),
+-        }
++        }?;
++        ordered_embeddings(resp, texts.len())
++    }
++
++    /// Embed a search query and the documents to score against it.
++    ///
++    /// Queries and documents take different task prompts, so the MLX server
++    /// gets one request for each. OpenRouter has no task prompts and takes
++    /// both in a single batch.
++    async fn embed_query_and_documents(
++        &self,
++        model: &str,
++        query: &str,
++        documents: &[String],
++    ) -> Result<(Vec<f64>, Vec<Vec<f64>>), Arc<String>> {
++        let query = [query.to_string()];
++        let (mut query_embs, doc_embs) = match self {
++            Self::Mlx(_) => tokio::try_join!(
++                self.embed(model, &query, EmbedTask::SearchQuery),
++                self.embed(model, documents, EmbedTask::Document),
++            )?,
++            Self::OpenRouter(_) => {
++                let texts: Vec<String> = query.iter().chain(documents).cloned().collect();
++                let mut embs = self.embed(model, &texts, EmbedTask::Document).await?;
++                let doc_embs = embs.split_off(1);
++                (embs, doc_embs)
++            }
++        };
++        let query_emb = query_embs
++            .pop()
++            .ok_or_else(|| Arc::new("No embedding returned for the query".to_string()))?;
++        Ok((query_emb, doc_embs))
++    }
++}
++
++/// Unpack an embedding response into vectors in input order, checking that
++/// the provider returned one per input.
++fn ordered_embeddings(
++    resp: EmbeddingResponse,
++    expected: usize,
++) -> Result<Vec<Vec<f64>>, Arc<String>> {
++    if resp.data.len() != expected {
++        return Err(Arc::new(format!(
++            "Expected {expected} embeddings, got {}",
++            resp.data.len()
++        )));
+     }
++    let mut data = resp.data;
++    data.sort_by_key(|d| d.index);
++    Ok(data.into_iter().map(|d| d.embedding).collect())
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -1029,6 +1064,38 @@ pub(crate) fn parse_cluster_topic_labels(content: &str, num_clusters: usize) ->
+ mod tests {
+     use super::*;
+ 
++    fn embedding_response(data: &[(usize, f64)]) -> EmbeddingResponse {
++        let data: Vec<_> = data
++            .iter()
++            .map(|(index, value)| serde_json::json!({"index": index, "embedding": [value]}))
++            .collect();
++        serde_json::from_value(serde_json::json!({"model": "m", "data": data})).unwrap()
++    }
++
++    #[test]
++    fn ordered_embeddings_sorts_by_index() {
++        let resp = embedding_response(&[(2, 2.0), (0, 0.0), (1, 1.0)]);
++        assert_eq!(
++            ordered_embeddings(resp, 3).unwrap(),
++            vec![vec![0.0], vec![1.0], vec![2.0]]
++        );
++    }
++
++    #[test]
++    fn ordered_embeddings_rejects_a_short_response() {
++        let err = ordered_embeddings(embedding_response(&[(0, 0.0)]), 2).unwrap_err();
++        assert_eq!(*err, "Expected 2 embeddings, got 1");
++    }
++
++    #[test]
++    fn ordered_embeddings_accepts_an_empty_batch() {
++        assert!(
++            ordered_embeddings(embedding_response(&[]), 0)
++                .unwrap()
++                .is_empty()
++        );
++    }
++
+     /// Live check of propose-then-pick against OpenRouter, using the same
+     /// helpers as `dispatch_jev_cluster_topics`. Run with:
+     /// `OPENROUTER_API_KEY=... cargo test propose_live -- --ignored`
+
+
+=== DIFF: src/mlx/client.rs ===
+@@ -15,6 +15,28 @@ pub struct MlxClient {
+     base_url: String,
+ }
+ 
++/// What a batch of embeddings is for. The MLX server maps it to the task
++/// prompt the loaded model expects (e.g. EmbeddingGemma 2's
++/// `task: clustering | query: `); models without task prompts ignore it.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
++#[serde(rename_all = "snake_case")]
++pub enum EmbedTask {
++    /// Texts that will be grouped by similarity.
++    Clustering,
++    /// A search query, scored against `Document` embeddings.
++    SearchQuery,
++    /// A text that search queries are scored against.
++    Document,
++}
++
++/// Request body for the text embedding endpoint.
++#[derive(Debug, Serialize)]
++struct TextEmbeddingRequest<'a> {
++    model: &'a str,
++    input: &'a [String],
++    task: EmbedTask,
++}
++
+ /// Request body for the multimodal embedding endpoint.
+ #[derive(Debug, Serialize)]
+ pub struct MultimodalEmbeddingRequest {
+@@ -61,11 +83,13 @@ impl MlxClient {
+         &self,
+         model: &str,
+         texts: &[String],
++        task: EmbedTask,
+     ) -> Result<EmbeddingResponse, MlxError> {
+         let url = format!("{}/v1/embeddings", self.base_url);
+-        let request = crate::openrouter::types::EmbeddingRequest {
+-            model: model.to_string(),
+-            input: texts.to_vec(),
++        let request = TextEmbeddingRequest {
++            model,
++            input: texts,
++            task,
+         };
+         let resp = self.http.post(&url).json(&request).send().await?;
+         self.handle_response(resp).await
+@@ -124,3 +148,28 @@ impl MlxClient {
+         Ok(resp.json().await?)
+     }
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn embedding_request_names_the_task_in_snake_case() {
++        let input = vec!["hello".to_string()];
++        for (task, name) in [
++            (EmbedTask::Clustering, "clustering"),
++            (EmbedTask::SearchQuery, "search_query"),
++            (EmbedTask::Document, "document"),
++        ] {
++            let request = TextEmbeddingRequest {
++                model: "some/model",
++                input: &input,
++                task,
++            };
++            assert_eq!(
++                serde_json::to_value(&request).unwrap(),
++                serde_json::json!({"model": "some/model", "input": ["hello"], "task": name}),
++            );
++        }
++    }
++}
+
+
+Investigate per the method in your instructions, then return the findings list.
