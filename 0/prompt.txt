@@ -1,0 +1,14 @@
+To continue with has been merged from PR #93, there are these gaps mentioned in the previous session
+
+```
+Three known gaps are still open if you want follow-ups:
+- **Local MLX models can still run out of tokens.** The MLX server ignores the setting that turns reasoning off, so a local model that thinks before answering can use up the label budget.
+- **Chat requests aren't retried after a dropped connection.** Only Jev requests are.
+- **The loading hint can name the wrong labeller.** While `:topics` runs, it shows the path it expects to take, not the one that actually runs.
+
+```
+Why does MLX server ignores that setting? I have it running on this machine
+
+What's the reason for retrying Jev but not the Chat requests (regardless of whether it's from MLX, huggingface, or openrouter)
+
+Would it be possible that what's running is different than the expected labeller?
