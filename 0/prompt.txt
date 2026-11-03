@@ -1,0 +1,2 @@
+4. [2.5] After the photo embeddings, what does k-means run on?  _(kept as proposed)_
+   → **All posts, once, with the same k** `all`
