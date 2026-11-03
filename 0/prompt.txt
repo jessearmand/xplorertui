@@ -1,0 +1,3 @@
+Split the commits from fnox and README changes to the same branch claude/jev-api-openrouter-1fe5tq
+
+Any README that's related to jev changes should be together, but pure fnox and credentials setup should be separate commit
