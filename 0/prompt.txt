@@ -1,0 +1,1 @@
+For the llama-server we only need to test gemma 4 12B
