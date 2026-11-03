@@ -1,0 +1,7 @@
+Yes, update AGENTS.md, I can use the OAuth instead for the rest of the secrets
+
+Then a few user interface improvements:
+- We need a larger status bar because when an error occurs, the text will not fit the one line bar at the bottom. Is there a shortcut or key bind to expand the status message?
+- Alternatively when a message doesn't fit one line in the status bar, an alert message should be shown instead
+
+- When no embedding models are selected, clustering fails with an unclear error message, where it says MLX server or OpenRouter fallback is not set. It should offer to select an embedding model. Is there an prompt UI in ratatui? Similar to how error is shown in the clustering view
