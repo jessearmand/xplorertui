@@ -1,0 +1,8 @@
+1. I ran it inside a herdr pane, but I just tested both, on ghostty directly, and inside herdr, it shows the text now
+2. It says Kitty
+
+I have `fnox exec -- cargo run` open on another ghostty tab, outside herdr
+
+Yes, let's fix the bug when opening a thread from a search. Hmm so what was the problem with the image?
+
+The image shows after I open the particular post from a search "Counterfactual Invariance"
