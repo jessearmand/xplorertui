@@ -1,0 +1,9 @@
+Here is a note offered by a side agent:
+
+> You should know · Photo embeddings only help clustering if they come from the same model as the text embeddings, because vectors from different models can't be compared.
+>
+> **Photo and text embeddings need one model**
+> * An **embedding** turns a post into a list of numbers. Clustering groups posts whose numbers are close together.
+> * Each model has its own number space. Numbers from **EmbeddingGemma 2** and from **gemini-embedding-2** don't line up, so comparing a photo vector from one with a text vector from the other gives meaningless clusters.
+> * So the photo model must be **whichever model embedded the text**: EmbeddingGemma 2 when the local MLX server is used, gemini-embedding-2 only if that same model also embedded the text.
+> * The local server's current image endpoint returns the text and the photo as **separate vectors**, not one vector per post. That likely needs changing before photo-heavy clusters can be re-clustered.
