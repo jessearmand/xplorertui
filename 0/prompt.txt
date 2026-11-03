@@ -1,0 +1,8 @@
+Review @mlx-server/ embedding model setup, and how should it be configured to run google/embeddinggemma-2
+By default it still downloads the default embedding model (Qwen) despite having the ~/.config/xplorertui/config.toml already configured
+
+References:
+https://github.com/google-gemma/cookbook/blob/main/docs/embeddinggemma/multimodal-embeddinggemma-with-sentence-transformers.ipynb
+https://github.com/google-gemma/cookbook/blob/main/docs/embeddinggemma/inference-embeddinggemma-with-sentence-transformers.ipynb
+
+https://huggingface.co/google/embeddinggemma-2
