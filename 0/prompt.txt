@@ -1,0 +1,1 @@
+I've refreshed the authentication, how are you planning to fix the bold text wraps early?
