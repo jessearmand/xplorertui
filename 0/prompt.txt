@@ -1,0 +1,1 @@
+Review @src/ui/help.rs and currently the command description could overflow beyond the boundary of the popup view, how to make it into multi-line? If this is supported adjust so the help view popup can be displayed in a multiline format for longer description text
