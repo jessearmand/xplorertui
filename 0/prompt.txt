@@ -1,0 +1,1 @@
+Update the artifact to dark theme, because it's not compatible when my browser is using dark theme
