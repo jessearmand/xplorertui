@@ -1,0 +1,1 @@
+We can resolve the hint, and the MLX budget headroom, I've loaded the gemma model
