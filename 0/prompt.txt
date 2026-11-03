@@ -1,0 +1,1 @@
+What would be good is to suggest to save the chat provider once it's reachable, and save it to the main configuration as chat_provider
