@@ -1,0 +1,2 @@
+Yes split the commits per area, I've updated the main config to jev-1.14
+I removed the chat model as well, to use the default
