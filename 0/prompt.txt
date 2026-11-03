@@ -1,0 +1,3 @@
+<bash-input>git worktree remove --force /private/tmp/claude-501/-Users-jessearmand-Develop-xdevplatform-xplorertui/7d7dc975-88c8-4710-ac29-87511a8bbad7/scratchpad/pr103 && git branch -D pr-103</bash-input><bash-stdout>Deleted branch pr-103 (was 8be1cec).
+
+~/Develop/xdevplatform/xplorertui feat/llama-cpp-server                04:55:49</bash-stdout><bash-stderr></bash-stderr>
