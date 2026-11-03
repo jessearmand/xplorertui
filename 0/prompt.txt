@@ -1,0 +1,4 @@
+Review PR #103 to test the dependencies with embeddinggemma2 and I have a few GGUF weights 
+list them with `hf cache list`
+
+Can we also support llama.cpp as a server, in addition to mlx? Create a new branch for this
