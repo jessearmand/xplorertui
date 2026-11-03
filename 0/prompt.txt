@@ -1,0 +1,1 @@
+Does the MLX startup probe related to chat and embedding requests, or this is a probe before any request is made?
