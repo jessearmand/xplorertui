@@ -1,0 +1,80 @@
+Update README.md to use fnox for anything that requires credentials passing, instead of using the classic `.env` although, it's supported in general
+
+To continue from ~/Develop/xdevplatform/xplorertui/docs/jev-design.md with jev API integration, I have ran the TUI, but jev has not been setup. Previous context is the following:
+
+```
+The previous session left a design note. Let me read it.
+
+Previous session produced a design note; section 7's open questions are the OpenRouter-only steps. Let me probe the Decisions API live first.
+
+Live and working. Note `score` also returns a `legend` and index-keyed probabilities. Now the open questions: billing vs. question count, per-element addressing in array state, and latency.
+
+Strong results. Batching looks promising — let me stress it harder (more posts, confusable topics) before trusting it for design.
+
+Batching many posts into one request breaks down accuracy fast, while one post per request scored 22/22 — so I'll design around one request per post (small batches at most). Next I'll check the existing OpenRouter client before implementing the decisions module.
+
+Let me check the existing CLI and the `:topics` dispatch path to scope the integration.
+
+Before wiring A-i into the TUI, a quick live check of the cluster-labelling shape (one request per cluster, `choice` + `coherent`), including a deliberately mixed cluster:
+
+I found that the `coherent` field is poorly calibrated (a clean sports cluster only scored 0.26), while `choice`'s `other` value already captures mixed clusters well. I'll drop `coherent` and rely on `other`/low confidence for "mixed" instead, then move on to the Rust module.
+
+Now the client accessor, module registration, and config.
+
+The build is clean. Next I'll test the CLI's `classify` and `rank` commands, which read tweet JSONL from stdin so they can be piped from `home`/`search` and tested without hitting X directly.
+
+That tail got messy (error items reordered in `classify`, a bogus stats line). Let me rewrite the loop cleanly.
+
+Errored rows would still sink to the bottom in `classify`. Small fix:
+
+End-to-end through the Rust client works, and the ranking looks right (the promo post drops out because its `substantive` score is 0.03). Now the TUI `:topics` path (A-i).
+
+Builds. I'll add an `#[ignore]`d live test that exercises the same cluster-labelling path the TUI uses, then run the full check suite.
+
+Everything checks out: clippy is clean, all 71 unit tests pass, and the live cluster-label test succeeds in 0.9s for 3 clusters. Next I'll update the docs—answering section 7, fixing the design corrections, and adding the new commands.
+
+The two doc warnings (`RT`, `Reply`) are in existing code, not mine. Updating the README and the design note:
+
+README hints that `denormalize_tweet` nests the text under `.tweet.text`. My stdin reader expects a top-level `text`, so let me check.
+
+Good catch — the real output is `{"tweet": {"text": ...}, "author", "media"}`. I'll accept both shapes (`tweet.text` first, then top-level `text`) and add a unit test for it.
+
+Both shapes work (the interleaved "jev:" line is just stderr mixing with `head`). Now the README and design doc.
+
+Now the design note: its status, corrections to the design, and answers to section 7.
+
+The checks are clean. AGENTS.md says to run `bend PROOF.bend` before committing, so let me check whether it applies here.
+
+The Bend proofs only pertain to the dependency security policy, and since no dependencies changed and bend isn't installed here, they don't apply to this commit. I'll proceed with committing, excluding the scratchpad.
+
+I picked up from the last session's design note (`docs/jev-design.md`) and did everything that only needs OpenRouter. The Jev client works end to end, the `:topics` swap is in, and there are two new CLI commands. It's all pushed to `claude/jev-api-openrouter-1fe5tq`. No PR yet.
+
+**What the live tests changed in the design**
+- **Billing:** you pay for the post text once per request, however many questions you ask. Going from 1 to 7 questions only added 73 input tokens, so asking for tags alongside the topic is nearly free.
+- **Batching doesn't work at scale.** Packing many tweets into one request and asking about each one by position breaks down quickly:
+
+  | Tweets per request | Accuracy |
+  |---|---|
+  | 8 | 8/8 |
+  | 22 | 19/22 |
+  | 44 | 28/44 |
+  | 88 | 33/88 |
+
+  Past about 20, even identical tweets got different labels. Sent one per request, they scored 22/22. So the code sends one tweet per request. Cost barely matters here: about $0.00003 per tweet.
+- **Speed:** 32 requests with 8 at a time took 2.8 s in total. A typical request took 0.5 s and the slowest 0.96 s, with no rate-limit errors.
+- **I dropped the `coherent` question.** It gives bad numbers: a clean sports cluster scored 0.26. The topic answer handles this better on its own: a deliberately mixed cluster picked `other` with 0.84 confidence. Clusters where the answer is `other`, or confidence is below 0.5, now show as **"Mixed"**.
+
+**What I built**
+- **`src/openrouter/decisions.rs`:** the client for Jev's decision questions. It retries on rate limits and server errors, runs several requests at once while keeping results in order, and includes a default topic list (based on the TweetTopic set, with tech split into finer topics, plus `other`).
+- **A `[jev]` section in `config.toml`:** when it's present and OpenRouter is signed in, `:topics` (and the automatic labelling after `:cluster`) sends one Jev request per cluster instead of asking a chat model to write labels. You can get labels like "AI · Software engineering".
+- **Two CLI commands that read tweets from stdin**, so they chain onto `home` and `search` and need no X credentials:
+  - `xplorertui search "rust async" | xplorertui rank "rust async runtimes"` re-sorts results by relevance. In a quick test, a "BUY NOW Rust course" post dropped to near zero because Jev judged it not substantive.
+  - `xplorertui home | xplorertui classify` tags each tweet with a topic plus `is_question`, `is_news` and `is_promo`.
+
+  I caught one bug before committing: the real output of `home`/`search` puts the text under `tweet.text`, not at the top level. Both shapes are accepted now.
+- **Docs:** section 8 of the design note records these measurements, and the README and AGENTS.md cover the new commands and config.
+
+**Checks:** formatting and clippy are clean, and all 72 tests pass. There's also a live test you can run with `cargo test jev_live -- --ignored`; it passed here. I didn't run `bend PROOF.bend`: the Bend proofs only cover the dependency security policy, no dependencies changed, and `bend` isn't installed in this environment.
+
+**Waiting on X API testing:** checking accuracy on your real timelines, and trying X's own topic annotations (`context_annotations`) as the topic list. Still to build: the Jev re-ranker inside the TUI search view, a `:classify` view, and showing cost in the status bar.
+```
