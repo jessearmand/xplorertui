@@ -1,0 +1,5 @@
+Research ratatui repository or the local dependencies, and examine what’s the support of rendering an image with the tui, and which terminal supports it
+
+The purpose is to be able to include images or thumbnails from a post to be classified together with Jev’s latest model version which has become multimodal. Image rendering quality can be optimized for TUI display 
+
+Review Jev’s API on official typesafe.ai doc and openrouter
