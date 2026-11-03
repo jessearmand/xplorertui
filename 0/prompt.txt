@@ -1,0 +1,13 @@
+Here is a note offered by a side agent:
+
+> Heads up · The MLX budget fix is being built as a second request with a bigger budget, even though you said no chat retries.
+>
+> **MLX headroom works by asking twice**
+> You said chat needs no retries. The main agent read that as "no retries for dropped connections" and is still planning one kind of repeat for MLX:
+> * If a local model spends its token budget on thinking and the answer is cut off, the app sends the same request again with 2,048 extra tokens.
+> * The first run is thrown away, so `:topics` takes longer on such a model.
+> * Both of your models (Gemma and the small Qwen) switch thinking off correctly, so this should not trigger for you today.
+> * In a forced test, the small Qwen still never finished thinking with the extra room.
+> The alternative is letting the server give thinking extra room in one run. **Say so in the main session if you prefer that.**
+
+Once this is resolved, create a new branch, and push and create a PR to main
