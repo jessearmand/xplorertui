@@ -1,0 +1,14 @@
+Here is a note offered by a side agent:
+
+> Heads up · The one-run fix changes what `max_tokens` means on your MLX server, so a model that never stops thinking can run far longer.
+>
+> **MLX `max_tokens` now caps only the answer**
+> The main agent is replacing the second request with a single run on the server (`mlx-server/server.py`).
+> * **Before:** `max_tokens` capped everything the model generated, thinking included.
+> * **Now:** it caps only the answer. Thinking gets up to **2,048 extra tokens** in the same run (`THINKING_HEADROOM_TOKENS`).
+> * **Unaffected:** models that switch thinking off, like your Gemma and small Qwen. They stop at the same point as before.
+> * **Cost:** a model that never stops thinking now runs to the full cap before failing. In the forced test, the small Qwen did exactly that.
+> * **Side effect:** any other client of this server gets the new meaning too.
+> **Restart the server on port 8678** to pick this up.
+
+We can restart the currently running server
