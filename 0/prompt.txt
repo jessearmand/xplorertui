@@ -1,0 +1,1 @@
+Check CI status on PR #53 (combined deps bump). If all required checks pass, report status to the user and ask whether to merge. If anything fails, investigate the failure.
